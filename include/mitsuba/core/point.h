@@ -804,6 +804,212 @@ template <> inline TPoint4<int> &TPoint4<int>::operator/=(int s) {
 	return *this;
 }
 
+/**
+ * \headerfile mitsuba/core/point.h mitsuba/mitsuba.h
+ * \brief Parameterizable four-dimensional point data structure
+ * \ingroup libcore
+ */
+template <typename T> struct TPoint6 {
+	typedef T           Scalar;
+	typedef TVector6<T> VectorType;
+
+	T x, y, z, w, s, t;
+
+	/// Number of dimensions
+	const static int dim = 6;
+
+	/** \brief Construct a new point without initializing it.
+	 *
+	 * This construtor is useful when the point will either not
+	 * be used at all (it might be part of a larger data structure)
+	 * or initialized at a later point in time. Always make sure
+	 * that one of the two is the case! Otherwise your program will do
+	 * computations involving uninitialized memory, which will probably
+	 * lead to a difficult-to-find bug.
+	 */
+#if !defined(MTS_DEBUG_UNINITIALIZED)
+	TPoint6() { }
+#else
+	TPoint6() { x = y = z = w = s = t = std::numeric_limits<T>::quiet_NaN(); }
+#endif
+
+	/// Initialize the point with the specified X, Y and Z components
+	TPoint6(T x, T y, T z, T w, T s, T t) : x(x), y(y), z(z), w(w), s(s), t(t) {  }
+
+	/// Initialize the point with the components of another two points
+	template <typename T2> explicit TPoint6(const TPoint3<T2> &p, const TPoint3<T2> &q)
+		: x((T) p.x), y((T) p.y), z((T) p.z), w((T) q.x), s((T) q.y), t((T) q.z) { }
+
+	/// Initialize the point with the components of a point data structure
+	template <typename T2> explicit TPoint6(const TPoint6<T2> &p)
+		: x((T) p.x), y((T) p.y), z((T) p.z), w((T) p.w), s((T) p.s), t((T) p.t) { }
+
+	/// Initialize the point with the components of a vector data structure
+	template <typename T2> explicit TPoint6(const TVector6<T2> &v)
+		: x((T) v.x), y((T) v.y), z((T) v.z), w((T) v.w), s((T) v.s), t((T) v.t) { }
+
+	/// Initialize all components of the the point with the specified value
+	explicit TPoint6(T val) : x(val), y(val), z(val), w(val), s(val), t(val) { }
+
+	/// Unserialize a point from a binary data stream
+	explicit TPoint6(Stream *stream) {
+		x = stream->readElement<T>();
+		y = stream->readElement<T>();
+		z = stream->readElement<T>();
+		w = stream->readElement<T>();
+		s = stream->readElement<T>();
+		t = stream->readElement<T>();
+	}
+
+	TPoint6 operator+(const TVector6<T>& v) const {
+		return TPoint6(x + v.x, y + v.y, z + v.z, w + v.w, s + v.s, t + v.t);
+	}
+
+	/// Add two points and return the result (e.g. to compute a weighted position)
+	TPoint6 operator+(const TPoint6 &p) const {
+		return TPoint6(x + p.x, y + p.y, z + p.z, w + p.w, s + p.s, t + p.t);
+	}
+
+	TPoint6& operator+=(const TVector6<T>& v) {
+		x += v.x; y += v.y; z += v.z; w += v.w; s += v.s; t += v.t;
+		return *this;
+	}
+
+	/// Add a point to this one (e.g. to compute a weighted position)
+	TPoint6& operator+=(const TPoint6 &p) {
+		x += p.x; y += p.y; z += p.z; w += p.w; s += p.s; t += p.t;
+		return *this;
+	}
+
+	TPoint6 operator-(const TVector6<T>& v) const {
+		return TPoint6(x - v.x, y - v.y, z - v.z, w - v.w, s - v.s, t - v.t);
+	} 
+
+	/// Subtract two points from each other and return the difference as a vector
+	TVector6<T> operator-(const TPoint6 &p) const {
+		return TVector6<T>(x - p.x, y - p.y, z - p.z, w - p.w, s - p.s, t - p.t);
+	}
+
+	TPoint6& operator-=(const TVector6<T>& v) {
+		x -= v.x; y -= v.y; z -= v.z; w -= v.w; s -= v.s; t -= v.t;
+		return *this;
+	}
+
+	/// Scale the point's coordinates by the given scalar and return the result
+	TPoint6 operator*(T f) const {
+		return TPoint6(x * f, y * f, z * f, w * f, s * f, t * f);
+	}
+
+	/// Scale the point's coordinates by the given scalar
+	TPoint6 &operator*=(T f) {
+		x *= f; y *= f; z *= f; w *= f; s *= f; t *= f;
+		return *this;
+	}
+
+	/// Return a version of the point, which has been flipped along the origin
+	TPoint6 operator-() const {
+		return TPoint6(-x, -y, -z, -w, -s, -t);
+	}
+
+	/// Divide the point's coordinates by the given scalar and return the result
+	TPoint6 operator/(T f) const {
+#ifdef MTS_DEBUG
+		if (f == 0)
+			SLog(EWarn, "Point6: Division by zero!");
+#endif
+		T recip = (T) 1 / f;
+		return TPoint6(x * recip, y * recip, z * recip, w * recip, s * recip, t * recip);
+	}
+
+	/// Divide the point's coordinates by the given scalar
+	TPoint6 &operator/=(T f) {
+#ifdef MTS_DEBUG
+		if (f == 0)
+			SLog(EWarn, "Point6: Division by zero!");
+#endif
+		T recip = (T) 1 / f;
+		x *= recip; y *= recip; z *= recip; w *= recip; s *= recip; t *= recip;
+		return *this;
+	}
+
+	/// Index into the point's components
+	T &operator[](int i) {
+		return (&x)[i];
+	}
+
+	/// Index into the point's components (const version)
+	T operator[](int i) const {
+		return (&x)[i];
+	}
+
+	/// Return whether or not this point is identically zero
+	bool isZero() const {
+		return x == 0 && y == 0 && z == 0 && w == 0 && s == 0 && t == 0;
+	}
+
+	/// Equality test
+	bool operator==(const TPoint6 &v) const {
+		return (v.x == x && v.y == y && v.z == z && v.w == w && v.s == s && v.t == t);
+	}
+
+	/// Inequality test
+	bool operator!=(const TPoint6 &v) const {
+		return v.x != x || v.y != y || v.z != z || v.w != w || v.s != s || v.t != t;
+	}
+
+	/// Serialize this point to a binary data stream
+	void serialize(Stream *stream) const {
+		stream->writeElement<T>(x);
+		stream->writeElement<T>(y);
+		stream->writeElement<T>(z);
+		stream->writeElement<T>(w);
+		stream->writeElement<T>(s);
+		stream->writeElement<T>(t);
+	}
+
+	/// Return a readable string representation of this point
+	std::string toString() const {
+		std::ostringstream oss;
+		oss << "[" << x << ", " << y << ", " << z << ", " << w << ", " << s << ", " << t "]";
+		return oss.str();
+	}
+};
+
+template <typename T> inline TPoint6<T> operator*(T f, const TPoint6<T> &v) {
+	return v*f;
+}
+
+template <typename T> inline T distance(const TPoint6<T> &p1, const TPoint6<T> &p2) {
+	return (p1-p2).length();
+}
+
+template <typename T> inline T distanceSquared(const TPoint6<T> &p1, const TPoint6<T> &p2) {
+	return (p1-p2).lengthSquared();
+}
+
+template <> inline TPoint6<int> TPoint6<int>::operator/(int a) const {
+#ifdef MTS_DEBUG
+	if (a == 0)
+		SLog(EWarn, "Point6i: Division by zero!");
+#endif
+	return TPoint6(x/a, y/a, z/a, w/a, s/a, t/a);
+}
+
+template <> inline TPoint6<int> &TPoint6<int>::operator/=(int a) {
+#ifdef MTS_DEBUG
+	if (a == 0)
+		SLog(EWarn, "Point6i: Division by zero!");
+#endif
+
+	x /= a;
+	y /= a;
+	z /= a;
+	w /= a;
+	s /= a;
+	t /= a;
+	return *this;
+}
+
 MTS_NAMESPACE_END
 
 #endif /* __MITSUBA_CORE_POINT_H_ */

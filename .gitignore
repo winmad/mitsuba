@@ -1,6 +1,9 @@
 *.obj
 *.opensdf
 scenes/
+results/
+render.py
+dependencies_macos/
 
 # Documentation
 doc/apidocs/*

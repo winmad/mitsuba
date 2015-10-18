@@ -20,6 +20,9 @@ plugins += env.SharedLibrary('multichannel', ['misc/multichannel.cpp'])
 plugins += env.SharedLibrary('field', ['misc/field.cpp'])
 plugins += env.SharedLibrary('motion', ['misc/motion.cpp'])
 
+# Lightcuts
+plugins += env.SharedLibrary('lightcuts', ['lightcuts/lightcuts.cpp'])
+
 # Bidirectional techniques
 bidirEnv = env.Clone()
 bidirEnv.Append(LIBS=['mitsuba-bidir'])

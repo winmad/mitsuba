@@ -21,6 +21,9 @@
 #define __MITSUBA_CORE_AABB_H_
 
 #include <mitsuba/core/bsphere.h>
+#define EIGEN_DONT_PARALLELIZE
+#define EIGEN_NO_DEBUG
+#include <Eigen/Dense>
 
 MTS_NAMESPACE_BEGIN
 
@@ -491,6 +494,43 @@ public:
 
 	/// Create a bounding sphere, which contains the axis-aligned box
 	MTS_EXPORT_CORE BSphere getBSphere() const;
+};
+
+typedef TPoint6<Float> Point6;
+/**
+ * \brief Axis-aligned bounding box data structure in six dimensions
+ *
+ * Maintains a component-wise minimum and maximum position and provides
+ * various convenience functions to query or change them.
+ *
+ * \ingroup libcore
+ * \ingroup libpython
+ */
+struct AABB6 : public TAABB<Point6> {
+public:
+	/**
+	 * \brief Create a new invalid bounding box
+	 *
+	 * Initializes the components of the minimum
+	 * and maximum position to \f$\infty\f$ and \f$-\infty\f$,
+	 * respectively.
+	 */
+	inline AABB6() : TAABB<Point6>() { }
+
+	/// Unserialize a bounding box from a binary data stream
+	inline AABB6(Stream *stream) : TAABB<Point6>(stream) { }
+
+	/// Create a collapsed AABB from a single point
+	inline AABB6(const Point6 &p) : TAABB<Point6>(p) { }
+
+	/// Create a bounding box from two positions
+	inline AABB6(const Point6 &min, const Point6 &max)
+		: TAABB<Point6>(min, max) {
+	}
+
+	/// Construct from a TAABB<Point>
+	inline AABB6(const TAABB<Point6> &aabb)
+		: TAABB<Point6>(aabb) { }
 };
 
 MTS_NAMESPACE_END

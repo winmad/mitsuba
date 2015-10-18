@@ -860,6 +860,212 @@ template <> inline TVector4<int> &TVector4<int>::operator/=(int s) {
 	return *this;
 }
 
+template <typename T> struct TVector6 {
+	typedef T          Scalar;
+	//typedef TPoint6<T> PointType;
+	typedef typename detail::VectorLength<T, std::numeric_limits<T>::is_integer>::type LengthType;
+
+	T x, y, z, w, s, t;
+
+	/// Number of dimensions
+	const static int dim = 6;
+
+	/** \brief Construct a new vector without initializing it.
+	 *
+	 * This construtor is useful when the vector will either not
+	 * be used at all (it might be part of a larger data structure)
+	 * or initialized at a later point in time. Always make sure
+	 * that one of the two is the case! Otherwise your program will do
+	 * computations involving uninitialized memory, which will probably
+	 * lead to a difficult-to-find bug.
+	 */
+#if !defined(MTS_DEBUG_UNINITIALIZED)
+	TVector6() { }
+#else
+	TVector6() { x = y = z = w = s = t = std::numeric_limits<T>::quiet_NaN(); }
+#endif
+	/// Initialize the vector with the specified X, Y and Z components
+	TVector6(T x, T y, T z, T w, T s, T t) : x(x), y(y), z(z), w(w), s(s), t(t) {  }
+
+	/// Initialize all components of the the vector with the specified value
+	explicit TVector6(T val) : x(val), y(val), z(val), w(val), s(val), t(val) { }
+
+	/// Initialize the vector with the components of another vector data structure
+	template <typename T2> explicit TVector6(const TVector6<T2> &v)
+		: x((T) v.x), y((T) v.y), z((T) v.z), w((T) v.w), s((T) v.s), t((T) v.t) { }
+
+	/// Initialize the vector with the components of a point data structure
+	//template <typename T2> explicit TVector6(const TPoint6<T2> &p)
+	//	: x((T) p.x), y((T) p.y), z((T) p.z), w((T) p.w), s((T) p.s), t((T) p.t) { }
+
+	/// Unserialize a vector from a binary data stream
+	explicit TVector6(Stream *stream) {
+		x = stream->readElement<T>();
+		y = stream->readElement<T>();
+		z = stream->readElement<T>();
+		w = stream->readElement<T>();
+		s = stream->readElement<T>();
+		t = stream->readElement<T>();
+	}
+
+	/// Add two vectors and return the result
+	TVector6 operator+(const TVector6 &v) const {
+		return TVector6(x + v.x, y + v.y, z + v.z, w + v.w, s + v.s, t + v.t);
+	}
+
+	/// Subtract two vectors and return the result
+	TVector6 operator-(const TVector6 &v) const {
+		return TVector6(x - v.x, y - v.y, z - v.z, w - v.w, s - v.s, t - v.t);
+	}
+
+	/// Add another vector to the current one
+	TVector6& operator+=(const TVector6 &v) {
+		x += v.x; y += v.y; z += v.z; w += v.w; s += v.s; t += v.t;
+		return *this;
+	}
+
+	/// Subtract another vector from the current one
+	TVector6& operator-=(const TVector6 &v) {
+		x -= v.x; y -= v.y; z -= v.z; w -= v.w; s -= v.s; t -= v.t;
+		return *this;
+	}
+
+	/// Multiply the vector by the given scalar and return the result
+	TVector6 operator*(T f) const {
+		return TVector6(x * f, y * f, z * f, w * f, s * f, t * f);
+	}
+
+	/// Multiply the vector by the given scalar
+	TVector6 &operator*=(T f) {
+		x *= f; y *= f; z *= f; w *= f; s *= f; t *= f;
+		return *this;
+	}
+
+	/// Return a negated version of the vector
+	TVector6 operator-() const {
+		return TVector6(-x, -y, -z, -w, -s, -t);
+	}
+
+	/// Divide the vector by the given scalar and return the result
+	TVector6 operator/(T f) const {
+#ifdef MTS_DEBUG
+		if (f == 0)
+			SLog(EWarn, "Vector6: Division by zero!");
+#endif
+		T recip = (T) 1 / f;
+		return TVector6(x * recip, y * recip, z * recip, w * recip, s * recip, t * recip);
+	}
+
+	/// Divide the vector by the given scalar
+	TVector6 &operator/=(T f) {
+#ifdef MTS_DEBUG
+		if (f == 0)
+			SLog(EWarn, "Vector6: Division by zero!");
+#endif
+		T recip = (T) 1 / f;
+		x *= recip; y *= recip; z *= recip; w *= recip; s *= recip; t *= recip;
+		return *this;
+	}
+
+	/// Index into the vector's components
+	T &operator[](int i) {
+		return (&x)[i];
+	}
+
+	/// Index into the vector's components (const version)
+	T operator[](int i) const {
+		return (&x)[i];
+	}
+
+	/// Return the squared 2-norm of this vector
+	T lengthSquared() const {
+		return x*x + y*y + z*z + w*w + s*s + t*t;
+	}
+
+	/// Return the 2-norm of this vector
+	LengthType length() const {
+		return (LengthType) std::sqrt((LengthType) lengthSquared());
+	}
+
+	/// Return whether or not this vector is identically zero
+	bool isZero() const {
+		return x == 0 && y == 0 && z == 0 && w == 0 && s == 0 && t == 0;
+	}
+
+	/// Equality test
+	bool operator==(const TVector6 &v) const {
+		return (v.x == x && v.y == y && v.z == z && v.w == w && v.s == s && v.t == t);
+	}
+
+	/// Inequality test
+	bool operator!=(const TVector6 &v) const {
+		return v.x != x || v.y != y || v.z != z || v.w != w || v.s != s || v.t != t;
+	}
+
+	/// Serialize this vector to a binary data stream
+	void serialize(Stream *stream) const {
+		stream->writeElement<T>(x);
+		stream->writeElement<T>(y);
+		stream->writeElement<T>(z);
+		stream->writeElement<T>(w);
+		stream->writeElement<T>(s);
+		stream->writeElement<T>(t);
+	}
+
+	/// Return a readable string representation of this vector
+	std::string toString() const {
+		std::ostringstream oss;
+		oss << "[" << x << ", " << y << ", " << z << ", " << w << ", " << s << ", " << t "]";
+		return oss.str();
+	}
+};
+
+template <typename T> inline TVector6<T> operator*(T f, const TVector6<T> &v) {
+	return v*f;
+}
+
+template <typename T> inline T dot(const TVector6<T> &v1, const TVector6<T> &v2) {
+	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z + v1.w * v2.w + v1.s * v2.s + v1.t * v2.t;
+}
+
+template <typename T> inline T absDot(const TVector6<T> &v1, const TVector6<T> &v2) {
+	return std::abs(dot(v1, v2));
+}
+
+template <typename T> inline TVector6<T> normalize(const TVector6<T> &v) {
+	return v / v.length();
+}
+
+template <typename T> inline TVector6<T> normalizeStrict(const TVector6<T> &v, const char *errMsg) {
+	Float length = v.length();
+	if (length == 0)
+		SLog(EError, "normalizeStrict(): %s", errMsg);
+	return v / length;
+}
+
+template <> inline TVector6<int> TVector6<int>::operator/(int a) const {
+#ifdef MTS_DEBUG
+	if (a == 0)
+		SLog(EWarn, "Vector6i: Division by zero!");
+#endif
+	return TVector6(x/a, y/a, z/a, w/a, s/a, t/a);
+}
+
+template <> inline TVector6<int> &TVector6<int>::operator/=(int a) {
+#ifdef MTS_DEBUG
+	if (a == 0)
+		SLog(EWarn, "Vector6i: Division by zero!");
+#endif
+
+	x /= a;
+	y /= a;
+	z /= a;
+	w /= a;
+	s /= a;
+	t /= a;
+	return *this;
+}
+
 MTS_NAMESPACE_END
 
 #endif /* __MITSUBA_CORE_VECTOR_H_ */
