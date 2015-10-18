@@ -21,9 +21,6 @@
 #define __MITSUBA_CORE_AABB_H_
 
 #include <mitsuba/core/bsphere.h>
-#define EIGEN_DONT_PARALLELIZE
-#define EIGEN_NO_DEBUG
-#include <Eigen/Dense>
 
 MTS_NAMESPACE_BEGIN
 
@@ -496,7 +493,6 @@ public:
 	MTS_EXPORT_CORE BSphere getBSphere() const;
 };
 
-typedef TPoint6<Float> Point6;
 /**
  * \brief Axis-aligned bounding box data structure in six dimensions
  *

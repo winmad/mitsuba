@@ -112,6 +112,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup Label="Header Files">
+    <ClInclude Include="..\include\mitsuba\core\cone.h" />
     <ClInclude Include="..\include\mitsuba\render\lighttree.h" />
     <ClInclude Include="..\src\converter\converter.h">
     </ClInclude>

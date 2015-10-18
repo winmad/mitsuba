@@ -1714,5 +1714,8 @@
     <ClInclude Include="..\include\mitsuba\render\lighttree.h">
       <Filter>Header Files\mitsuba\render</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\mitsuba\core\cone.h">
+      <Filter>Header Files\mitsuba\core</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

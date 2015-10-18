@@ -4,10 +4,11 @@
 */
 
 #pragma once
-#if !defined(__MISTUBA_RENDER_LIGHT_TREE_H)
-#define __MITSUBA_RENDER_LIGHT_TREE_H	
+#if !defined(__MISTUBA_RENDER_LIGHT_TREE_H_)
+#define __MITSUBA_RENDER_LIGHT_TREE_H_	
 
 #include <mitsuba/render/vpl.h>
+#include <mitsuba/core/cone.h>
 
 MTS_NAMESPACE_BEGIN
 
