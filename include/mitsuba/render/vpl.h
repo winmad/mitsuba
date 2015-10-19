@@ -45,6 +45,16 @@ struct VPL {
 	const Emitter *emitter;
 	Float emitterScale;
 
+	Point6 pos;
+
+	Point6 getPos(Float ratio) {
+		if (type == ESurfaceVPL) {
+			return Point6(its.p, Point(its.shFrame.n) * ratio);
+		} else {
+			return Point6(its.p, Point(0.f));
+		}
+	}
+
 	std::string toString() const;
 };
 

@@ -45,6 +45,8 @@ template <typename Derived> class SAHKDTree3D;
 class ShapeKDTree;
 class LocalWorker;
 struct LuminaireSamplingRecord;
+struct LightNode;
+template <typename LightNodeType> class LightTree;
 class Medium;
 struct MediumSamplingRecord;
 class MIPMap;

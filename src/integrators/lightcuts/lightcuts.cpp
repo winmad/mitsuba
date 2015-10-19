@@ -4,6 +4,7 @@
 */
 
 #include <mitsuba/render/scene.h>
+#include <mitsuba/render/lighttree.h>
 
 MTS_NAMESPACE_BEGIN
 

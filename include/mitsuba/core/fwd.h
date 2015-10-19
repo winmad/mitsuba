@@ -33,6 +33,7 @@ struct BSphere;
 class ConfigurableObject;
 struct CacheLineCounter;
 class Class;
+struct Cone;
 class ConditionVariable;
 class ConsoleStream;
 class DefaultFormatter;
