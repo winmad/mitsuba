@@ -89,9 +89,9 @@
     <NMakeForcedUsingAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(NMakeForcedUsingAssemblies)</NMakeForcedUsingAssemblies>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Release\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Release\</IntDir>
-    <NMakeBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2013.py</NMakeBuildCommandLine>
-    <NMakeReBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2013.py -c &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2010.py</NMakeReBuildCommandLine>
-    <NMakeCleanCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2013.py -c</NMakeCleanCommandLine>
+    <NMakeBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config.py</NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config.py -c &amp;&amp; scons --parallelize --cfg=build\config.py</NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config.py -c</NMakeCleanCommandLine>
     <NMakeOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\dist\mtsgui.exe</NMakeOutput>
     <NMakePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">WIN32;NDEBUG;SINGLE_PRECISION;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <NMakeIncludeSearchPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\include;$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
