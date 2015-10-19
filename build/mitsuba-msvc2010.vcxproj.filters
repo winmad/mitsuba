@@ -1720,5 +1720,8 @@
     <ClInclude Include="..\include\mitsuba\render\lighttree.h">
       <Filter>Header Files\mitsuba\render</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\mitsuba\render\lightcutter.h">
+      <Filter>Header Files\mitsuba\render</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

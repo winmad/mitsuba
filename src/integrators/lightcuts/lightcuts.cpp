@@ -4,7 +4,7 @@
 */
 
 #include <mitsuba/render/scene.h>
-#include <mitsuba/render/lighttree.h>
+#include <mitsuba/render/lightcutter.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -37,11 +37,66 @@ public:
 			sampler->request2DArray(m_shadingSamples);
 	}
 
+	void testPointLightTree() {
+		std::vector<VPL> vpls;
+		VPL l;
+		l.its.p = Point(0, 0, 0);
+		l.P = Spectrum(100);
+		vpls.push_back(l);
+		
+		l.its.p = Point(1, 0, 0);
+		l.P = Spectrum(1);
+		vpls.push_back(l);
+		
+		l.its.p = Point(2, 0, 0);
+		l.P = Spectrum(1);
+		vpls.push_back(l);
+
+		l.its.p = Point(-1, 0, 0);
+		l.P = Spectrum(1);
+		vpls.push_back(l);
+
+		l.its.p = Point(-2, 0, 0);
+		l.P = Spectrum(1);
+		vpls.push_back(l);
+
+		pointLightTree.build(vpls);
+		
+		std::queue<PointLightNode*> q;
+		q.push(pointLightTree.root);
+		while (!q.empty()) {
+			PointLightNode *node = q.front();
+			q.pop();
+			VPL *light = node->light;
+			if (!node->isLeaf()) {
+				q.push(node->left);
+				q.push(node->right);
+			}
+			Log(EInfo, "======= light cluster =======\n");
+			Log(EInfo, "pos = (%.6f, %.6f, %.6f)\n", light->its.p.x, light->its.p.y, light->its.p.z);
+			Log(EInfo, "intensity = (%.6f, %.6f, %.6f)\n", node->P[0], node->P[1], node->P[2]);
+		}
+	}
+
 	bool preprocess(const Scene *scene, RenderQueue *queue,
 		const RenderJob *job, int sceneResID, int sensorResID,
 		int samplerResID) {
 		Integrator::preprocess(scene, queue, job, sceneResID,
 				sensorResID, samplerResID);
+
+		if (!(scene->getSensor()->getType() & Sensor::EProjectiveCamera))
+			Log(EError, "The VPL integrator requires a projective camera "
+			"(e.g. perspective/thinlens/orthographic/telecentric)!");
+
+		m_random = new Random();
+		m_ratio = scene->getBSphere().radius / 16.f;
+
+		pointLightTree.init(m_random, 0.f);
+		directionalLightTree.init(m_random, 0.f);
+		surfaceLightTree.init(m_random, m_ratio);
+
+		Lightcutter lightcutter(&pointLightTree, &directionalLightTree, &surfaceLightTree);
+
 		if (m_rayLength < 0) {
 			m_rayLength = scene->getAABB().getBSphere().radius * 0.5f;
 			Log(EInfo, "Setting occlusion ray length to %f", m_rayLength);
@@ -94,7 +149,7 @@ public:
 
 	std::string toString() const {
 		std::ostringstream oss;
-		oss << "AmbientOcclusionIntegrator[" << endl
+		oss << "LightcutsIntegrator[" << endl
 			<< "  shadingSamples = " << m_shadingSamples << "," << endl
 			<< "  rayLength = " << m_rayLength << endl
 			<< "]";
@@ -105,6 +160,13 @@ public:
 private:
 	size_t m_shadingSamples;
 	Float m_rayLength;
+	
+	LightTree<PointLightNode> pointLightTree;
+	LightTree<DirectionalLightNode> directionalLightTree;
+	LightTree<SurfaceLightNode> surfaceLightTree;
+
+	Random *m_random;
+	Float m_ratio;
 };
 
 MTS_IMPLEMENT_CLASS_S(LightcutsIntegrator, false, SamplingIntegrator)

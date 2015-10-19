@@ -26,7 +26,7 @@ struct LightNode {
 	
 	virtual bool isLeaf() const = 0;
 	virtual ELightNodeType getNodeType() const = 0;
-	virtual void initLeaf() = 0;
+	virtual void initLeaf(VPL *vl) = 0;
 	virtual void update(Random *random) = 0;
 };
 
@@ -45,9 +45,10 @@ struct PointLightNode : public LightNode {
 		return EPointLightNode;
 	}
 
-	virtual void initLeaf() {
+	virtual void initLeaf(VPL *vl) {
 		left = right = NULL;
-		light = NULL;
+		light = vl;
+		P = vl->P;
 		bbox.reset();
 	}
 
@@ -78,9 +79,10 @@ struct DirectionalLightNode : public LightNode {
 		return EDirectionalLightNode;
 	}
 
-	virtual void initLeaf() {
+	virtual void initLeaf(VPL *vl) {
 		left = right = NULL;
-		light = NULL;
+		light = vl;
+		P = vl->P;
 		bbox.reset();
 	}
 
@@ -112,9 +114,10 @@ struct SurfaceLightNode : public LightNode {
 		return ESurfaceLightNode;
 	}
 
-	virtual void initLeaf() {
+	virtual void initLeaf(VPL *vl) {
 		left = right = NULL;
-		light = NULL;
+		light = vl;
+		P = vl->P;
 		bbox.reset();
 		cone.reset();
 	}

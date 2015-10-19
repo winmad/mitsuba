@@ -27,6 +27,8 @@
 #include <map>
 #include <iostream>
 #include <vector>
+#include <queue>
+#include <utility>
 #include <cmath>
 #include <algorithm>
 #include <limits.h>

@@ -4,6 +4,7 @@ scenes/
 results/
 render.py
 dependencies_macos/
+backup/
 
 # Documentation
 doc/apidocs/*

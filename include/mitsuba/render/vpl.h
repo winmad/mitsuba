@@ -36,6 +36,7 @@ enum EVPLType {
  * \ingroup librender
  */
 struct VPL {
+	inline VPL() {}
 	inline VPL(EVPLType type, const Spectrum &P)
 		: type(type), P(P) {
 	}
