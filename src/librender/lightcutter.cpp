@@ -36,14 +36,14 @@ Spectrum Lightcutter::evalLightcut(const RayDifferential& ray, RadianceQueryReco
 			else {
 				L -= ln.contrib;
 				
-				SurfaceLightNode *left = ((SurfaceLightNode*)node)->left;
+				SurfaceLightNode *left = (SurfaceLightNode*)(node->getLeft());
 				contrib = evalNodeIllumination(left, rRec.scene, random,
 					-ray.d, rRec.its, bsdf);
 				error = evalErrorBound(left, -ray.d, rRec.its, bsdf);
 				L += contrib;
 				q.push(LightcutHeapNode(left, error, contrib));
 
-				SurfaceLightNode *right = ((SurfaceLightNode*)node)->right;
+				SurfaceLightNode *right = (SurfaceLightNode*)(node->getRight());
 				contrib = evalNodeIllumination(right, rRec.scene, random,
 					-ray.d, rRec.its, bsdf);
 				error = evalErrorBound(right, -ray.d, rRec.its, bsdf);

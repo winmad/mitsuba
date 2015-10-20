@@ -24,6 +24,12 @@ struct LightNode {
 	
 	Spectrum P;
 	
+	virtual LightNode* getLeft() = 0;
+	virtual LightNode* getRight() = 0;
+	virtual AABB getBBox() = 0;
+	virtual VPL* getLight() = 0;
+	virtual Cone getCone() = 0;
+
 	virtual bool isLeaf() const = 0;
 	virtual ELightNodeType getNodeType() const = 0;
 	virtual void initLeaf(VPL *vl) = 0;
@@ -37,6 +43,26 @@ struct PointLightNode : public LightNode {
 	}
 	virtual ~PointLightNode() {}
 	
+	virtual LightNode* getLeft() {
+		return left;
+	}
+
+	virtual LightNode* getRight() {
+		return right;
+	}
+
+	virtual AABB getBBox() {
+		return bbox;
+	}
+
+	virtual VPL* getLight() {
+		return light;
+	}
+
+	virtual Cone getCone() {
+		return Cone();
+	}
+
 	virtual bool isLeaf() const {
 		return left == NULL && right == NULL;
 	}
@@ -50,6 +76,7 @@ struct PointLightNode : public LightNode {
 		light = vl;
 		P = vl->P;
 		bbox.reset();
+		bbox.expandBy(vl->its.p);
 	}
 
 	virtual void update(Random *random) {
@@ -71,6 +98,26 @@ struct DirectionalLightNode : public LightNode {
 	}
 	virtual ~DirectionalLightNode() {}
 
+	virtual LightNode* getLeft() {
+		return left;
+	}
+
+	virtual LightNode* getRight() {
+		return right;
+	}
+
+	virtual AABB getBBox() {
+		return bbox;
+	}
+
+	virtual VPL* getLight() {
+		return light;
+	}
+
+	virtual Cone getCone() {
+		return Cone();
+	}
+
 	virtual bool isLeaf() const {
 		return left == NULL && right == NULL;
 	}
@@ -84,6 +131,7 @@ struct DirectionalLightNode : public LightNode {
 		light = vl;
 		P = vl->P;
 		bbox.reset();
+		bbox.expandBy(vl->its.p);
 	}
 
 	virtual void update(Random *random) {
@@ -106,6 +154,26 @@ struct SurfaceLightNode : public LightNode {
 
 	virtual ~SurfaceLightNode() {}
 
+	virtual LightNode* getLeft() {
+		return left;
+	}
+
+	virtual LightNode* getRight() {
+		return right;
+	}
+
+	virtual AABB getBBox() {
+		return bbox;
+	}
+
+	virtual VPL* getLight() {
+		return light;
+	}
+
+	virtual Cone getCone() {
+		return cone;
+	}
+
 	virtual bool isLeaf() const {
 		return left == NULL && right == NULL;
 	}
@@ -123,7 +191,9 @@ struct SurfaceLightNode : public LightNode {
 		
 		P = vl->P * f;
 		bbox.reset();
+		bbox.expandBy(vl->its.p);
 		cone.reset();
+		cone.expandBy(vl->its.shFrame.n);
 	}
 
 	virtual void update(Random *random) {

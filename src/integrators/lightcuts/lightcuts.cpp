@@ -269,7 +269,7 @@ public:
 		/* Lightcuts */
 		Spectrum indirResult(0.f);
 
-		indirResult += m_lightcutter.evalLightcut(ray, rRec, m_random, 500, 0.01f);
+		indirResult += m_lightcutter.evalLightcut(ray, rRec, m_random, 300, 0.02f);
 		/*
 		Vector wi = -ray.d;
 		for (int i = 0; i < m_surfaceLightTree.nextFreeNode; i++) {
