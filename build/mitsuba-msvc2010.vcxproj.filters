@@ -1025,6 +1025,9 @@
     <ClCompile Include="..\src\integrators\lightcuts\lightcuts.cpp">
       <Filter>Source Files\integrators\lightcuts</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\librender\lightcutter.cpp">
+      <Filter>Source Files\librender</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

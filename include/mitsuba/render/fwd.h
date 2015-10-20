@@ -47,6 +47,7 @@ class LocalWorker;
 struct LuminaireSamplingRecord;
 struct LightNode;
 template <typename LightNodeType> class LightTree;
+class Lightcutter;
 class Medium;
 struct MediumSamplingRecord;
 class MIPMap;

@@ -171,7 +171,11 @@ size_t generateVPLs(const Scene *scene, Random *random,
 			else
 				weight /= approxAlbedo;
 
+			/* Modified by Lifan Wu
+			   Assume Lambertian BRDF
+			*/
 			VPL vpl(ESurfaceVPL, weight);
+			//VPL vpl(ESurfaceVPL, weight * bsdfVal);
 			vpl.its = its;
 
 			if (BSDF::getMeasure(bRec.sampledType) == ESolidAngle)

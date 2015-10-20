@@ -78,9 +78,9 @@
     <NMakeForcedUsingAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(NMakeForcedUsingAssemblies)</NMakeForcedUsingAssemblies>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Debug\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Debug\</IntDir>
-    <NMakeBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2010-debug.py</NMakeBuildCommandLine>
-    <NMakeReBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2010-debug.py -c &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2010-debug.py</NMakeReBuildCommandLine>
-    <NMakeCleanCommandLine Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-win64-msvc2010-debug.py -c</NMakeCleanCommandLine>
+    <NMakeBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-debug.py</NMakeBuildCommandLine>
+    <NMakeReBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-debug.py -c &amp;&amp; scons --parallelize --cfg=build\config-debug.py</NMakeReBuildCommandLine>
+    <NMakeCleanCommandLine Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config-debug.py -c</NMakeCleanCommandLine>
     <NMakeOutput Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\dist\mtsgui.exe</NMakeOutput>
     <NMakePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">WIN32;_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <NMakeIncludeSearchPath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">..\include;$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
@@ -627,6 +627,7 @@
     <ClCompile Include="..\src\bsdfs\roughplastic.cpp">
     </ClCompile>
     <ClCompile Include="..\src\integrators\lightcuts\lightcuts.cpp" />
+    <ClCompile Include="..\src\librender\lightcutter.cpp" />
     <ClCompile Include="..\src\librender\trimesh.cpp">
     </ClCompile>
     <ClCompile Include="..\src\librender\irrcache.cpp">
