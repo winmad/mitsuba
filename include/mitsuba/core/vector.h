@@ -1015,7 +1015,7 @@ template <typename T> struct TVector6 {
 	/// Return a readable string representation of this vector
 	std::string toString() const {
 		std::ostringstream oss;
-		oss << "[" << x << ", " << y << ", " << z << ", " << w << ", " << s << ", " << t "]";
+		oss << "[" << x << ", " << y << ", " << z << ", " << w << ", " << s << ", " << t << "]";
 		return oss.str();
 	}
 };

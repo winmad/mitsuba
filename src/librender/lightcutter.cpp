@@ -11,8 +11,9 @@ Spectrum Lightcutter::evalLightcut(const RayDifferential& ray, RadianceQueryReco
 	Random *random, int maxCutSize, Float maxErrorRatio) const {
 	LightNode *node = m_surfaceLightTree->root;
 	const BSDF *bsdf = rRec.its.getBSDF(ray);
-	Spectrum contrib = evalNodeIllumination((SurfaceLightNode*)node, rRec.scene, random, -ray.d, rRec.its, bsdf);
-	Spectrum error = evalErrorBound((SurfaceLightNode*)node, -ray.d, rRec.its, bsdf);
+        Vector dir = -ray.d;
+	Spectrum contrib = evalNodeIllumination((SurfaceLightNode*)node, rRec.scene, random, dir, rRec.its, bsdf);
+	Spectrum error = evalErrorBound((SurfaceLightNode*)node, dir, rRec.its, bsdf);
 
 	Spectrum L = contrib;
 	std::priority_queue<LightcutHeapNode> q;
@@ -35,18 +36,18 @@ Spectrum Lightcutter::evalLightcut(const RayDifferential& ray, RadianceQueryReco
 			}
 			else {
 				L -= ln.contrib;
-				
+				Vector dir = -ray.d;
 				SurfaceLightNode *left = (SurfaceLightNode*)(node->getLeft());
 				contrib = evalNodeIllumination(left, rRec.scene, random,
-					-ray.d, rRec.its, bsdf);
-				error = evalErrorBound(left, -ray.d, rRec.its, bsdf);
+					dir, rRec.its, bsdf);
+				error = evalErrorBound(left, dir, rRec.its, bsdf);
 				L += contrib;
 				q.push(LightcutHeapNode(left, error, contrib));
 
 				SurfaceLightNode *right = (SurfaceLightNode*)(node->getRight());
 				contrib = evalNodeIllumination(right, rRec.scene, random,
-					-ray.d, rRec.its, bsdf);
-				error = evalErrorBound(right, -ray.d, rRec.its, bsdf);
+					dir, rRec.its, bsdf);
+				error = evalErrorBound(right, dir, rRec.its, bsdf);
 				L += contrib;
 				q.push(LightcutHeapNode(right, error, contrib));
 			}
