@@ -12,6 +12,13 @@ MTS_NAMESPACE_BEGIN
 class LightcutsIntegrator : public SamplingIntegrator {
 public:
 	LightcutsIntegrator(const Properties &props) : SamplingIntegrator(props) {
+		/* Number of virtual lights */
+		m_vplSamples = props.getSize("vplSamples", 1000);
+		m_maxCutSize = props.getSize("maxCutSize", 300);
+		m_maxErrorRatio = props.getFloat("maxErrorRatio", 0.01f);
+		m_gLimit = props.getFloat("gLimit", 1e-3f);
+		m_dLimit = props.getFloat("dLimit", 0.1f);
+		m_useCosBound = props.getBoolean("useCosBound", false);
 		/* Number of shading samples -- this parameter is a shorthand notation
 		to set both 'emitterSamples' and 'bsdfSamples' at the same time*/
 		size_t shadingSamples = props.getSize("shadingSamples", 1);
@@ -83,7 +90,7 @@ public:
 
 		std::deque<VPL> _vpls;
 		m_surfaceVPLs.clear();
-		Float normalization = 1.f / generateVPLs(scene, m_random, 0, 1000, 5, true, _vpls);
+		Float normalization = 1.f / generateVPLs(scene, m_random, 0, m_vplSamples, 5, true, _vpls);
 		for (int i = 0; i < _vpls.size(); i++) {
 			_vpls[i].P *= normalization;
 			if (_vpls[i].type == ESurfaceVPL) {
@@ -95,8 +102,11 @@ public:
 		m_surfaceLightTree.build(m_surfaceVPLs);
 		Log(EInfo, "Finish building light tree");
 
-		m_lightcutter.init(&m_pointLightTree, &m_directionalLightTree, &m_surfaceLightTree,
-			1e-4f, 1e-4f);
+		//m_lightcutter.init(&m_pointLightTree, &m_directionalLightTree, &m_surfaceLightTree,
+		//	1e-4f, 1e-4f);
+
+		m_lightcutter = new Lightcutter(&m_pointLightTree, &m_directionalLightTree, &m_surfaceLightTree,
+			m_gLimit, m_dLimit, 1e-4f, m_useCosBound);
 
 		return true;
 	}
@@ -269,7 +279,8 @@ public:
 		/* Lightcuts */
 		Spectrum indirResult(0.f);
 
-		indirResult += m_lightcutter.evalLightcut(ray, rRec, m_random, 300, 0.02f);
+		indirResult += m_lightcutter->evalLightcut(ray, rRec, m_random, m_maxCutSize, m_maxErrorRatio);
+		
 		/*
 		Vector wi = -ray.d;
 		for (int i = 0; i < m_surfaceLightTree.nextFreeNode; i++) {
@@ -283,6 +294,13 @@ public:
 		Li += indirResult;
 
 		return Li;
+	}
+	
+	void postprocess(const Scene *scene, RenderQueue *queue,
+		const RenderJob *job, int sceneResID, int sensorResID,
+		int samplerResID) {
+		m_lightcutter->avgCutSize /= m_lightcutter->count;
+		Log(EInfo, "avgCutSize = %.6f", m_lightcutter->avgCutSize);
 	}
 
 	inline Float miWeight(Float pdfA, Float pdfB) const {
@@ -304,10 +322,16 @@ public:
 public:
 	size_t m_emitterSamples;
 	size_t m_bsdfSamples;
+	size_t m_vplSamples;
+	Float m_gLimit;
+	Float m_dLimit;
+	int m_maxCutSize;
+	Float m_maxErrorRatio;
 	Float m_fracBSDF, m_fracLum;
 	Float m_weightBSDF, m_weightLum;
 	bool m_strictNormals;
 	bool m_hideEmitters;
+	bool m_useCosBound;
 
 	std::vector<VPL> m_surfaceVPLs;
 
@@ -315,7 +339,7 @@ public:
 	LightTree<DirectionalLightNode> m_directionalLightTree;
 	LightTree<SurfaceLightNode> m_surfaceLightTree;
 
-	Lightcutter m_lightcutter;
+	Lightcutter *m_lightcutter;
 
 	Random *m_random;
 	Float m_ratio;

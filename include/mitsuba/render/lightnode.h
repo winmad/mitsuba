@@ -23,6 +23,10 @@ struct LightNode {
 	virtual ~LightNode() {}
 	
 	Spectrum P;
+
+	// Luminance attenuation of a child
+	Float ratio;
+	bool isLeft;
 	
 	virtual LightNode* getLeft() = 0;
 	virtual LightNode* getRight() = 0;
@@ -83,7 +87,16 @@ struct PointLightNode : public LightNode {
 		bbox = left->bbox;
 		bbox.expandBy(right->bbox);
 		P = left->P + right->P;
-		light = (random->nextFloat() < (left->P.getLuminance() / P.getLuminance()) ? left->light : right->light);
+		ratio = left->P.getLuminance() / P.getLuminance();
+		if (random->nextFloat() < ratio) {
+			light = left->light;
+			isLeft = true;
+		}
+		else {
+			light = right->light;
+			ratio = 1.f - ratio;
+			isLeft = false;
+		}
 	}
 
 	AABB bbox;
@@ -138,7 +151,16 @@ struct DirectionalLightNode : public LightNode {
 		bbox = left->bbox;
 		bbox.expandBy(right->bbox);
 		P = left->P + right->P;
-		light = (random->nextFloat() < (left->P.getLuminance() / P.getLuminance()) ? left->light : right->light);
+		ratio = left->P.getLuminance() / P.getLuminance();
+		if (random->nextFloat() < ratio) {
+			light = left->light;
+			isLeft = true;
+		}
+		else {
+			light = right->light;
+			ratio = 1.f - ratio;
+			isLeft = false;
+		}
 	}
 
 	AABB bbox;
@@ -202,7 +224,16 @@ struct SurfaceLightNode : public LightNode {
 		cone = left->cone;
 		cone.expandBy(right->cone);
 		P = left->P + right->P;
-		light = (random->nextFloat() < (left->P.getLuminance() / P.getLuminance()) ? left->light : right->light);
+		ratio = left->P.getLuminance() / P.getLuminance();
+		if (random->nextFloat() < ratio) {
+			light = left->light;
+			isLeft = true;
+		}
+		else {
+			light = right->light;
+			ratio = 1.f - ratio;
+			isLeft = false;
+		}
 	}
 
 	AABB bbox;

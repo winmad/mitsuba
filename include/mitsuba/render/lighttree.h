@@ -71,10 +71,10 @@ LightNodeType* LightTree<LightNodeType>::recursiveBuild(size_t nodeNum, int star
 	});
 
 	LightNodeType *node = &m_nodes[nodeNum];
-	int lc = nextFreeNode++;
-	node->left = recursiveBuild(lc, start, mid, vpls);
 	int rc = nextFreeNode++;
 	node->right = recursiveBuild(rc, mid, end, vpls);
+	int lc = nextFreeNode++;
+	node->left = recursiveBuild(lc, start, mid, vpls);
 	node->update(m_random);
 	return node;
 }

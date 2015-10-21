@@ -37,36 +37,35 @@ public:
 	Lightcutter(LightTree<PointLightNode> *plt, 
 		LightTree<DirectionalLightNode> *dlt, 
 		LightTree<SurfaceLightNode> *slt,
-		Float gLimit, Float rrThreshold)
+		Float gLimit, Float dLimit, Float rrThreshold, bool useCosBound)
 		: m_pointLightTree(plt), m_directionalLightTree(dlt),
-		m_surfaceLightTree(slt), m_gLimit(gLimit), m_rrThreshold(rrThreshold) {}
+		m_surfaceLightTree(slt), m_gLimit(gLimit), 
+		m_dLimit(dLimit), m_rrThreshold(rrThreshold),
+		m_useCosBound(useCosBound), count(0.f), avgCutSize(0.f) {}
 
 	void init(LightTree<PointLightNode> *plt,
 		LightTree<DirectionalLightNode> *dlt,
 		LightTree<SurfaceLightNode> *slt,
-		Float gLimit, Float rrThreshold) {
+		Float gLimit, Float dLimit, Float rrThreshold, bool useCosBound) {
 		m_pointLightTree = plt;
 		m_directionalLightTree = dlt;
 		m_surfaceLightTree = slt;
 		m_gLimit = gLimit;
+		m_dLimit = dLimit;
 		m_rrThreshold = rrThreshold;
+		m_useCosBound = useCosBound;
+
+		count = 0;
+		avgCutSize = 0;
 	}
 
-	Spectrum evalLightcut(const RayDifferential& ray, RadianceQueryRecord& rRec,
-		Random *random, int maxCutSize, Float maxErrorRatio) const;
+	Spectrum evalLightcut(RayDifferential& ray, RadianceQueryRecord& rRec,
+		Random *random, int maxCutSize, Float maxErrorRatio);
 	
-	Spectrum evalNodeIllumination(const PointLightNode *node, const Scene *scene, Random *random,
-		Vector &wi, Intersection &its, const BSDF *bsdf) const;
-	Spectrum evalNodeIllumination(const DirectionalLightNode *node, const Scene *scene, Random *random,
-		Vector &wi, Intersection &its, const BSDF *bsdf) const;
-	Spectrum evalNodeIllumination(const SurfaceLightNode *node, const Scene *scene, Random *random,
+	Spectrum evalNodeIllumination(LightNode *node, const Scene *scene, Random *random,
 		Vector &wi, Intersection &its, const BSDF *bsdf) const;
 
-	Spectrum evalErrorBound(const PointLightNode *node, Vector &wi,
-		Intersection &its, const BSDF *bsdf) const;
-	Spectrum evalErrorBound(const DirectionalLightNode *node, Vector &wi,
-		Intersection &its, const BSDF *bsdf) const;
-	Spectrum evalErrorBound(const SurfaceLightNode *node, Vector &wi,
+	Spectrum evalErrorBound(LightNode *node, Vector &wi,
 		Intersection &its, const BSDF *bsdf) const;
 
 	Spectrum evalMaterialErrorBound(const AABB &bbox, Vector &wi,
@@ -76,7 +75,12 @@ public:
 	LightTree<DirectionalLightNode> *m_directionalLightTree;
 	LightTree<SurfaceLightNode> *m_surfaceLightTree;
 	Float m_gLimit;
+	Float m_dLimit;
 	Float m_rrThreshold;
+	bool m_useCosBound;
+
+	Float count;
+	Float avgCutSize;
 };
 
 MTS_NAMESPACE_END
