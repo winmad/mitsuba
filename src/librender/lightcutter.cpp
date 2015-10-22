@@ -43,8 +43,10 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 					L += contrib;
 					q.push(LightcutHeapNode(node->getLeft(), error, contrib));
 
+                                        // For linux
+                                        Vector dir = -ray.d;
 					contrib = evalNodeIllumination(node->getRight(), rRec.scene, random,
-						-ray.d, rRec.its, bsdf);
+						dir, rRec.its, bsdf);
 					error = evalErrorBound(node->getRight(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getRight(), error, contrib));
@@ -52,8 +54,10 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 				else {
 					L -= ln.contrib;
 
+                                        // For linux
+                                        Vector dir = -ray.d;
 					contrib = evalNodeIllumination(node->getLeft(), rRec.scene, random,
-						-ray.d, rRec.its, bsdf);
+						dir, rRec.its, bsdf);
 					error = evalErrorBound(node->getLeft(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getLeft(), error, contrib));
