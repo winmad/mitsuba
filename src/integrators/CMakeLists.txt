@@ -11,6 +11,7 @@ macro(add_bidir)
   add_integrator(${ARGN} MTS_BIDIR)
 endmacro()
 
+add_integrator(info    info/info.cpp)
 add_integrator(lightcuts    lightcuts/lightcuts.cpp)
 add_integrator(ao       direct/ao.cpp)
 add_integrator(direct   direct/direct.cpp)
