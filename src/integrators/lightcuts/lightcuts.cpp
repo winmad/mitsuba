@@ -9,6 +9,8 @@
 
 MTS_NAMESPACE_BEGIN
 
+#define DIRECT 0
+
 class LightcutsIntegrator : public SamplingIntegrator {
 public:
 	LightcutsIntegrator(const Properties &props) : SamplingIntegrator(props) {
@@ -93,9 +95,15 @@ public:
 		Float normalization = 1.f / generateVPLs(scene, m_random, 0, m_vplSamples, 5, true, _vpls);
 		for (int i = 0; i < _vpls.size(); i++) {
 			_vpls[i].P *= normalization;
+#if DIRECT
+			if (_vpls[i].type == ESurfaceVPL) {
+				m_surfaceVPLs.push_back(_vpls[i]);
+			}
+#else
 			if (_vpls[i].type == EPointEmitterVPL) {
 				m_surfaceVPLs.push_back(_vpls[i]);
 			}
+#endif
 		}
 		
 		Log(EInfo, "Building light tree begin");
@@ -140,141 +148,144 @@ public:
 
 		const BSDF *bsdf = its.getBSDF(ray);
 
-// 		if (!(rRec.type & RadianceQueryRecord::EDirectSurfaceRadiance)
-// 			|| (m_strictNormals && dot(ray.d, its.geoFrame.n)
-// 			* Frame::cosTheta(its.wi) >= 0)) {
-// 			/* Only render the direct illumination component if
-// 			*
-// 			* 1. It was requested
-// 			* 2. The surface has an associated BSDF (i.e. it isn't an index-
-// 			*    matched medium transition -- this is not supported by 'direct')
-// 			* 3. If 'strictNormals'=true, when the geometric and shading
-// 			*    normals classify the incident direction to the same side
-// 			*/
-// 			return Li;
-// 		}
-// 		
-// 		/* ==================================================================== */
-// 		/*                          Emitter sampling                          */
-// 		/* ==================================================================== */
-// 		bool adaptiveQuery = (rRec.extra & RadianceQueryRecord::EAdaptiveQuery);
-// 
-// 		/* Figure out how many BSDF and direct illumination samples to
-// 		generate, and where the random numbers should come from */
-// 		Point2 *sampleArray;
-// 		size_t numDirectSamples = m_emitterSamples,
-// 			numBSDFSamples = m_bsdfSamples;
-// 		Float fracLum = m_fracLum, fracBSDF = m_fracBSDF,
-// 			weightLum = m_weightLum, weightBSDF = m_weightBSDF;
-// 
-// 		if (rRec.depth > 1 || adaptiveQuery) {
-// 			/* This integrator is used recursively by another integrator.
-// 			Be less accurate as this sample will not directly be observed. */
-// 			numBSDFSamples = numDirectSamples = 1;
-// 			fracLum = fracBSDF = .5f;
-// 			weightLum = weightBSDF = 1.0f;
-// 		}
-// 
-// 		if (numDirectSamples > 1) {
-// 			sampleArray = rRec.sampler->next2DArray(numDirectSamples);
-// 		}
-// 		else {
-// 			sample = rRec.nextSample2D(); sampleArray = &sample;
-// 		}
-// 
-// 		DirectSamplingRecord dRec(its);
-// 		if (bsdf->getType() & BSDF::ESmooth) {
-// 			/* Only use direct illumination sampling when the surface's
-// 			BSDF has smooth (i.e. non-Dirac delta) component */
-// 			for (size_t i = 0; i<numDirectSamples; ++i) {
-// 				/* Estimate the direct illumination if this is requested */
-// 				Spectrum value = scene->sampleEmitterDirect(dRec, sampleArray[i]);
-// 				if (!value.isZero()) {
-// 					const Emitter *emitter = static_cast<const Emitter *>(dRec.object);
-// 
-// 					/* Allocate a record for querying the BSDF */
-// 					BSDFSamplingRecord bRec(its, its.toLocal(dRec.d));
-// 
-// 					/* Evaluate BSDF * cos(theta) */
-// 					const Spectrum bsdfVal = bsdf->eval(bRec);
-// 
-// 					if (!bsdfVal.isZero() && (!m_strictNormals
-// 						|| dot(its.geoFrame.n, dRec.d) * Frame::cosTheta(bRec.wo) > 0)) {
-// 						/* Calculate prob. of sampling that direction using BSDF sampling */
-// 						Float bsdfPdf = emitter->isOnSurface() ? bsdf->pdf(bRec) : 0;
-// 
-// 						/* Weight using the power heuristic */
-// 						const Float weight = miWeight(dRec.pdf * fracLum,
-// 							bsdfPdf * fracBSDF) * weightLum;
-// 
-// 						Li += value * bsdfVal * weight;
-// 					}
-// 				}
-// 			}
-// 		}
-// 
-// 		/* ==================================================================== */
-// 		/*                            BSDF sampling                             */
-// 		/* ==================================================================== */
-// 
-// 		if (numBSDFSamples > 1) {
-// 			sampleArray = rRec.sampler->next2DArray(numBSDFSamples);
-// 		}
-// 		else {
-// 			sample = rRec.nextSample2D(); sampleArray = &sample;
-// 		}
-// 
-// 		Intersection bsdfIts;
-// 		for (size_t i = 0; i<numBSDFSamples; ++i) {
-// 			/* Sample BSDF * cos(theta) and also request the local density */
-// 			Float bsdfPdf;
-// 
-// 			BSDFSamplingRecord bRec(its, rRec.sampler, ERadiance);
-// 			Spectrum bsdfVal = bsdf->sample(bRec, bsdfPdf, sampleArray[i]);
-// 			if (bsdfVal.isZero())
-// 				continue;
-// 
-// 			/* Prevent light leaks due to the use of shading normals */
-// 			const Vector wo = its.toWorld(bRec.wo);
-// 			Float woDotGeoN = dot(its.geoFrame.n, wo);
-// 			if (m_strictNormals && woDotGeoN * Frame::cosTheta(bRec.wo) <= 0)
-// 				continue;
-// 
-// 			/* Trace a ray in this direction */
-// 			Ray bsdfRay(its.p, wo, ray.time);
-// 
-// 			Spectrum value;
-// 			if (scene->rayIntersect(bsdfRay, bsdfIts)) {
-// 				/* Intersected something - check if it was an emitter */
-// 				if (!bsdfIts.isEmitter())
-// 					continue;
-// 
-// 				value = bsdfIts.Le(-bsdfRay.d);
-// 				dRec.setQuery(bsdfRay, bsdfIts);
-// 			}
-// 			else {
-// 				/* Intersected nothing -- perhaps there is an environment map? */
-// 				const Emitter *env = scene->getEnvironmentEmitter();
-// 
-// 				if (!env || (m_hideEmitters && bRec.sampledType == BSDF::ENull))
-// 					continue;
-// 
-// 				value = env->evalEnvironment(RayDifferential(bsdfRay));
-// 				if (!env->fillDirectSamplingRecord(dRec, bsdfRay))
-// 					continue;
-// 			}
-// 
-// 			/* Compute the prob. of generating that direction using the
-// 			implemented direct illumination sampling technique */
-// 			const Float lumPdf = (!(bRec.sampledType & BSDF::EDelta)) ?
-// 				scene->pdfEmitterDirect(dRec) : 0;
-// 
-// 			/* Weight using the power heuristic */
-// 			const Float weight = miWeight(bsdfPdf * fracBSDF,
-// 				lumPdf * fracLum) * weightBSDF;
-// 
-// 			Li += value * bsdfVal * weight;
-// 		}
+		if (!(rRec.type & RadianceQueryRecord::EDirectSurfaceRadiance)
+			|| (m_strictNormals && dot(ray.d, its.geoFrame.n)
+			* Frame::cosTheta(its.wi) >= 0)) {
+			/* Only render the direct illumination component if
+			*
+			* 1. It was requested
+			* 2. The surface has an associated BSDF (i.e. it isn't an index-
+			*    matched medium transition -- this is not supported by 'direct')
+			* 3. If 'strictNormals'=true, when the geometric and shading
+			*    normals classify the incident direction to the same side
+			*/
+			return Li;
+		}
+		
+		/* ==================================================================== */
+		/*                          Emitter sampling                          */
+		/* ==================================================================== */
+		bool adaptiveQuery = (rRec.extra & RadianceQueryRecord::EAdaptiveQuery);
+
+		/* Figure out how many BSDF and direct illumination samples to
+		generate, and where the random numbers should come from */
+		Point2 *sampleArray;
+		size_t numDirectSamples = m_emitterSamples,
+			numBSDFSamples = m_bsdfSamples;
+		Float fracLum = m_fracLum, fracBSDF = m_fracBSDF,
+			weightLum = m_weightLum, weightBSDF = m_weightBSDF;
+
+		if (rRec.depth > 1 || adaptiveQuery) {
+			/* This integrator is used recursively by another integrator.
+			Be less accurate as this sample will not directly be observed. */
+			numBSDFSamples = numDirectSamples = 1;
+			fracLum = fracBSDF = .5f;
+			weightLum = weightBSDF = 1.0f;
+		}
+
+		if (numDirectSamples > 1) {
+			sampleArray = rRec.sampler->next2DArray(numDirectSamples);
+		}
+		else {
+			sample = rRec.nextSample2D(); sampleArray = &sample;
+		}
+
+		DirectSamplingRecord dRec(its);
+		if (bsdf->getType() & BSDF::ESmooth) {
+			/* Only use direct illumination sampling when the surface's
+			BSDF has smooth (i.e. non-Dirac delta) component */
+			for (size_t i = 0; i<numDirectSamples; ++i) {
+				/* Estimate the direct illumination if this is requested */
+				Spectrum value = scene->sampleEmitterDirect(dRec, sampleArray[i]);
+				if (!value.isZero()) {
+					const Emitter *emitter = static_cast<const Emitter *>(dRec.object);
+
+					/* Allocate a record for querying the BSDF */
+					BSDFSamplingRecord bRec(its, its.toLocal(dRec.d));
+
+					/* Evaluate BSDF * cos(theta) */
+					const Spectrum bsdfVal = bsdf->eval(bRec);
+
+					if (!bsdfVal.isZero() && (!m_strictNormals
+						|| dot(its.geoFrame.n, dRec.d) * Frame::cosTheta(bRec.wo) > 0)) {
+						/* Calculate prob. of sampling that direction using BSDF sampling */
+						Float bsdfPdf = emitter->isOnSurface() ? bsdf->pdf(bRec) : 0;
+
+						/* Weight using the power heuristic */
+						const Float weight = miWeight(dRec.pdf * fracLum,
+							bsdfPdf * fracBSDF) * weightLum;
+
+#if DIRECT
+						Li += value * bsdfVal * weight;
+#endif
+					}
+				}
+			}
+		}
+
+		/* ==================================================================== */
+		/*                            BSDF sampling                             */
+		/* ==================================================================== */
+
+		if (numBSDFSamples > 1) {
+			sampleArray = rRec.sampler->next2DArray(numBSDFSamples);
+		}
+		else {
+			sample = rRec.nextSample2D(); sampleArray = &sample;
+		}
+
+		Intersection bsdfIts;
+		for (size_t i = 0; i<numBSDFSamples; ++i) {
+			/* Sample BSDF * cos(theta) and also request the local density */
+			Float bsdfPdf;
+
+			BSDFSamplingRecord bRec(its, rRec.sampler, ERadiance);
+			Spectrum bsdfVal = bsdf->sample(bRec, bsdfPdf, sampleArray[i]);
+			if (bsdfVal.isZero())
+				continue;
+
+			/* Prevent light leaks due to the use of shading normals */
+			const Vector wo = its.toWorld(bRec.wo);
+			Float woDotGeoN = dot(its.geoFrame.n, wo);
+			if (m_strictNormals && woDotGeoN * Frame::cosTheta(bRec.wo) <= 0)
+				continue;
+
+			/* Trace a ray in this direction */
+			Ray bsdfRay(its.p, wo, ray.time);
+
+			Spectrum value;
+			if (scene->rayIntersect(bsdfRay, bsdfIts)) {
+				/* Intersected something - check if it was an emitter */
+				if (!bsdfIts.isEmitter())
+					continue;
+
+				value = bsdfIts.Le(-bsdfRay.d);
+				dRec.setQuery(bsdfRay, bsdfIts);
+			}
+			else {
+				/* Intersected nothing -- perhaps there is an environment map? */
+				const Emitter *env = scene->getEnvironmentEmitter();
+
+				if (!env || (m_hideEmitters && bRec.sampledType == BSDF::ENull))
+					continue;
+
+				value = env->evalEnvironment(RayDifferential(bsdfRay));
+				if (!env->fillDirectSamplingRecord(dRec, bsdfRay))
+					continue;
+			}
+
+			/* Compute the prob. of generating that direction using the
+			implemented direct illumination sampling technique */
+			const Float lumPdf = (!(bRec.sampledType & BSDF::EDelta)) ?
+				scene->pdfEmitterDirect(dRec) : 0;
+
+			/* Weight using the power heuristic */
+			const Float weight = miWeight(bsdfPdf * fracBSDF,
+				lumPdf * fracLum) * weightBSDF;
+#if DIRECT
+			Li += value * bsdfVal * weight;
+#endif
+		}
 
 		/* Lightcuts */
 		Spectrum indirResult(0.f);

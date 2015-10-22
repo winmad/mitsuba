@@ -12,6 +12,7 @@ macro(add_bidir)
 endmacro()
 
 add_integrator(aaf      aaf/aaf.cpp)
+add_integrator(info    info/info.cpp)
 add_integrator(lightcuts    lightcuts/lightcuts.cpp)
 add_integrator(ao       direct/ao.cpp)
 add_integrator(direct   direct/direct.cpp)
