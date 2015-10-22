@@ -62,11 +62,11 @@ public:
 	Spectrum evalLightcut(RayDifferential& ray, RadianceQueryRecord& rRec,
 		Random *random, int maxCutSize, Float maxErrorRatio);
 	
-	Spectrum evalNodeIllumination(LightNode *node, const Scene *scene, Random *random,
-		Vector &wi, Intersection &its, const BSDF *bsdf) const;
+	Spectrum evalNodeIllumination(const LightNode *node, const Scene *scene, Random *random,
+		Vector &wi, Intersection &its, const BSDF *bsdf);
 
-	Spectrum evalErrorBound(LightNode *node, Vector &wi,
-		Intersection &its, const BSDF *bsdf) const;
+	Spectrum evalErrorBound(const LightNode *node, Vector &wi,
+		Intersection &its, const BSDF *bsdf);
 
 	Spectrum evalMaterialErrorBound(const AABB &bbox, Vector &wi,
 		Intersection &its, const BSDF *bsdf, bool isDirLight) const;

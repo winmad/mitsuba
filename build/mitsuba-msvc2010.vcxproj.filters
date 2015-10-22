@@ -144,6 +144,9 @@
     <Filter Include="Source Files\integrators\lightcuts">
       <UniqueIdentifier>{47989420-bea5-4fa9-abc5-37793b7d9890}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\integrators\aaf">
+      <UniqueIdentifier>{724ce9b1-f6f1-4290-b48f-e5ba39d962f3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup Label="Source Files">
     <ClCompile Include="..\src\converter\mtsimport.cpp">
@@ -1027,6 +1030,9 @@
     </ClCompile>
     <ClCompile Include="..\src\librender\lightcutter.cpp">
       <Filter>Source Files\librender</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\integrators\aaf\aaf.cpp">
+      <Filter>Source Files\integrators\aaf</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">

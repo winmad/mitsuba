@@ -584,6 +584,10 @@ public:
 		return oss.str();
 	}
 
+	ImageBlock *getImageBlock() { return m_storage.get(); }
+
+	const ImageBlock *getImageBlock() const { return m_storage.get(); }
+
 	MTS_DECLARE_CLASS()
 protected:
 	Bitmap::EFileFormat m_fileFormat;

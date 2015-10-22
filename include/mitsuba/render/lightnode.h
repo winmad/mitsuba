@@ -28,11 +28,11 @@ struct LightNode {
 	Float ratio;
 	bool isLeft;
 	
-	virtual LightNode* getLeft() = 0;
-	virtual LightNode* getRight() = 0;
-	virtual AABB getBBox() = 0;
-	virtual VPL* getLight() = 0;
-	virtual Cone getCone() = 0;
+	virtual LightNode* getLeft() const = 0;
+	virtual LightNode* getRight() const = 0;
+	virtual AABB getBBox() const = 0;
+	virtual VPL* getLight() const = 0;
+	virtual Cone getCone() const = 0;
 
 	virtual bool isLeaf() const = 0;
 	virtual ELightNodeType getNodeType() const = 0;
@@ -47,23 +47,23 @@ struct PointLightNode : public LightNode {
 	}
 	virtual ~PointLightNode() {}
 	
-	virtual LightNode* getLeft() {
+	virtual LightNode* getLeft() const {
 		return left;
 	}
 
-	virtual LightNode* getRight() {
+	virtual LightNode* getRight() const {
 		return right;
 	}
 
-	virtual AABB getBBox() {
+	virtual AABB getBBox() const {
 		return bbox;
 	}
 
-	virtual VPL* getLight() {
+	virtual VPL* getLight() const {
 		return light;
 	}
 
-	virtual Cone getCone() {
+	virtual Cone getCone() const {
 		return Cone();
 	}
 
@@ -111,23 +111,23 @@ struct DirectionalLightNode : public LightNode {
 	}
 	virtual ~DirectionalLightNode() {}
 
-	virtual LightNode* getLeft() {
+	virtual LightNode* getLeft() const {
 		return left;
 	}
 
-	virtual LightNode* getRight() {
+	virtual LightNode* getRight() const {
 		return right;
 	}
 
-	virtual AABB getBBox() {
+	virtual AABB getBBox() const {
 		return bbox;
 	}
 
-	virtual VPL* getLight() {
+	virtual VPL* getLight() const {
 		return light;
 	}
 
-	virtual Cone getCone() {
+	virtual Cone getCone() const {
 		return Cone();
 	}
 
@@ -176,23 +176,23 @@ struct SurfaceLightNode : public LightNode {
 
 	virtual ~SurfaceLightNode() {}
 
-	virtual LightNode* getLeft() {
+	virtual LightNode* getLeft() const {
 		return left;
 	}
 
-	virtual LightNode* getRight() {
+	virtual LightNode* getRight() const {
 		return right;
 	}
 
-	virtual AABB getBBox() {
+	virtual AABB getBBox() const {
 		return bbox;
 	}
 
-	virtual VPL* getLight() {
+	virtual VPL* getLight() const {
 		return light;
 	}
 
-	virtual Cone getCone() {
+	virtual Cone getCone() const {
 		return cone;
 	}
 
@@ -209,9 +209,11 @@ struct SurfaceLightNode : public LightNode {
 		light = vl;
 		
 		// Assume Lambertian BRDF
-		Spectrum f(1.f);
+		Spectrum f;
 		if (vl->type == ESurfaceVPL)
-			f = vl->its.getBSDF()->getDiffuseReflectance(vl->its) * INV_PI; 
+			f = vl->its.getBSDF()->getDiffuseReflectance(vl->its) * INV_PI;
+		else
+			f = Spectrum(INV_PI);
 		
 		P = vl->P * f;
 		bbox.reset();

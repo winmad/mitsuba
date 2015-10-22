@@ -1,6 +1,6 @@
 /*
-Added by Lifan Wu
-Oct 18, 2015
+	Added by Lifan Wu
+	Oct 18, 2015
 */
 
 #include <mitsuba/render/lightcutter.h>
@@ -73,8 +73,8 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 	return L;
 }
 
-Spectrum Lightcutter::evalNodeIllumination(LightNode *node, const Scene *scene, Random *random,
-	Vector &wi, Intersection &its, const BSDF *bsdf) const {
+Spectrum Lightcutter::evalNodeIllumination(const LightNode *node, const Scene *scene, Random *random,
+	Vector &wi, Intersection &its, const BSDF *bsdf) {
 	Spectrum result;
 	Vector wo;
 	Float d;
@@ -113,7 +113,10 @@ Spectrum Lightcutter::evalNodeIllumination(LightNode *node, const Scene *scene, 
 		d = sqrt(d2);
 		Float cosWo = absDot(wo, its.shFrame.n);
 		Float cosLight = absDot(-wo, light->its.shFrame.n);
+		
+		// cosLight or 1.f ?
 		Float G = 1.f / d2;
+
 		G = std::min(G, m_gLimit);
 		BSDFSamplingRecord bRec(its, its.toLocal(wo));
 		Spectrum f = bsdf->eval(bRec);
@@ -129,7 +132,7 @@ Spectrum Lightcutter::evalNodeIllumination(LightNode *node, const Scene *scene, 
 		result /= continueProb;
 	}
 
-	Ray connectRay(its.p, wo, Epsilon, sqrt(d) * (1.f - ShadowEpsilon), its.time);
+	Ray connectRay(its.p, wo, Epsilon, d * (1.f - ShadowEpsilon), its.time);
 	if (!scene->rayIntersect(connectRay))
 		return result;
 	else
@@ -138,8 +141,8 @@ Spectrum Lightcutter::evalNodeIllumination(LightNode *node, const Scene *scene, 
 	return result;
 }
 
-Spectrum Lightcutter::evalErrorBound(LightNode *node, Vector &wi, 
-	Intersection &its, const BSDF *bsdf) const {
+Spectrum Lightcutter::evalErrorBound(const LightNode *node, Vector &wi, 
+	Intersection &its, const BSDF *bsdf) {
 	Spectrum result(1e8f);
 	if (node->getNodeType() == ESurfaceLightNode) {
 		Float errorBound = 1.f;

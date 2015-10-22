@@ -97,6 +97,10 @@ public:
 	/// Return the image reconstruction filter (const version)
 	inline const ReconstructionFilter *getReconstructionFilter() const { return m_filter.get(); }
 
+	virtual ImageBlock *getImageBlock() { NotImplementedError("getImageBlock"); }
+
+	virtual const ImageBlock *getImageBlock() const { NotImplementedError("getImageBlock"); }
+
 	// =============================================================
 	//! @{ \name ConfigurableObject interface
 	// =============================================================
