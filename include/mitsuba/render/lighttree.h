@@ -24,7 +24,7 @@ public:
 	void build(std::vector<VPL> &_vpls);
 
 	LightNodeType *recursiveBuild(size_t nodeNum, int start, int end, 
-		VPL **vpls);
+		std::vector<VPL*>& vpls);
 
 	LightNodeType *root;
 
@@ -47,12 +47,19 @@ void LightTree<LightNodeType>::build(std::vector<VPL> &_vpls) {
 		vpls[i] = &_vpls[i];
 		_vpls[i].pos = _vpls[i].getPos(m_ratio);
 	}
-	root = recursiveBuild(0, 0, _vpls.size(), &vpls[0]);
+	root = recursiveBuild(0, 0, _vpls.size(), vpls);
 }
+
+# ifdef linux
+template<int dim> bool cmp(const VPL *l1, const VPL *l2) 
+{
+    return l1->pos[dim] == l2->pos[dim] ? (l1 < l2) : (l1->pos[dim] < l2->pos[dim]);
+}
+#endif
 
 template <typename LightNodeType>
 LightNodeType* LightTree<LightNodeType>::recursiveBuild(size_t nodeNum, int start, int end, 
-		VPL **vpls) {
+		std::vector<VPL*>& vpls) {
 	if (start + 1 == end) {
 		m_nodes[nodeNum].initLeaf(vpls[start]);
 		return &m_nodes[nodeNum];
@@ -65,10 +72,41 @@ LightNodeType* LightTree<LightNodeType>::recursiveBuild(size_t nodeNum, int star
 
 	int dim = bound.getLargestAxis();
 	int mid = (start + end) / 2;
-	std::nth_element(&vpls[start], &vpls[mid], &vpls[end], 
+	
+# ifdef linux
+        switch(dim)
+        {
+        case 0:
+            std::nth_element(vpls.begin()+start, vpls.begin()+mid, vpls.begin()+end, 
+		cmp<0>);
+            break;
+        case 1:
+            std::nth_element(vpls.begin()+start, vpls.begin()+mid, vpls.begin()+end, 
+		cmp<1>);
+            break;
+        case 2:
+            std::nth_element(vpls.begin()+start, vpls.begin()+mid, vpls.begin()+end, 
+		cmp<2>);
+            break;
+        case 3:
+            std::nth_element(vpls.begin()+start, vpls.begin()+mid, vpls.begin()+end, 
+		cmp<3>);
+            break;
+        case 4:
+            std::nth_element(vpls.begin()+start, vpls.begin()+mid, vpls.begin()+end, 
+		cmp<4>);
+            break;
+        case 5:
+            std::nth_element(vpls.begin()+start, vpls.begin()+mid, vpls.begin()+end, 
+		cmp<5>);
+            break;
+        }
+#else
+        std::nth_element(vpls.begin()+start, vpls.begin()+mid, vpls.begin()+end, 
 		[dim](const VPL *l1, const VPL *l2)->bool {
 			return l1->pos[dim] == l2->pos[dim] ? (l1 < l2) : (l1->pos[dim] < l2->pos[dim]);
 	});
+#endif
 
 	LightNodeType *node = &m_nodes[nodeNum];
 	int rc = nextFreeNode++;

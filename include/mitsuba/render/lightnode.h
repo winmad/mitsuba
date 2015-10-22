@@ -209,7 +209,9 @@ struct SurfaceLightNode : public LightNode {
 		light = vl;
 		
 		// Assume Lambertian BRDF
-		Spectrum f = vl->its.getBSDF()->getDiffuseReflectance(vl->its) * INV_PI; 
+		Spectrum f(1.f);
+		if (vl->type == ESurfaceVPL)
+			f = vl->its.getBSDF()->getDiffuseReflectance(vl->its) * INV_PI; 
 		
 		P = vl->P * f;
 		bbox.reset();

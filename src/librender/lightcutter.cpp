@@ -11,8 +11,10 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 	Random *random, int maxCutSize, Float maxErrorRatio) {
 	LightNode *node = m_surfaceLightTree->root;
 	const BSDF *bsdf = rRec.its.getBSDF(ray);
-	Spectrum contrib = evalNodeIllumination(node, rRec.scene, random, -ray.d, rRec.its, bsdf);
-	Spectrum error = evalErrorBound(node, -ray.d, rRec.its, bsdf);
+	
+	Vector dir = -ray.d;
+	Spectrum contrib = evalNodeIllumination(node, rRec.scene, random, dir, rRec.its, bsdf);
+	Spectrum error = evalErrorBound(node, dir, rRec.its, bsdf);
 
 	Spectrum L = contrib;
 	std::priority_queue<LightcutHeapNode> q;
@@ -37,13 +39,13 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 					L -= ln.contrib;
 
 					contrib = ln.contrib * node->ratio;
-					error = evalErrorBound(node->getLeft(), -ray.d, rRec.its, bsdf);
+					error = evalErrorBound(node->getLeft(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getLeft(), error, contrib));
 
 					contrib = evalNodeIllumination(node->getRight(), rRec.scene, random,
 						-ray.d, rRec.its, bsdf);
-					error = evalErrorBound(node->getRight(), -ray.d, rRec.its, bsdf);
+					error = evalErrorBound(node->getRight(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getRight(), error, contrib));
 				}
@@ -52,12 +54,12 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 
 					contrib = evalNodeIllumination(node->getLeft(), rRec.scene, random,
 						-ray.d, rRec.its, bsdf);
-					error = evalErrorBound(node->getLeft(), -ray.d, rRec.its, bsdf);
+					error = evalErrorBound(node->getLeft(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getLeft(), error, contrib));
 
 					contrib = ln.contrib * node->ratio;
-					error = evalErrorBound(node->getRight(), -ray.d, rRec.its, bsdf);
+					error = evalErrorBound(node->getRight(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getRight(), error, contrib));
 				}
@@ -74,12 +76,14 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 Spectrum Lightcutter::evalNodeIllumination(LightNode *node, const Scene *scene, Random *random,
 	Vector &wi, Intersection &its, const BSDF *bsdf) const {
 	Spectrum result;
+	Vector wo;
+	Float d;
 	if (node->getNodeType() == ESurfaceLightNode) {
 		VPL *light = ((SurfaceLightNode*)node)->light;
-		DirectSamplingRecord dRec(its);
-		Vector wo = normalize(light->its.p - its.p);
+		wo = normalize(light->its.p - its.p);
 		Float d2 = (light->its.p - its.p).lengthSquared();
 		// d2 = std::max(m_dLimit, d2);
+		d = sqrt(d2);
 		Float cosWo = absDot(wo, its.shFrame.n);
 		Float cosLight = absDot(-wo, light->its.shFrame.n);
 		Float G = cosLight / d2;
@@ -88,28 +92,49 @@ Spectrum Lightcutter::evalNodeIllumination(LightNode *node, const Scene *scene, 
 		Spectrum f = bsdf->eval(bRec);
 		if (G == 0.f || f.isZero())
 			return Spectrum(0.f);
-		result = f * G * node->P;
-		Ray connectRay(its.p, wo, Epsilon, sqrt(d2) * (1.f - ShadowEpsilon), its.time);
-
-		if (result.getLuminance() < m_rrThreshold) {
-			Float continueProb = 0.1f;
-			if (random->nextFloat() > continueProb)
-				return Spectrum(0.f);
-			result /= continueProb;
-		}
-
-		if (!scene->rayIntersect(connectRay))
-			return result;
-		else
-			return Spectrum(0.f);
+		result = f * G * node->P;	
 	}
 	else if (node->getNodeType() == EDirectionalLightNode) {
+		VPL *light = ((DirectionalLightNode*)node)->light;
+		Vector wo = -light->its.shFrame.n;
+		d = 1e12f;
+		BSDFSamplingRecord bRec(its, its.toLocal(wo));
+		Spectrum f = bsdf->eval(bRec);
+		if (f.isZero())
+			return Spectrum(0.f);
+		result = f * node->P;
 
 	}
 	else if (node->getNodeType() == EPointLightNode) {
-
+		VPL *light = ((PointLightNode*)node)->light;
+		Vector wo = normalize(light->its.p - its.p);
+		Float d2 = (light->its.p - its.p).lengthSquared();
+		// d2 = std::max(m_dLimit, d2);
+		d = sqrt(d2);
+		Float cosWo = absDot(wo, its.shFrame.n);
+		Float cosLight = absDot(-wo, light->its.shFrame.n);
+		Float G = 1.f / d2;
+		G = std::min(G, m_gLimit);
+		BSDFSamplingRecord bRec(its, its.toLocal(wo));
+		Spectrum f = bsdf->eval(bRec);
+		if (G == 0.f || f.isZero())
+			return Spectrum(0.f);
+		result = f * G * node->P;	
 	}
 	
+	if (result.getLuminance() < m_rrThreshold) {
+		Float continueProb = 0.1f;
+		if (random->nextFloat() > continueProb)
+			return Spectrum(0.f);
+		result /= continueProb;
+	}
+
+	Ray connectRay(its.p, wo, Epsilon, sqrt(d) * (1.f - ShadowEpsilon), its.time);
+	if (!scene->rayIntersect(connectRay))
+		return result;
+	else
+		return Spectrum(0.f);
+
 	return result;
 }
 
@@ -123,7 +148,7 @@ Spectrum Lightcutter::evalErrorBound(LightNode *node, Vector &wi,
 		Float dist2 = bound.squaredDistanceTo(its.p);
 		
 		if (dist2 < 1e-6f)
-			return Spectrum(1e8f);
+			return Spectrum(1e12f);
 		
 		errorBound /= dist2;
 		
@@ -137,7 +162,7 @@ Spectrum Lightcutter::evalErrorBound(LightNode *node, Vector &wi,
 				Vector v = cross(Vector(0.f, 0.f, 1.f), coneAxis);
 				if (v.length() > 0) {
 					v = normalize(v);
-					Transform t = Transform::rotate(v, -acosf(dot(Vector(0.f, 0.f, 1.f), coneAxis)));
+					Transform t = Transform::rotate(v, radToDeg(-acosf(dot(Vector(0.f, 0.f, 1.f), coneAxis))));
 
 					Point corners[8];
 					AABB tBound;
@@ -184,10 +209,22 @@ Spectrum Lightcutter::evalErrorBound(LightNode *node, Vector &wi,
 		result = node->P * brdf * errorBound;
 	}
 	else if (node->getNodeType() == EDirectionalLightNode) {
-
+		Spectrum brdf = evalMaterialErrorBound(node->getBBox(), wi, its, bsdf, true);
+		result = node->P * brdf;
 	}
 	else if (node->getNodeType() == EPointLightNode) {
+		Float errorBound = 1.f;
 
+		const AABB &bound = node->getBBox();
+		Float dist2 = bound.squaredDistanceTo(its.p);
+
+		if (dist2 < 1e-6f)
+			return Spectrum(1e8f);
+
+		errorBound /= dist2;
+
+		Spectrum brdf = evalMaterialErrorBound(node->getBBox(), wi, its, bsdf, false);
+		result = node->P * brdf * errorBound;
 	}
 
 	return result;
@@ -203,12 +240,12 @@ Spectrum Lightcutter::evalMaterialErrorBound(const AABB &bbox, Vector &wi,
 	if (!m_useCosBound)
 		return diffuse;
 
-	Vector v = cross(Vector(0.f, 0.f, 1.f), its.geoFrame.n);
+	Vector v = cross(Vector(0.f, 0.f, 1.f), its.shFrame.n);
 	if (v.length() < 1e-6f)
 		return diffuse;
 
 	v = normalize(v);
-	Transform t = Transform::rotate(v, -acosf(dot(Vector(0.f, 0.f, 1.f), its.geoFrame.n)));
+	Transform t = Transform::rotate(v, radToDeg(-acosf(dot(Vector(0.f, 0.f, 1.f), its.shFrame.n))));
 	Point corners[8];
 	AABB tBound;
 	Point tp;
@@ -225,7 +262,7 @@ Spectrum Lightcutter::evalMaterialErrorBound(const AABB &bbox, Vector &wi,
 	Point &m = tBound.min;
 	Point &M = tBound.max;
 
-	Float cosTheta = 1.f;
+	Float cosTheta = 0.f;
 	if (M.z > 0) {
 		Float minx2, miny2;
 		if (m.x * M.x <= 0)

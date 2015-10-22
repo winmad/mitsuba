@@ -970,7 +970,7 @@ template <typename T> struct TPoint6 {
 	/// Return a readable string representation of this point
 	std::string toString() const {
 		std::ostringstream oss;
-		oss << "[" << x << ", " << y << ", " << z << ", " << w << ", " << s << ", " << t "]";
+		oss << "[" << x << ", " << y << ", " << z << ", " << w << ", " << s << ", " << t << "]";
 		return oss.str();
 	}
 };
