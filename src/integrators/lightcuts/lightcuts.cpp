@@ -9,6 +9,8 @@
 
 MTS_NAMESPACE_BEGIN
 
+#define DIRECT 0
+
 class LightcutsIntegrator : public SamplingIntegrator {
 public:
 	LightcutsIntegrator(const Properties &props) : SamplingIntegrator(props) {
@@ -100,6 +102,13 @@ public:
 
 		return true;
 	}
+        
+        bool render(Scene *scene,
+		RenderQueue *queue, const RenderJob *job,
+		int sceneResID, int sensorResID, int samplerResID)
+        {
+            SamplingIntegrator::render(scene, queue, job, sceneResID, sensorResID, samplerResID);
+        }
 
 	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec) const {
 		/* Some aliases and local variables */
@@ -179,6 +188,16 @@ public:
 			for (size_t i = 0; i<numDirectSamples; ++i) {
 				/* Estimate the direct illumination if this is requested */
 				Spectrum value = scene->sampleEmitterDirect(dRec, sampleArray[i]);
+                                
+                                Intersection occ_its;
+                                Ray ray(dRec.ref, dRec.d, Epsilon,
+					dRec.dist*(1-ShadowEpsilon), dRec.time);
+                                bool hit = scene->rayIntersect(ray, occ_its);
+                                if(hit && occ_its.t < its.t)
+                                    return Spectrum((its.t/(its.t-occ_its.t)-1));
+                                else
+                                    return Spectrum(0.0);
+                                
 				if (!value.isZero()) {
 					const Emitter *emitter = static_cast<const Emitter *>(dRec.object);
 
@@ -197,7 +216,9 @@ public:
 						const Float weight = miWeight(dRec.pdf * fracLum,
 							bsdfPdf * fracBSDF) * weightLum;
 
+#if DIRECT
 						Li += value * bsdfVal * weight;
+#endif
 					}
 				}
 			}
@@ -263,7 +284,9 @@ public:
 			const Float weight = miWeight(bsdfPdf * fracBSDF,
 				lumPdf * fracLum) * weightBSDF;
 
+#if DIRECT
 			Li += value * bsdfVal * weight;
+#endif
 		}
 
 		/* Lightcuts */

@@ -77,6 +77,7 @@ public:
 	LightTree<SurfaceLightNode> *m_surfaceLightTree;
 	Float m_gLimit;
 	Float m_rrThreshold;
+        
 };
 
 MTS_NAMESPACE_END
