@@ -4,8 +4,12 @@
 */
 
 #include <mitsuba/render/scene.h>
+#include <mitsuba/render/film.h>
+#include <mitsuba/core/fstream.h>
 #include <mitsuba/core/statistics.h>
+#include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/algorithm/string.hpp>
 
 MTS_NAMESPACE_BEGIN
 
@@ -155,10 +159,16 @@ public:
 		const RenderJob *job, int sceneResID, int sensorResID,
 		int samplerResID) {
 		const Film *film = scene->getSensor()->getFilm();
-		const Bitmap *img = film->getImageBlock()->getBitmap();
-		//boost::filesystem::path output{ "test.exr" };
-		//Log(EInfo, "output path = %s", output.string().c_str());
-		//img->write(output);
+		const Bitmap *bitmap = film->getImageBlock()->getBitmap();
+		ref<Bitmap> img = new Bitmap(*bitmap);
+		img = img->convert(Bitmap::ERGB, Bitmap::EFloat32);
+
+		fs::path output = scene->getDestinationFile();
+		output.replace_extension("test.pfm");
+		Log(EInfo, "output path = %s", output.string().c_str());
+		ref<FileStream> stream = new FileStream(output, FileStream::ETruncWrite);
+
+		img->write(Bitmap::EPFM, stream);
 	}
 
 	void serialize(Stream *stream, InstanceManager *manager) const {

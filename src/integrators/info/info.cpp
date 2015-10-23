@@ -33,7 +33,6 @@ public:
     }
     
     Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec) const {
-        
         const Scene *scene = rRec.scene;
         Intersection &its = rRec.its;
         RayDifferential ray(r);

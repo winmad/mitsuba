@@ -147,6 +147,9 @@
     <Filter Include="Source Files\integrators\aaf">
       <UniqueIdentifier>{724ce9b1-f6f1-4290-b48f-e5ba39d962f3}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\integrators\info">
+      <UniqueIdentifier>{80b56aac-62ab-4d8a-ad85-8dbbe4a5573b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup Label="Source Files">
     <ClCompile Include="..\src\converter\mtsimport.cpp">
@@ -1033,6 +1036,9 @@
     </ClCompile>
     <ClCompile Include="..\src\integrators\aaf\aaf.cpp">
       <Filter>Source Files\integrators\aaf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\integrators\info\info.cpp">
+      <Filter>Source Files\integrators\info</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">

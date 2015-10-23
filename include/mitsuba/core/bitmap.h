@@ -1385,7 +1385,7 @@ public:
 			Bitmap::EPixelFormat destFormat, Float destGamma, void *_dest,
 			size_t count, Float multiplier = 1.0f,
 			Spectrum::EConversionIntent intent = Spectrum::EReflectance,
-			int channelCount = -1) const= 0;
+			int channelCount = -1) const = 0;
 
 	/**
 	 * \brief Return the format conversion implemented by this
