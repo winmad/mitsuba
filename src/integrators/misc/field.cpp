@@ -63,7 +63,10 @@ public:
 		EUV,
 		EAlbedo,
 		EShapeIndex,
-		EPrimIndex
+		EPrimIndex,
+		// Added by Lifan Wu
+		// Oct 23, 2015
+		EDistancesForAAF
 	};
 
 	FieldIntegrator(const Properties &props) : SamplingIntegrator(props) {
@@ -87,6 +90,8 @@ public:
 			m_field = EShapeIndex;
 		} else if (field == "primIndex") {
 			m_field = EPrimIndex;
+		} else if (field == "distancesForAAF") {
+			m_field = EDistancesForAAF;
 		} else {
 			Log(EError, "Invalid 'field' parameter. Must be one of 'position', "
 				"'relPosition', 'distance', 'geoNormal', 'shNormal', "
@@ -167,6 +172,8 @@ public:
 			case EPrimIndex:
 				result = Spectrum((Float) its.primIndex);
 				break;
+			case EDistancesForAAF:
+				
 			default:
 				Log(EError, "Internal error!");
 		}

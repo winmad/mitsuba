@@ -632,6 +632,9 @@
     <ClCompile Include="..\src\integrators\aaf\aaf.cpp" />
     <ClCompile Include="..\src\integrators\info\info.cpp" />
     <ClCompile Include="..\src\integrators\lightcuts\lightcuts.cpp" />
+    <ClCompile Include="..\src\integrators\misc\field.cpp" />
+    <ClCompile Include="..\src\integrators\misc\motion.cpp" />
+    <ClCompile Include="..\src\integrators\misc\multichannel.cpp" />
     <ClCompile Include="..\src\librender\lightcutter.cpp" />
     <ClCompile Include="..\src\librender\trimesh.cpp">
     </ClCompile>

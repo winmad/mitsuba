@@ -7,6 +7,7 @@
 #include <mitsuba/render/film.h>
 #include <mitsuba/core/fstream.h>
 #include <mitsuba/core/statistics.h>
+#include <mitsuba/core/plugin.h>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string.hpp>
@@ -51,7 +52,13 @@ public:
 			return false;
 		if (m_subIntegrator == NULL)
 			Log(EError, "No sub-integrator was specified!");
-		Sampler *sampler = static_cast<Sampler *>(Scheduler::getInstance()->getResource(samplerResID, 0));
+//		Sampler *sampler = static_cast<Sampler *>(Scheduler::getInstance()->getResource(samplerResID, 0)); 
+		Properties props("stratified");
+		props.setInteger("sampleCount", m_initSamples);
+		props.setInteger("dimension", 7);
+		Sampler *sampler = static_cast<Sampler*> (PluginManager::getInstance()->createObject(MTS_CLASS(Sampler), props));
+		sampler->configure();
+
 		Sensor *sensor = static_cast<Sensor *>(Scheduler::getInstance()->getResource(sensorResID));
 // 		if (sampler->getClass()->getName() != "IndependentSampler")
 // 			Log(EError, "The error-controlling integrator should only be "
@@ -68,6 +75,65 @@ public:
 		Point2 apertureSample(0.5f);
 		Float timeSample = 0.5f;
 		RadianceQueryRecord rRec(scene, sampler);
+		rRec.newQuery(RadianceQueryRecord::EDistance | RadianceQueryRecord::EIntersection, sensor->getMedium());
+
+		int pixelNums = filmSize.x * filmSize.y;
+		infos.resize(pixelNums);
+		normals.resize(pixelNums);
+		dists.resize(pixelNums);
+
+		for (int x = 0; x < filmSize.x; x++) {
+			for (int y = 0; y < filmSize.y; y++) {
+				sampler->generate(Point2i(x, y));
+
+				for (int c = 0; c < m_initSamples; c++) {
+					Point2 samplePos(rRec.nextSample2D());
+					samplePos.x *= filmSize.x;
+					samplePos.y *= filmSize.y;
+
+					if (needsApertureSample)
+						apertureSample = rRec.nextSample2D();
+					if (needsTimeSample)
+						timeSample = rRec.nextSample1D();
+
+					RayDifferential eyeRay;
+					Spectrum sampleValue = sensor->sampleRay(
+						eyeRay, samplePos, apertureSample, timeSample);
+
+					int index = x + filmSize.x * y;
+
+					if (rRec.rayIntersect(eyeRay)) {
+						dists[index] = rRec.dist;
+						normals[index] = rRec.its.shFrame.n;
+
+						Point2 lightSample(rRec.nextSample2D());
+						Point2 *sampleArray;
+						sampleArray = &lightSample;
+
+						DirectSamplingRecord dRec(rRec.its);
+						const BSDF *bsdf = rRec.its.getBSDF(eyeRay);
+
+						if (bsdf->getType() & BSDF::ESmooth) {
+							for (size_t i = 0; i < 1; ++i) {
+								scene->sampleEmitterDirect(dRec, sampleArray[i]);
+								Intersection occ_its;
+								Ray ray(dRec.ref, dRec.d, Epsilon,
+									dRec.dist*(1 - ShadowEpsilon), dRec.time);
+								bool hit = scene->rayIntersect(ray, occ_its);
+								if (hit) {
+									// update d2_min
+								}
+							}
+						}
+					}
+					else {
+						infos[index] = Spectrum(-1.f);
+						normals[index] = Vector(std::numeric_limits<Float>::infinity());
+						dists[index] = -1.f;
+					}
+				}
+			}
+		}
 
 		/* Estimate the overall luminance on the image plane */
 		for (int i = 0; i<nSamples; ++i) {
@@ -213,7 +279,9 @@ private:
 	int m_initSamples;
 
 	// 0: d1 (distance from light to pixel), 1: d2_min, 2: d2_max (distance from light to occluders)
-	std::vector<Spectrum> info;
+	std::vector<Spectrum> infos;
+	std::vector<Vector> normals;
+	std::vector<Float> dists;
 
 	bool m_verbose;
 };

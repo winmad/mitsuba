@@ -21,6 +21,7 @@
 #define __MITSUBA_CORE_LOGGER_H_
 
 #include <mitsuba/core/formatter.h>
+#include <stdarg.h>
 
 // -----------------------------------------------------------------------
 //  Logging
@@ -30,6 +31,8 @@ MTS_NAMESPACE_BEGIN
 
 /*! \addtogroup libcore */
 /*! @{ */
+
+#define writeLog Logger::writeLog
 
 /// Write a Log message to the console (to be used within subclasses of <tt>Object</tt>)
 #define Log(level, fmt, ...) do { \
@@ -208,6 +211,30 @@ public:
 	/// Shutdown logging
 	static void staticShutdown();
 
+	static bool restartFileLog() {
+		FILE *fp = fopen(logFilename.c_str(), "w");
+		if (!fp) {
+			fprintf(stderr, "ERROR: could not open LOG_FILE %s\n", logFilename);
+			return false;
+		}
+		fclose(fp);
+		return true;
+	}
+
+	static bool writeLog(const char *format, ...) {
+		va_list args;
+		FILE *fp = fopen(logFilename.c_str(), "a");
+		if (!fp) {
+			fprintf(stderr, "ERROR: could not open LOG_FILE %s\n", logFilename);
+			return false;
+		}
+		va_start(args, format);
+		vfprintf(fp, format, args);
+		va_end(args);
+		fclose(fp);
+		return true;
+	}
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor
@@ -219,7 +246,10 @@ private:
 	ref<Mutex> m_mutex;
 	std::vector<Appender *> m_appenders;
 	size_t m_warningCount;
+
+	static std::string logFilename;
 };
+
 
 MTS_NAMESPACE_END
 

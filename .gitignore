@@ -6,6 +6,7 @@ render.py
 dependencies_macos/
 backup/
 build/*.py
+*.txt
 
 # Documentation
 doc/apidocs/*

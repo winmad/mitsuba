@@ -9,6 +9,7 @@ public:
     MTS_DECLARE_CLASS()
     std::string m_info_name;
     size_t m_samples;
+
     InfoIntegrator(const Properties &props) : SamplingIntegrator(props) {
         m_info_name = props.getString("infoName");
         m_samples = props.getSize("samples");

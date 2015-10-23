@@ -29,9 +29,13 @@
 
 MTS_NAMESPACE_BEGIN
 
+std::string Logger::logFilename("debug.txt");
+
 Logger::Logger(ELogLevel level)
  : m_logLevel(level), m_errorLevel(EError), m_warningCount(0) {
 	m_mutex = new Mutex();
+
+	//logFilename = "debug.txt";
 }
 
 Logger::~Logger() {
@@ -195,6 +199,8 @@ void Logger::clearAppenders() {
 }
 
 void Logger::staticInitialization() {
+	restartFileLog();
+
 	Logger *logger = new Logger(EInfo);
 	ref<Appender> appender = new StreamAppender(&std::cout);
 	ref<Formatter> formatter = new DefaultFormatter();

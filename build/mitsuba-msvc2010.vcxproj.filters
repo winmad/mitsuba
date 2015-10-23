@@ -1040,6 +1040,15 @@
     <ClCompile Include="..\src\integrators\info\info.cpp">
       <Filter>Source Files\integrators\info</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\integrators\misc\field.cpp">
+      <Filter>Source Files\integrators\misc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\integrators\misc\motion.cpp">
+      <Filter>Source Files\integrators\misc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\integrators\misc\multichannel.cpp">
+      <Filter>Source Files\integrators\misc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
