@@ -900,4 +900,26 @@ std::string memString(size_t size, bool precise) {
 	return os.str();
 }
 
+Spectrum heatMap(Float val) {
+	float fraction;
+	Spectrum result;
+	if (val < 0.0f)
+		fraction = -1.0f;
+	else if (val > 1.0f)
+		fraction = 1.0f;
+	else
+		fraction = 2.0f * val - 1.0f;
+
+	if (fraction < -0.5f)
+		result.fromLinearRGB(0.0f, 2 * (fraction + 1.0f), 1.0f);
+	else if (fraction < 0.0f)
+		result.fromLinearRGB(0.0f, 1.0f, 1.0f - 2.0f * (fraction + 0.5f));
+	else if (fraction < 0.5f)
+		result.fromLinearRGB(2.0f * fraction, 1.0f, 0.0f);
+	else
+		result.fromLinearRGB(1.0f, 1.0f - 2.0f*(fraction - 0.5f), 0.0f);
+	
+	return result;
+}
+
 MTS_NAMESPACE_END

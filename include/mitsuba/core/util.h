@@ -674,6 +674,8 @@ extern MTS_EXPORT_CORE Vector refract(const Vector &wi, const Normal &n,
  */
 extern MTS_EXPORT_CORE Vector refract(const Vector &wi, const Normal &n, Float eta);
 
+extern MTS_EXPORT_CORE Spectrum heatMap(Float val);
+
 //! @}
 // -----------------------------------------------------------------------
 
