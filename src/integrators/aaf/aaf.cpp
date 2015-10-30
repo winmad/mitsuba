@@ -50,6 +50,16 @@ public:
 		m_subIntegrator->configureSampler(scene, sampler);
 	}
 
+	Float calcOmegaXf(int index) {
+		// min{spp_mu / (light_sigma * s2), 1 / (projDist * (1 + s2))}
+		return std::min(slopes[0][index].y > 0 ? 3.f / (2.f * slopes[0][index].y) : 1e10f, 
+			1.f / (projDists[index] * (1.f + slopes[0][index].y)));
+	}
+
+	Float calcGaussian(Float d, Float sigma) {
+		return expf(-d * d / (2.0f * sigma * sigma));
+	}
+
 	void filterSlope(Vector2 &slope, bool &occ, int id, int i, int j, int pass) {
 		if (i < 0 || i >= width || j < 0 || j >= height)
 			return;
@@ -88,10 +98,53 @@ public:
 			}
 		}
 
+		filterBeta[0].resize(pixelNum);
+		filterBeta[1].resize(pixelNum);
 		// calculate beta
-
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+				int index = x + y * width;
+				filterBeta[0][index] = calcOmegaXf(index);
+			}
+		}
 
 		// filter beta
+		for (int pass = 0; pass < 2; pass++) {
+			for (int x = 0; x < width; x++) {
+				for (int y = 0; y < height; y++) {
+					int index = x + y * width;
+					if (!occluded[0][index])
+						continue;
+
+					Float totValue = 0.f;
+					Float totWeight = 0.f;
+					for (int d = -radius; d <= radius; d++) {
+						int i, j;
+						if (pass == 0) {
+							i = x + d;
+							j = y;
+						}
+						else {
+							i = x;
+							j = y + d;
+						}
+						if (i < 0 || i >= width || j < 0 || j >= height)
+							continue;
+						
+						int targetIndex = i + j * width;
+						if (!occluded[0][targetIndex] || 
+							objId[targetIndex] != objId[index])
+							continue;
+						Float weight = calcGaussian((Float)d, 0.5f);
+						totValue += filterBeta[pass][targetIndex] * weight;
+						totWeight += weight;
+					}
+
+					if (totWeight > 1e-4f)
+						filterBeta[1 - pass][index] = totValue / totWeight;
+				}
+			}
+		}
 	}
 
 	bool preprocess(const Scene *scene, RenderQueue *queue, const RenderJob *job,
@@ -136,8 +189,10 @@ public:
 			slopes[i].resize(pixelNums);
 		}
 		objId.resize(pixelNums);
+		projDists.resize(pixelNums);
 		Float *data = new Float[pixelNums * 3];
 
+		Float xfov = ((PerspectiveCamera*)sensor)->getXFov();
 		m_timer->start();
 
 		for (int x = 0; x < filmSize.x; x++) {
@@ -153,6 +208,7 @@ public:
 				slopes[0][index].y = slopes[1][index].y = 1e10f;
 				occluded[0][index] = occluded[1][index] = false;
 				objId[index] = -1;
+				Float cnt = 0.f;
 
 				for (int c = 0; c < m_initSamples; c++) {
 					Point2 samplePos(rRec.nextSample2D());
@@ -175,6 +231,8 @@ public:
 						positions[index] += rRec.its.p;
 						normals[index] += rRec.its.shFrame.n;
 						objId[index] = rRec.its.primIndex;
+						projDists[index] += 2.f / width * rRec.its.t * tan(xfov * 0.5 * M_PI / 180.f);
+						cnt += 1.f;
 
 						Point2 lightSample(rRec.nextSample2D());
 						Point2 *sampleArray;
@@ -194,7 +252,7 @@ public:
 								dRec.dist * (1 - ShadowEpsilon), dRec.time);
 							bool hit = scene->rayIntersect(ray_l2s, occ_its_light_to_surface);
 							if (hit) {
-								occluded[index] = true;
+								occluded[0][index] = true;
 								dists[index].x = std::min(dists[index].x, dist2Light);
 								dists[index].y = std::max(dists[index].y, dist2Light);
 								dists[index].z = std::min(dists[index].z, occ_its_light_to_surface.t);
@@ -205,20 +263,25 @@ public:
 						}
 					}
 
-					if (occluded[index]) {
-						slopes[index].x = dists[index].y / dists[index].z - 1.f;
-						slopes[index].y = dists[index].x / dists[index].w - 1.f;
+					if (occluded[0][index]) {
+						slopes[0][index].x = dists[index].y / dists[index].z - 1.f;
+						slopes[0][index].y = dists[index].x / dists[index].w - 1.f;
 					}
 
 					sampler->advance();
 				}
 
-				positions[index] /= (Float)m_initSamples;
-				normals[index] /= (Float)m_initSamples;
-				if (normals[index].length() > 1e-4)
-					normalize(normals[index]);
+				if (cnt > 0) {
+					positions[index] /= cnt;
+					normals[index] /= cnt;
+					if (normals[index].length() > 1e-4)
+						normalize(normals[index]);
+					projDists[index] /= cnt;
+				}
 			}
 		}
+
+		calcFilterBeta();
 
 		Float preprocessTime = m_timer->getSecondsSinceStart();
 		Log(EInfo, "Preprocessing time = %.6fs", preprocessTime);
@@ -226,7 +289,7 @@ public:
 		for (int y = 0; y < filmSize.y; y++) {
 			for (int x = 0; x < filmSize.x; x++) {
 				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * filmSize.x) + c] = (occluded[x + y * filmSize.x] ? 1.f : 0.f);
+					data[3 * (x + y * filmSize.x) + c] = (occluded[0][x + y * filmSize.x] ? 1.f : 0.f);
 				}
 			}
 		}
@@ -235,12 +298,12 @@ public:
 		for (int y = 0; y < filmSize.y; y++) {
 			for (int x = 0; x < filmSize.x; x++) {
 				int index = x + y * filmSize.x;
-				if (!occluded[index]) {
+				if (!occluded[0][index]) {
 					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
 					continue;
 				}
 				//Spectrum s1 = heatMap(slopes[index].x);
-				Spectrum s1(slopes[index].x);
+				Spectrum s1(slopes[0][index].x);
 				for (int c = 0; c < 3; c++) {
 					data[3 * (x + y * filmSize.x) + c] = s1[c];
 				}
@@ -251,18 +314,34 @@ public:
 		for (int y = 0; y < filmSize.y; y++) {
 			for (int x = 0; x < filmSize.x; x++) {
 				int index = x + y * filmSize.x;
-				if (!occluded[index]) {
+				if (!occluded[0][index]) {
 					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
 					continue;
 				}
 				//Spectrum s2 = heatMap(slopes[index].y);
-				Spectrum s2(slopes[index].y);
+				Spectrum s2(slopes[0][index].y);
 				for (int c = 0; c < 3; c++) {
 					data[3 * (x + y * filmSize.x) + c] = s2[c];
 				}
 			}
 		}
 		savePfm("s2.pfm", data, filmSize.x, filmSize.y);
+
+		for (int y = 0; y < filmSize.y; y++) {
+			for (int x = 0; x < filmSize.x; x++) {
+				int index = x + y * filmSize.x;
+				if (!occluded[0][index]) {
+					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
+					continue;
+				}
+				//Spectrum s2 = heatMap(slopes[index].y);
+				Spectrum beta(filterBeta[0][index]);
+				for (int c = 0; c < 3; c++) {
+					data[3 * (x + y * filmSize.x) + c] = beta[c];
+				}
+			}
+		}
+		savePfm("beta.pfm", data, filmSize.x, filmSize.y);
 
 		return true;
 	}
@@ -332,6 +411,13 @@ public:
 		const Film *film = scene->getSensor()->getFilm();
 		const Bitmap *bitmap = film->getImageBlock()->getBitmap();
 		ref<Bitmap> img = new Bitmap(*bitmap);
+
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+
+			}
+		}
+
 		img = img->convert(Bitmap::ERGB, Bitmap::EFloat32);
 
 		fs::path output = scene->getDestinationFile();
@@ -414,6 +500,7 @@ private:
 	std::vector<Vector> normals;
 	std::vector<Point> positions;
 	std::vector<int> objId;
+	std::vector<Float> projDists;
 
 	std::vector<Float> filterBeta[2];
 
