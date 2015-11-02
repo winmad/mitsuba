@@ -74,7 +74,7 @@ public:
 		occ = (occ || occluded[pass][index]);
 	}
 
-	void calcFilterBeta() {
+	void calcOmegaXf() {
 		// filter slopes
 		int radius = 5;
 		int pixelNum = width * height;
@@ -98,13 +98,13 @@ public:
 			}
 		}
 
-		filterBeta[0].resize(pixelNum);
-		filterBeta[1].resize(pixelNum);
+		OmegaXf[0].resize(pixelNum);
+		OmegaXf[1].resize(pixelNum);
 		// calculate beta
 		for (int x = 0; x < width; x++) {
 			for (int y = 0; y < height; y++) {
 				int index = x + y * width;
-				filterBeta[0][index] = calcOmegaXf(index);
+				OmegaXf[0][index] = calcOmegaXf(index);
 			}
 		}
 
@@ -136,12 +136,12 @@ public:
 							objId[targetIndex] != objId[index])
 							continue;
 						Float weight = calcGaussian((Float)d, 0.5f);
-						totValue += filterBeta[pass][targetIndex] * weight;
+						totValue += OmegaXf[pass][targetIndex] * weight;
 						totWeight += weight;
 					}
 
 					if (totWeight > 1e-4f)
-						filterBeta[1 - pass][index] = totValue / totWeight;
+						OmegaXf[1 - pass][index] = totValue / totWeight;
 				}
 			}
 		}
@@ -183,7 +183,6 @@ public:
 
 		positions.resize(pixelNums);
 		normals.resize(pixelNums);
-		dists.resize(pixelNums);
 		for (int i = 0; i < 2; i++) {
 			occluded[i].resize(pixelNums);
 			slopes[i].resize(pixelNums);
@@ -202,8 +201,8 @@ public:
 				int index = x + filmSize.x * y;
 				positions[index] = Point(0.f);
 				normals[index] = Vector(0.f);
-				dists[index].x = dists[index].z = 1e10f;
-				dists[index].y = dists[index].w = 0;
+				Float d2_min = 1e10;
+				Float d2_max = 0;
 				slopes[0][index].x = slopes[1][index].x = -1e10f;
 				slopes[0][index].y = slopes[1][index].y = 1e10f;
 				occluded[0][index] = occluded[1][index] = false;
@@ -242,7 +241,11 @@ public:
 
 						for (size_t i = 0; i < 1; ++i) {
 							scene->sampleEmitterDirect(dRec, sampleArray[i]);
-							Float dist2Light = dRec.dist;
+							Float dist2Light;
+							//dist2Light = dRec.dist;
+							Vector lightDir = dRec.ref - dRec.p;
+							lightNormal = dRec.n;
+							dist2Light = fabsf(dot(lightDir, dRec.n));
 							
 							Intersection occ_its_light_to_surface;
 							Intersection occ_its_surface_to_light;
@@ -253,19 +256,20 @@ public:
 							bool hit = scene->rayIntersect(ray_l2s, occ_its_light_to_surface);
 							if (hit) {
 								occluded[0][index] = true;
-								dists[index].x = std::min(dists[index].x, dist2Light);
-								dists[index].y = std::max(dists[index].y, dist2Light);
-								dists[index].z = std::min(dists[index].z, occ_its_light_to_surface.t);
+								Float t = fabs(dot(occ_its_light_to_surface.t * dRec.d, dRec.n));
+								d2_min = std::min(d2_min, t);
 								bool hit_s2l = scene->rayIntersect(ray_s2l, occ_its_surface_to_light);
-								Assert(hit_s2l);
-								dists[index].w = std::max(dists[index].w, dist2Light - occ_its_surface_to_light.t);
+								if (hit_s2l) {
+									t = dist2Light - fabs(dot(occ_its_surface_to_light.t * dRec.d, dRec.n));
+									d2_max = std::max(d2_max, t);
+								}
+								else {
+									d2_max = std::max(d2_max, dist2Light - t);
+								}
+								slopes[0][index].x = std::max(slopes[0][index].x, dist2Light / d2_min - 1.f);
+								slopes[0][index].y = std::min(slopes[0][index].y, dist2Light / d2_max - 1.f);
 							}
 						}
-					}
-
-					if (occluded[0][index]) {
-						slopes[0][index].x = dists[index].y / dists[index].z - 1.f;
-						slopes[0][index].y = dists[index].x / dists[index].w - 1.f;
 					}
 
 					sampler->advance();
@@ -281,7 +285,7 @@ public:
 			}
 		}
 
-		calcFilterBeta();
+		calcOmegaXf();
 
 		Float preprocessTime = m_timer->getSecondsSinceStart();
 		Log(EInfo, "Preprocessing time = %.6fs", preprocessTime);
@@ -335,7 +339,23 @@ public:
 					continue;
 				}
 				//Spectrum s2 = heatMap(slopes[index].y);
-				Spectrum beta(filterBeta[0][index]);
+				Spectrum projD(projDists[index]);
+				for (int c = 0; c < 3; c++) {
+					data[3 * (x + y * filmSize.x) + c] = projD[c];
+				}
+			}
+		}
+		savePfm("proj_d.pfm", data, filmSize.x, filmSize.y);
+
+		for (int y = 0; y < filmSize.y; y++) {
+			for (int x = 0; x < filmSize.x; x++) {
+				int index = x + y * filmSize.x;
+				if (!occluded[0][index]) {
+					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
+					continue;
+				}
+				//Spectrum s2 = heatMap(slopes[index].y);
+				Spectrum beta(OmegaXf[0][index]);
 				for (int c = 0; c < 3; c++) {
 					data[3 * (x + y * filmSize.x) + c] = beta[c];
 				}
@@ -405,6 +425,20 @@ public:
 			sampler, nSamples, includeIndirect);
 	}
 
+	void filterPixel(Vector2 &slope, bool &occ, int id, int i, int j, int pass) {
+		if (i < 0 || i >= width || j < 0 || j >= height)
+			return;
+		int index = i + j * width;
+		if (objId[index] != id)
+			return;
+
+		if (!occluded[pass][index])
+			return;
+		slope.x = std::max(slope.x, slopes[pass][index].x);
+		slope.y = std::min(slope.y, slopes[pass][index].y);
+		occ = (occ || occluded[pass][index]);
+	}
+
 	void postprocess(const Scene *scene, RenderQueue *queue,
 		const RenderJob *job, int sceneResID, int sensorResID,
 		int samplerResID) {
@@ -412,12 +446,110 @@ public:
 		const Bitmap *bitmap = film->getImageBlock()->getBitmap();
 		ref<Bitmap> img = new Bitmap(*bitmap);
 
+		int pixelNum = height * width;
+		imgRes[0].resize(pixelNum);
+		imgRes[1].resize(pixelNum);
+
+		//totWeights[0].resize(pixelNum);
+		//totWeights[1].resize(pixelNum);
+
 		for (int x = 0; x < width; x++) {
 			for (int y = 0; y < height; y++) {
-
+				int index = x + y * width;
+				imgRes[0][index] = img->getPixel(Point2i(x, y));
 			}
 		}
 
+		Float *data = new Float[pixelNum * 3];
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int index = x + y * width;
+				Spectrum color(imgRes[0][index]);
+				for (int c = 0; c < 3; c++) {
+					data[3 * (x + y * width) + c] = color[c];
+				}
+			}
+		}
+		savePfm("origin.pfm", data, width, height);
+
+		const float dist_scale_threshold = 0.5f;
+		const float dist_threshold = 1.f;
+		const float cos_angle_threshold = 0.7f;
+
+		for (int pass = 0; pass < 2; pass++) {
+			for (int x = 0; x < width; x++) {
+				for (int y = 0; y < height; y++) {
+					int index = x + y * width;
+					if (!occluded[0][index])
+						continue;
+
+					Spectrum totValue(0.f);
+					Float totWeight = 0.f;
+					for (int d = -m_filterRadius; d <= m_filterRadius; d++) {
+						int i, j;
+						if (pass == 0) {
+							i = x + d;
+							j = y;
+						}
+						else {
+							i = x;
+							j = y + d;
+						}
+						if (i < 0 || i >= width || j < 0 || j >= height)
+							continue;
+
+						int targetIndex = i + j * width;
+						if (!occluded[0][targetIndex] ||
+							objId[targetIndex] != objId[index])
+							continue;
+						if (fabsf(OmegaXf[0][targetIndex] - OmegaXf[0][index]) > dist_scale_threshold)
+							continue;
+						
+						Vector diff = positions[targetIndex] - positions[index];
+						Float normComp = dot(diff, lightNormal);
+						Float dist2 = diff.lengthSquared() - normComp * normComp;
+						if (fabsf(dist2) > dist_threshold)
+							continue;
+
+						if (fabsf(dot(normals[targetIndex], normals[index])) <= cos_angle_threshold)
+							continue;
+
+						Float wxf = OmegaXf[0][index];
+						Float weight = expf(-9.f * dist2 * wxf * wxf * 0.5f);
+						totValue += imgRes[pass][targetIndex] * weight;
+						totWeight += weight;
+					}
+
+					if (totWeight > 1e-4f) {
+						imgRes[1 - pass][index] = totValue / totWeight;
+						//totWeights[pass][index] = totWeight;
+					}
+				}
+			}
+		}
+
+// 		for (int y = 0; y < height; y++) {
+// 			for (int x = 0; x < width; x++) {
+// 				int index = x + y * width;
+// 				data[3 * (x + y * width) + 0] = totWeights[0][index];
+// 				data[3 * (x + y * width) + 1] = totWeights[1][index];
+// 				data[3 * (x + y * width) + 2] = 0;
+// 			}
+// 		}
+// 		savePfm("totWeights.pfm", data, width, height);
+
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int index = x + y * width;
+				Spectrum color(imgRes[0][index]);
+				for (int c = 0; c < 3; c++) {
+					data[3 * (x + y * width) + c] = color[c];
+				}
+			}
+		}
+		savePfm("filtered.pfm", data, width, height);
+
+		/*
 		img = img->convert(Bitmap::ERGB, Bitmap::EFloat32);
 
 		fs::path output = scene->getDestinationFile();
@@ -426,6 +558,7 @@ public:
 		ref<FileStream> stream = new FileStream(output, FileStream::ETruncWrite);
 
 		img->write(Bitmap::EPFM, stream);
+		*/
 	}
 
 	void serialize(Stream *stream, InstanceManager *manager) const {
@@ -472,9 +605,9 @@ public:
 		fwrite(header, strlen(header), 1, fp);
 		for (int y = height - 1; y >= 0; y--) {
 			for (int x = 0; x < width; x++) {
-				fwrite(&data[3 * (y * width + x) + 2], sizeof(float), 1, fp);
-				fwrite(&data[3 * (y * width + x) + 1], sizeof(float), 1, fp);
 				fwrite(&data[3 * (y * width + x) + 0], sizeof(float), 1, fp);
+				fwrite(&data[3 * (y * width + x) + 1], sizeof(float), 1, fp);
+				fwrite(&data[3 * (y * width + x) + 2], sizeof(float), 1, fp);
 			}
 		}
 		fclose(fp);
@@ -489,9 +622,6 @@ private:
 	Timer *m_timer;
 
 	int width, height;
-
-	// 0: d1_min, 1: d1_max (distance from light to receiver); 2: d2_min, 3: d2_max (distance from light to occluders)
-	std::vector<Vector4> dists;
 	
 	// 0: max_slope, 1: min_slope
 	std::vector<Vector2> slopes[2];
@@ -502,7 +632,13 @@ private:
 	std::vector<int> objId;
 	std::vector<Float> projDists;
 
-	std::vector<Float> filterBeta[2];
+	std::vector<Float> OmegaXf[2];
+	std::vector<Spectrum> imgRes[2];
+
+	//std::vector<Float> totWeights[2];
+
+	// assume only one area light source
+	Vector lightNormal;
 
 	bool m_verbose;
 };
