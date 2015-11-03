@@ -21,6 +21,10 @@ public:
 		m_initSamples = props.getSize("initSamples", 16);
 		m_filterRadius = props.getSize("filterRadius", 5);
 		m_verbose = props.getBoolean("verbose", false);
+		m_adaptive = props.getBoolean("adaptive", true);
+
+		sppMu = 2.f;
+		lightSigma = 2.f;
 
 		m_timer = new Timer(false);
 	}
@@ -52,8 +56,16 @@ public:
 
 	Float calcOmegaXf(int index) {
 		// min{spp_mu / (light_sigma * s2), 1 / (projDist * (1 + s2))}
-		return std::min(slopes[0][index].y > 0 ? 3.f / (2.f * slopes[0][index].y) : 1e10f, 
+		return std::min(slopes[0][index].y > 0 ? sppMu / (lightSigma * slopes[0][index].y) : 1e10f, 
 			1.f / (projDists[index] * (1.f + slopes[0][index].y)));
+	}
+
+	Float calcSpp(Float s1, Float s2, Float wxf, Float projD) {
+		//Float spp1 = (1.f / (1.f + s2) + projD * wxf);
+		//Float spp2 = (1.f + lightSigma * std::min(s1 * wxf, 1.f / projD * s1 / (1.f + s1)));
+		Float spp1 = 1.f + sppMu * s1 / s2;
+		Float spp2 = projD / (s2 * lightSigma) + 1.f / (1.f + s2);
+		return 4 * spp1 * spp1 * spp2 * spp2;
 	}
 
 	Float calcGaussian(Float d, Float sigma) {
@@ -145,6 +157,21 @@ public:
 				}
 			}
 		}
+
+		// calculate spp
+		spp.resize(pixelNum);
+		for (int x = 0; x < width; x++) {
+			for (int y = 0; y < height; y++) {
+				int index = x + y * width;
+				if (m_adaptive) {
+					spp[index] = calcSpp(slopes[0][index].x, slopes[0][index].y, OmegaXf[0][index], projDists[index]);
+					spp[index] = math::clamp(spp[index], (Float)m_initSamples, 1024.f);
+				}
+				else {
+					spp[index] = m_initSamples;
+				}
+			}
+		}
 	}
 
 	bool preprocess(const Scene *scene, RenderQueue *queue, const RenderJob *job,
@@ -153,17 +180,19 @@ public:
 			return false;
 		if (m_subIntegrator == NULL)
 			Log(EError, "No sub-integrator was specified!");
-//		Sampler *sampler = static_cast<Sampler *>(Scheduler::getInstance()->getResource(samplerResID, 0)); 
+		Sampler *originalSampler = static_cast<Sampler*>(Scheduler::getInstance()->getResource(samplerResID, 0)); 
+		if (originalSampler->getClass()->getName() != "IndependentSampler")
+			Log(EError, "The aaf_shadows integrator should only be "
+			"used in conjunction with the independent sampler");
+	
 		Properties props("stratified");
 		props.setInteger("sampleCount", m_initSamples);
-		props.setInteger("dimension", 7);
-		Sampler *sampler = static_cast<Sampler*> (PluginManager::getInstance()->createObject(MTS_CLASS(Sampler), props));
+		props.setInteger("dimension", 8);
+		Sampler *sampler = static_cast<Sampler*>(PluginManager::getInstance()->createObject(MTS_CLASS(Sampler), props));
 		sampler->configure();
 
-		Sensor *sensor = static_cast<Sensor *>(Scheduler::getInstance()->getResource(sensorResID));
-// 		if (sampler->getClass()->getName() != "IndependentSampler")
-// 			Log(EError, "The error-controlling integrator should only be "
-// 			"used in conjunction with the independent sampler");
+		Sensor *sensor = static_cast<Sensor*>(Scheduler::getInstance()->getResource(sensorResID));
+
 		if (!m_subIntegrator->preprocess(scene, queue, job, sceneResID, sensorResID, samplerResID))
 			return false;
 
@@ -306,62 +335,13 @@ public:
 					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
 					continue;
 				}
-				//Spectrum s1 = heatMap(slopes[index].x);
-				Spectrum s1(slopes[0][index].x);
-				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * filmSize.x) + c] = s1[c];
-				}
+				data[3 * (x + y * filmSize.x) + 0] = slopes[0][index].x;
+				data[3 * (x + y * filmSize.x) + 1] = slopes[0][index].y;
+				//data[3 * (x + y * filmSize.x) + 2] = OmegaXf[0][index];
+				data[3 * (x + y * filmSize.x) + 2] = spp[index];
 			}
 		}
-		savePfm("s1.pfm", data, filmSize.x, filmSize.y);
-
-		for (int y = 0; y < filmSize.y; y++) {
-			for (int x = 0; x < filmSize.x; x++) {
-				int index = x + y * filmSize.x;
-				if (!occluded[0][index]) {
-					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
-					continue;
-				}
-				//Spectrum s2 = heatMap(slopes[index].y);
-				Spectrum s2(slopes[0][index].y);
-				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * filmSize.x) + c] = s2[c];
-				}
-			}
-		}
-		savePfm("s2.pfm", data, filmSize.x, filmSize.y);
-
-		for (int y = 0; y < filmSize.y; y++) {
-			for (int x = 0; x < filmSize.x; x++) {
-				int index = x + y * filmSize.x;
-				if (!occluded[0][index]) {
-					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
-					continue;
-				}
-				//Spectrum s2 = heatMap(slopes[index].y);
-				Spectrum projD(projDists[index]);
-				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * filmSize.x) + c] = projD[c];
-				}
-			}
-		}
-		savePfm("proj_d.pfm", data, filmSize.x, filmSize.y);
-
-		for (int y = 0; y < filmSize.y; y++) {
-			for (int x = 0; x < filmSize.x; x++) {
-				int index = x + y * filmSize.x;
-				if (!occluded[0][index]) {
-					for (int c = 0; c < 3; c++) data[3 * index + c] = 0.f;
-					continue;
-				}
-				//Spectrum s2 = heatMap(slopes[index].y);
-				Spectrum beta(OmegaXf[0][index]);
-				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * filmSize.x) + c] = beta[c];
-				}
-			}
-		}
-		savePfm("beta.pfm", data, filmSize.x, filmSize.y);
+		savePfm("s1s2wxf.pfm", data, filmSize.x, filmSize.y);
 
 		return true;
 	}
@@ -369,13 +349,9 @@ public:
 	void renderBlock(const Scene *scene, const Sensor *sensor,
 		Sampler *sampler, ImageBlock *block, const bool &stop,
 		const std::vector< TPoint2<uint8_t> > &points) const {
-		Float diffScaleFactor = 1.0f /
-			std::sqrt((Float)sampler->getSampleCount());
-
 		bool needsApertureSample = sensor->needsApertureSample();
 		bool needsTimeSample = sensor->needsTimeSample();
 
-		RadianceQueryRecord rRec(scene, sampler);
 		Point2 apertureSample(0.5f);
 		Float timeSample = 0.5f;
 		RayDifferential sensorRay;
@@ -392,11 +368,22 @@ public:
 			if (stop)
 				break;
 
+			int index = offset.x + offset.y * width;
+			int sqrtSpp = (int)(ceil(sqrtf(spp[index])));
+
+			RadianceQueryRecord rRec(scene, sampler);
+			Float diffScaleFactor = 1.0f / (Float)sqrtSpp;
+
 			sampler->generate(offset);
 
-			for (size_t j = 0; j < sampler->getSampleCount(); j++) {
+			for (size_t j = 0; j < sqrtSpp * sqrtSpp; j++) {
 				rRec.newQuery(queryType, sensor->getMedium());
-				Point2 samplePos(Point2(offset) + Vector2(rRec.nextSample2D()));
+
+				Point2 samplePos(Vector2(rRec.nextSample2D()));
+				int x = j % sqrtSpp;
+				int y = j / sqrtSpp;
+				samplePos.x = ((Float)x + samplePos.x) / (Float)sqrtSpp + offset.x;
+				samplePos.y = ((Float)y + samplePos.y) / (Float)sqrtSpp + offset.y;
 
 				if (needsApertureSample)
 					apertureSample = rRec.nextSample2D();
@@ -410,6 +397,7 @@ public:
 
 				spec *= m_subIntegrator->Li(sensorRay, rRec);
 				block->put(samplePos, spec, rRec.alpha);
+				
 				sampler->advance();
 			}
 		}
@@ -423,20 +411,6 @@ public:
 		Sampler *sampler, int nSamples, bool includeIndirect) const {
 		return m_subIntegrator->E(scene, its, medium,
 			sampler, nSamples, includeIndirect);
-	}
-
-	void filterPixel(Vector2 &slope, bool &occ, int id, int i, int j, int pass) {
-		if (i < 0 || i >= width || j < 0 || j >= height)
-			return;
-		int index = i + j * width;
-		if (objId[index] != id)
-			return;
-
-		if (!occluded[pass][index])
-			return;
-		slope.x = std::max(slope.x, slopes[pass][index].x);
-		slope.y = std::min(slope.y, slopes[pass][index].y);
-		occ = (occ || occluded[pass][index]);
 	}
 
 	void postprocess(const Scene *scene, RenderQueue *queue,
@@ -618,6 +592,7 @@ private:
 	ref<SamplingIntegrator> m_subIntegrator;
 	int m_initSamples;
 	int m_filterRadius;
+	bool m_adaptive;
 
 	Timer *m_timer;
 
@@ -633,12 +608,15 @@ private:
 	std::vector<Float> projDists;
 
 	std::vector<Float> OmegaXf[2];
+	std::vector<Float> spp;
 	std::vector<Spectrum> imgRes[2];
 
 	//std::vector<Float> totWeights[2];
 
 	// assume only one area light source
 	Vector lightNormal;
+	Float lightSigma;
+	Float sppMu;
 
 	bool m_verbose;
 };
