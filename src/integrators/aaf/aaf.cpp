@@ -19,6 +19,7 @@ class AAFIntegrator : public SamplingIntegrator {
 public:
 	AAFIntegrator(const Properties &props) : SamplingIntegrator(props) {
 		m_initSamples = props.getSize("initSamples", 16);
+		m_minSamples = props.getSize("minSamples", 16);
 		m_filterRadius = props.getSize("filterRadius", 5);
 		m_verbose = props.getBoolean("verbose", false);
 		m_adaptive = props.getBoolean("adaptive", true);
@@ -165,10 +166,10 @@ public:
 				int index = x + y * width;
 				if (m_adaptive) {
 					spp[index] = calcSpp(slopes[0][index].x, slopes[0][index].y, OmegaXf[0][index], projDists[index]);
-					spp[index] = math::clamp(spp[index], (Float)m_initSamples, 1024.f);
+					spp[index] = math::clamp(spp[index], (Float)m_minSamples, 1024.f);
 				}
 				else {
-					spp[index] = m_initSamples;
+					spp[index] = (Float)m_minSamples;
 				}
 			}
 		}
@@ -591,6 +592,7 @@ public:
 private:
 	ref<SamplingIntegrator> m_subIntegrator;
 	int m_initSamples;
+	int m_minSamples;
 	int m_filterRadius;
 	bool m_adaptive;
 
