@@ -1049,6 +1049,9 @@
     <ClCompile Include="..\src\integrators\misc\multichannel.cpp">
       <Filter>Source Files\integrators\misc</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\utils\downSampleVolume.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

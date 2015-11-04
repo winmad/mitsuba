@@ -948,6 +948,7 @@
     </ClCompile>
     <ClCompile Include="..\src\rfilters\gaussian.cpp">
     </ClCompile>
+    <ClCompile Include="..\src\utils\downSampleVolume.cpp" />
     <ClCompile Include="..\src\volume\volcache.cpp">
     </ClCompile>
     <ClCompile Include="..\src\volume\gridvolume.cpp">

@@ -9,6 +9,8 @@ endmacro()
 
 include_directories(${ILMBASE_INCLUDE_DIRS})
 
+add_utility(downSampleVolume downSampleVolume.cpp)
+
 add_utility(addimages      addimages.cpp)
 add_utility(joinrgb        joinrgb.cpp)
 add_utility(cylclip        cylclip.cpp MTS_HW)

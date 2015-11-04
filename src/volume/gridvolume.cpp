@@ -580,6 +580,14 @@ public:
 	bool supportsVectorLookups() const { return m_channels == 3; }
 	Float getStepSize() const { return m_stepSize; }
 
+	Vector3i getResolution() const {
+		return m_res;
+	}
+
+	int getChannels() const {
+		return m_channels;
+	}
+
 	Float getMaximumFloatValue() const {
 		return 1.0f;
 	}

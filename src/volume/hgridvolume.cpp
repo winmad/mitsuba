@@ -141,6 +141,10 @@ public:
 		return m_stepSize;
 	}
 
+	Vector3i getResolution() const {
+		return m_res;
+	}
+
 	Float lookupFloat(const Point &_p) const {
 		const Point p = m_worldToGrid.transformAffine(_p);
 		const int x = math::floorToInt(p.x),

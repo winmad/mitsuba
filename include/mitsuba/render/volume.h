@@ -71,6 +71,10 @@ public:
 	 */
 	virtual Float getMaximumFloatValue() const = 0;
 
+	virtual Vector3i getResolution() const;
+
+	virtual int getChannels() const;
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor

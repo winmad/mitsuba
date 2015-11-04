@@ -66,6 +66,16 @@ bool VolumeDataSource::supportsVectorLookups() const {
 	return false;
 }
 
+Vector3i VolumeDataSource::getResolution() const {
+	Log(EError, "'%s': does not implement getResolution()!", getClass()->getName().c_str());
+	return Vector3i();
+}
+
+int VolumeDataSource::getChannels() const {
+	Log(EError, "'%s': does not implement getChannels()!", getClass()->getName().c_str());
+	return 0;
+}
+
 MTS_IMPLEMENT_CLASS(VolumeDataSource, true, ConfigurableObject)
 MTS_NAMESPACE_END
 
