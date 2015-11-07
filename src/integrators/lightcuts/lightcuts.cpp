@@ -9,7 +9,7 @@
 
 MTS_NAMESPACE_BEGIN
 
-#define DIRECT 0
+#define GI 1
 
 class LightcutsIntegrator : public SamplingIntegrator {
 public:
@@ -95,10 +95,10 @@ public:
 		Float normalization = 1.f / generateVPLs(scene, m_random, 0, m_vplSamples, 5, true, _vpls);
 		for (int i = 0; i < _vpls.size(); i++) {
 			_vpls[i].P *= normalization;
-#if DIRECT
-			if (_vpls[i].type == ESurfaceVPL) {
+#if GI
+			//if (_vpls[i].type == ESurfaceVPL) {
 				m_surfaceVPLs.push_back(_vpls[i]);
-			}
+			//}
 #else
 			if (_vpls[i].type == EPointEmitterVPL) {
 				m_surfaceVPLs.push_back(_vpls[i]);
@@ -215,8 +215,8 @@ public:
 						const Float weight = miWeight(dRec.pdf * fracLum,
 							bsdfPdf * fracBSDF) * weightLum;
 
-#if DIRECT
-						Li += value * bsdfVal * weight;
+#if GI
+						//Li += value * bsdfVal * weight;
 #endif
 					}
 				}
@@ -282,23 +282,23 @@ public:
 			/* Weight using the power heuristic */
 			const Float weight = miWeight(bsdfPdf * fracBSDF,
 				lumPdf * fracLum) * weightBSDF;
-#if DIRECT
-			Li += value * bsdfVal * weight;
+#if GI
+			//Li += value * bsdfVal * weight;
 #endif
 		}
 
 		/* Lightcuts */
 		Spectrum indirResult(0.f);
 
-		indirResult += m_lightcutter->evalLightcut(ray, rRec, m_random, m_maxCutSize, m_maxErrorRatio);
+		//indirResult += m_lightcutter->evalLightcut(ray, rRec, m_random, m_maxCutSize, m_maxErrorRatio, true);
 			
-// 		Vector wi = -ray.d;
-// 		for (int i = 0; i < m_surfaceLightTree.nextFreeNode; i++) {
-// 			if (m_surfaceLightTree.m_nodes[i].isLeaf()) {
-// 				const LightNode *node = &m_surfaceLightTree.m_nodes[i];
-// 				indirResult += m_lightcutter->evalNodeIllumination(node, rRec.scene, m_random, wi, its, bsdf);
-// 			}
-// 		}
+		Vector wi = -ray.d;
+		for (int i = 0; i < m_surfaceLightTree.nextFreeNode; i++) {
+			if (m_surfaceLightTree.m_nodes[i].isLeaf()) {
+				const LightNode *node = &m_surfaceLightTree.m_nodes[i];
+				indirResult += m_lightcutter->evalNodeIllumination(node, rRec.scene, m_random, wi, its, bsdf, true);
+			}
+		}
 		
 		//Log(EInfo, "(%.6f, %.6f, %.6f)", indirResult[0], indirResult[1], indirResult[2]);
 		Li += indirResult;
@@ -310,7 +310,9 @@ public:
 		const RenderJob *job, int sceneResID, int sensorResID,
 		int samplerResID) {
 		m_lightcutter->avgCutSize /= m_lightcutter->count;
+		m_lightcutter->avgMaxRelError /= m_lightcutter->count;
 		Log(EInfo, "avgCutSize = %.6f", m_lightcutter->avgCutSize);
+		Log(EInfo, "maxRelError = %.6f", m_lightcutter->avgMaxRelError);
 	}
 
 	inline Float miWeight(Float pdfA, Float pdfB) const {

@@ -74,13 +74,13 @@ public:
 						for (int dy = 0; dy < scale.y; dy++) {
 							for (int dz = 0; dz < scale.z; dz++) {
 								Point p = bbox.min;
-								p.x += step.x * (i + dx) * step.x;
-								p.y += step.y * (j + dy) * step.y;
-								p.z += step.z * (k + dz) * step.z;
+								p.x += step.x * (i + dx);
+								p.y += step.y * (j + dy);
+								p.z += step.z * (k + dz);
 
 								if (channels == 1) {
 									// Only handle 1 channel
-									Float v = originVol->lookupFloat(p);
+									float v = originVol->lookupFloat(p);
 									sumValue += v;
 									cnt += 1.f;
 								}
@@ -110,59 +110,28 @@ public:
 		int type = 1;
 		stream->writeInt(type);
 
-		/*
-		int xres = stream->readInt(),
-			yres = stream->readInt(),
-			zres = stream->readInt();
-		m_res = Vector3i(xres, yres, zres);
-		m_channels = stream->readInt();
-		std::string format;
+		stream->writeInt(res.x);
+		stream->writeInt(res.y);
+		stream->writeInt(res.z);
 
-		switch (type) {
-		case EFloat32:
-			if (m_channels != 1 && m_channels != 3)
-				Log(EError, "Encountered an unsupported float32 volume data "
-				"file (%i channels, only 1 and 3 are supported)",
-				m_channels);
-			format = "float32";
-			break;
-		case EFloat16:
-			format = "float16";
-			Log(EError, "Error: float16 volumes are not yet supported!");
-		case EUInt8:
-			format = "uint8";
-			if (m_channels != 1 && m_channels != 3)
-				Log(EError, "Encountered an unsupported uint8 volume data "
-				"file (%i channels, only 1 and 3 are supported)", m_channels);
-			break;
-		case EQuantizedDirections:
-			format = "qdir";
-			if (m_channels != 3)
-				Log(EError, "Encountered an unsupported quantized direction "
-				"volume data file (%i channels, only 3 are supported)",
-				m_channels);
-			break;
-		default:
-			Log(EError, "Encountered a volume data file of unknown type (type=%i, channels=%i)!", type, m_channels);
+		stream->writeInt(channels);
+
+		stream->writeSingle(bbox.min.x);
+		stream->writeSingle(bbox.min.y);
+		stream->writeSingle(bbox.min.z);
+		stream->writeSingle(bbox.max.x);
+		stream->writeSingle(bbox.max.y);
+		stream->writeSingle(bbox.max.z);
+
+		data = new float[res.x * res.y * res.z];
+		for (int z = 0; z < res.z; z++) {
+			for (int y = 0; y < res.y; y++) {
+				for (int x = 0; x < res.x; x++) {
+					data[(z * res.y + y) * res.x + x] = gridData[x][y][z];
+				}
+			}
 		}
-
-		m_volumeType = (EVolumeType)type;
-
-		if (!m_dataAABB.isValid()) {
-			Float xmin = stream->readSingle(),
-				ymin = stream->readSingle(),
-				zmin = stream->readSingle();
-			Float xmax = stream->readSingle(),
-				ymax = stream->readSingle(),
-				zmax = stream->readSingle();
-			m_dataAABB = AABB(Point(xmin, ymin, zmin), Point(xmax, ymax, zmax));
-		}
-
-		Log(EDebug, "Mapped \"%s\" into memory: %ix%ix%i (%i channels, format = %s), %s, %s",
-			resolved.filename().string().c_str(), m_res.x, m_res.y, m_res.z, m_channels, format.c_str(),
-			memString(m_mmap->getSize()).c_str(), m_dataAABB.toString().c_str());
-		m_data = (uint8_t *)(((float *)m_mmap->getData()) + 12);
-		*/
+		stream->writeSingleArray(data, res.x * res.y * res.z);
 	}
 
 	Vector3i scale;
@@ -175,8 +144,8 @@ public:
 	// original step size
 	Vector step;
 
-	uint8_t *data;
-	std::vector<std::vector<std::vector<Float> > > gridData;
+	float *data;
+	std::vector<std::vector<std::vector<float> > > gridData;
 
 	MTS_DECLARE_UTILITY()
 };

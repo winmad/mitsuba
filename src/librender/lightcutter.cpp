@@ -8,12 +8,12 @@
 MTS_NAMESPACE_BEGIN
 
 Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rRec,
-	Random *random, int maxCutSize, Float maxErrorRatio) {
+	Random *random, int maxCutSize, Float maxErrorRatio, bool useVis) {
 	LightNode *node = m_surfaceLightTree->root;
 	const BSDF *bsdf = rRec.its.getBSDF(ray);
 	
 	Vector dir = -ray.d;
-	Spectrum contrib = evalNodeIllumination(node, rRec.scene, random, dir, rRec.its, bsdf);
+	Spectrum contrib = evalNodeIllumination(node, rRec.scene, random, dir, rRec.its, bsdf, useVis);
 	Spectrum error = evalErrorBound(node, dir, rRec.its, bsdf);
 
 	Spectrum L = contrib;
@@ -46,7 +46,7 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
                     // For linux
                     Vector dir = -ray.d;
 					contrib = evalNodeIllumination(node->getRight(), rRec.scene, random,
-						dir, rRec.its, bsdf);
+						dir, rRec.its, bsdf, useVis);
 					error = evalErrorBound(node->getRight(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getRight(), error, contrib));
@@ -57,7 +57,7 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
                     // For linux
                     Vector dir = -ray.d;
 					contrib = evalNodeIllumination(node->getLeft(), rRec.scene, random,
-						dir, rRec.its, bsdf);
+						dir, rRec.its, bsdf, useVis);
 					error = evalErrorBound(node->getLeft(), dir, rRec.its, bsdf);
 					L += contrib;
 					q.push(LightcutHeapNode(node->getLeft(), error, contrib));
@@ -74,11 +74,16 @@ Spectrum Lightcutter::evalLightcut(RayDifferential& ray, RadianceQueryRecord& rR
 	count += 1.f;
 	avgCutSize += q.size() + nLeafNodes;
 
+	if (!q.empty() && L.getLuminance() > 1e-4) {
+		avgMaxRelError += q.top().errorValue / L.getLuminance();
+		errorCount += 1.f;
+	}
+
 	return L;
 }
 
 Spectrum Lightcutter::evalNodeIllumination(const LightNode *node, const Scene *scene, Random *random,
-	Vector &wi, Intersection &its, const BSDF *bsdf) {
+	Vector &wi, Intersection &its, const BSDF *bsdf, bool useVis) {
 	Spectrum result;
 	Vector wo;
 	Float d;
@@ -135,6 +140,9 @@ Spectrum Lightcutter::evalNodeIllumination(const LightNode *node, const Scene *s
 			return Spectrum(0.f);
 		result /= continueProb;
 	}
+
+	if (!useVis)
+		return result;
 
 	Ray connectRay(its.p, wo, Epsilon, d * (1.f - ShadowEpsilon), its.time);
 	if (!scene->rayIntersect(connectRay))

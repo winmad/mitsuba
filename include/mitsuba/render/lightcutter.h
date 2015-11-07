@@ -57,13 +57,16 @@ public:
 
 		count = 0;
 		avgCutSize = 0;
+
+		errorCount = 0;
+		avgMaxRelError = 0;
 	}
 
 	Spectrum evalLightcut(RayDifferential& ray, RadianceQueryRecord& rRec,
-		Random *random, int maxCutSize, Float maxErrorRatio);
+		Random *random, int maxCutSize, Float maxErrorRatio, bool useVis);
 	
 	Spectrum evalNodeIllumination(const LightNode *node, const Scene *scene, Random *random,
-		Vector &wi, Intersection &its, const BSDF *bsdf);
+		Vector &wi, Intersection &its, const BSDF *bsdf, bool useVis);
 
 	Spectrum evalErrorBound(const LightNode *node, Vector &wi,
 		Intersection &its, const BSDF *bsdf);
@@ -81,6 +84,8 @@ public:
 
 	Float count;
 	Float avgCutSize;
+	Float errorCount;
+	Float avgMaxRelError;
 };
 
 MTS_NAMESPACE_END
