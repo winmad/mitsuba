@@ -44,5 +44,10 @@ Float PhaseFunction::getMeanCosine() const {
 	return 0.0f;
 }
 
+void PhaseFunction::setS(Float _Sxx, Float _Syy, Float _Szz, Float _Sxy, Float _Sxz, Float _Syz) {
+	Log(EError, "%s::setS() is not implemented!",
+		getClass()->getName().c_str());
+}
+
 MTS_IMPLEMENT_CLASS(PhaseFunction, true, ConfigurableObject)
 MTS_NAMESPACE_END

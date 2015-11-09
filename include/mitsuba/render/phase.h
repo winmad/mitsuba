@@ -123,7 +123,7 @@ public:
 		EAngleDependence = 0x04,
 		/// The opposite of \ref EAngleDependence (there is an arbitrary dependence)
 		EAnisotropic     = 0x02,
-		/// The phase function is non symmetric, i.e. eval(wi,wo) != eval(wo, wi)
+		/// The phase function is non symmetric, i.e. eval(wi, wo) != eval(wo, wi)
 		ENonSymmetric    = 0x08
 	};
 
@@ -222,6 +222,8 @@ public:
 
 	/// Return a string representation
 	virtual std::string toString() const = 0;
+
+	virtual void setS(Float _Sxx, Float _Syy, Float _Szz, Float _Sxy, Float _Sxz, Float _Syz);
 
 	MTS_DECLARE_CLASS()
 protected:

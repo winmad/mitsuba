@@ -21,7 +21,11 @@ public:
 
 		char *end_ptr = NULL;
 		scale.x = strtol(argv[2], &end_ptr, 10);
+		if (*end_ptr != '\0')
+			SLog(EError, "Could not parse integer value");
 		scale.y = strtol(argv[3], &end_ptr, 10);
+		if (*end_ptr != '\0')
+			SLog(EError, "Could not parse integer value");
 		scale.z = strtol(argv[4], &end_ptr, 10);
 		if (*end_ptr != '\0')
 			SLog(EError, "Could not parse integer value");

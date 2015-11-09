@@ -1,5 +1,7 @@
 Import('env', 'plugins')
 
+plugins += env.SharedLibrary('SGGX', ['SGGX.cpp'])
+
 plugins += env.SharedLibrary('isotropic', ['isotropic.cpp'])
 plugins += env.SharedLibrary('hg', ['hg.cpp'])
 plugins += env.SharedLibrary('rayleigh', ['rayleigh.cpp'])

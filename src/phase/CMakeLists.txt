@@ -7,6 +7,8 @@ macro(add_phase)
   add_mts_plugin(${ARGN} TYPE phase)
 endmacro()
 
+add_phase(SGGX         SGGX.cpp)
+
 add_phase(isotropic    isotropic.cpp)
 add_phase(hg           hg.cpp)
 add_phase(rayleigh     rayleigh.cpp)

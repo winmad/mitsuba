@@ -704,6 +704,7 @@
     </ClCompile>
     <ClCompile Include="..\src\librender\imageblock.cpp">
     </ClCompile>
+    <ClCompile Include="..\src\phase\SGGX.cpp" />
     <ClCompile Include="..\src\samplers\stratified.cpp">
     </ClCompile>
     <ClCompile Include="..\src\samplers\independent.cpp">
@@ -949,6 +950,7 @@
     <ClCompile Include="..\src\rfilters\gaussian.cpp">
     </ClCompile>
     <ClCompile Include="..\src\utils\downSampleVolume.cpp" />
+    <ClCompile Include="..\src\utils\microflake2SGGX.cpp" />
     <ClCompile Include="..\src\volume\volcache.cpp">
     </ClCompile>
     <ClCompile Include="..\src\volume\gridvolume.cpp">
