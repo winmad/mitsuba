@@ -1,5 +1,6 @@
 #include <mitsuba/render/phase.h>
 #include <mitsuba/render/medium.h>
+#include <mitsuba/render/volume.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -12,6 +13,32 @@ std::string PhaseFunctionSamplingRecord::toString() const {
 		<< "  mode = " << mode << endl
 		<< "]";
 	return oss.str();
+}
+
+PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
+	const Vector &wi, bool _useSGGX, ETransportMode mode)
+	: mRec(mRec), wi(wi), mode(mode), useSGGX(_useSGGX) {
+	if (useSGGX) {
+		const VolumeDataSource *VolS1 = mRec.medium->getS1();
+		const VolumeDataSource *VolS2 = mRec.medium->getS2();
+		Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
+		Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
+		Sxx = S1[0]; Syy = S1[1], Szz = S1[2];
+		Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
+	}
+}
+
+PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
+	const Vector &wi, const Vector &wo, bool _useSGGX, ETransportMode mode)
+	: mRec(mRec), wi(wi), wo(wo), mode(mode), useSGGX(_useSGGX) {
+	if (useSGGX) {
+		const VolumeDataSource *VolS1 = mRec.medium->getS1();
+		const VolumeDataSource *VolS2 = mRec.medium->getS2();
+		Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
+		Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
+		Sxx = S1[0]; Syy = S1[1], Szz = S1[2];
+		Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
+	}
 }
 
 void PhaseFunction::configure() {
@@ -42,11 +69,6 @@ Float PhaseFunction::getMeanCosine() const {
 	Log(EError, "%s::getMeanCosine() is not implemented!",
 		getClass()->getName().c_str());
 	return 0.0f;
-}
-
-void PhaseFunction::setS(Float _Sxx, Float _Syy, Float _Szz, Float _Sxy, Float _Sxz, Float _Syz) {
-	Log(EError, "%s::setS() is not implemented!",
-		getClass()->getName().c_str());
 }
 
 MTS_IMPLEMENT_CLASS(PhaseFunction, true, ConfigurableObject)

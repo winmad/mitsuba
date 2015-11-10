@@ -130,7 +130,11 @@ public:
 						const Emitter *emitter = static_cast<const Emitter *>(dRec.object);
 
 						/* Evaluate the phase function */
-						PhaseFunctionSamplingRecord pRec(mRec, -ray.d, dRec.d);
+						bool useSGGX = false;
+						if (phase->getClass()->getName() == "SGGXPhaseFunction")
+							useSGGX = true;
+						PhaseFunctionSamplingRecord pRec(mRec, -ray.d, dRec.d, useSGGX);
+						
 						Float phaseVal = phase->eval(pRec);
 
 						if (phaseVal != 0) {
@@ -151,7 +155,12 @@ public:
 				/* ==================================================================== */
 
 				Float phasePdf;
-				PhaseFunctionSamplingRecord pRec(mRec, -ray.d);
+
+				bool useSGGX = false;
+				if (phase->getClass()->getName() == "SGGXPhaseFunction")
+					useSGGX = true;
+				PhaseFunctionSamplingRecord pRec(mRec, -ray.d, dRec.d, useSGGX);
+
 				Float phaseVal = phase->sample(pRec, phasePdf, rRec.sampler);
 				if (phaseVal == 0)
 					break;

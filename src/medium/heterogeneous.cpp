@@ -272,12 +272,26 @@ public:
 			} else if (name == "orientation") {
 				Assert(volume->supportsVectorLookups());
 				m_orientation = volume;
+			} else if (name == "S1") {
+				Assert(volume->supportsSpectrumLookups());
+				m_S1 = volume;
+			} else if (name == "S2") {
+				Assert(volume->supportsSpectrumLookups());
+				m_S2 = volume;
 			} else {
 				Medium::addChild(name, child);
 			}
 		} else {
 			Medium::addChild(name, child);
 		}
+	}
+
+	const VolumeDataSource *getS1() const {
+		return m_S1.get();
+	}
+
+	const VolumeDataSource *getS2() const {
+		return m_S2.get();
 	}
 
 	/*
@@ -720,6 +734,8 @@ protected:
 	ref<VolumeDataSource> m_density;
 	ref<VolumeDataSource> m_albedo;
 	ref<VolumeDataSource> m_orientation;
+	ref<VolumeDataSource> m_S1;
+	ref<VolumeDataSource> m_S2;
 	Float m_scale;
 	bool m_anisotropicMedium;
 	Float m_stepSize;

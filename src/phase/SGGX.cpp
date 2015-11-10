@@ -6,6 +6,7 @@
 #include <mitsuba/core/frame.h>
 #include <mitsuba/render/phase.h>
 #include <mitsuba/render/medium.h>
+#include <mitsuba/render/volume.h>
 #include <mitsuba/render/sampler.h>
 #include <mitsuba/core/plugin.h>
 #include "microflake_fiber.h"
@@ -27,13 +28,6 @@ public:
 			m_sampleType = EDiffuse;
 		else
 			Log(EError, "Unknown SGGX phase function type. Support specular and diffuse.");
-
-		Sxx = props.getFloat("Sxx", 0.f);
-		Syy = props.getFloat("Syy", 0.f);
-		Szz = props.getFloat("Szz", 0.f);
-		Sxy = props.getFloat("Sxy", 0.f);
-		Sxz = props.getFloat("Sxz", 0.f);
-		Syz = props.getFloat("Syz", 0.f);
 
 		m_fiberDistr = GaussianFiberDistribution(0.3f);
 	}
@@ -60,13 +54,12 @@ public:
 		stream->writeInt((int)m_sampleType);
 	}
 
-	void setS(Float _Sxx, Float _Syy, Float _Szz, Float _Sxy, Float _Sxz, Float _Syz) {
-		Sxx = _Sxx; Syy = _Syy; Szz = _Szz; Sxy = _Sxy; Sxz = _Sxz; Syz = _Syz;
-	}
-
 	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
 		Vector wi = pRec.wi;
 		Vector wo = pRec.wo;
+
+		Float Sxx = pRec.Sxx, Syy = pRec.Syy, Szz = pRec.Szz;
+		Float Sxy = pRec.Sxy, Sxz = pRec.Sxz, Syz = pRec.Syz;
 
 		if (m_sampleType == ESpecular) {
 			Vector H = wi + wo;
@@ -76,10 +69,10 @@ public:
 				return 0.f;
 
 			H /= length;
-			return 0.25f * ndf(H) / sigma(wi);
+			return 0.25f * ndf(H, Sxx, Syy, Szz, Sxy, Sxz, Syz) / sigma(wi, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 		}
 		else if (m_sampleType == EDiffuse) {
-			Vector wm = sampleVNormal(wi, m_sampler);
+			Vector wm = sampleVNormal(wi, m_sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 			return 1.f * INV_PI * std::max(0.f, dot(wo, wm));
 		}
 		else
@@ -88,7 +81,11 @@ public:
 
 	inline Float sample(PhaseFunctionSamplingRecord &pRec, Sampler *sampler) const {
 		Vector wi = pRec.wi;
-		Vector wm = sampleVNormal(wi, sampler);
+
+		Float Sxx = pRec.Sxx, Syy = pRec.Syy, Szz = pRec.Szz;
+		Float Sxy = pRec.Sxy, Sxz = pRec.Sxz, Syz = pRec.Syz;
+
+		Vector wm = sampleVNormal(wi, sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 
 		if (m_sampleType == ESpecular) {
 			Vector wo = -wi + 2.f * dot(wm, wi) * wm;
@@ -136,7 +133,8 @@ public:
 		return 1.0f;
 	}
 
-	Vector sampleVNormal(const Vector &wi, Sampler *sampler) const {
+	Vector sampleVNormal(const Vector &wi, Sampler *sampler, Float Sxx, Float Syy, Float Szz,
+		Float Sxy, Float Sxz, Float Syz) const {
 		Float u1 = sampler->next1D();
 		Float u2 = sampler->next1D();
 		
@@ -180,13 +178,15 @@ public:
 		return wm_kji.x * wk + wm_kji.y * wj + wm_kji.z * wi;
 	}
 
-	Float sigma(const Vector &wi) const {
+	Float sigma(const Vector &wi, Float Sxx, Float Syy, Float Szz,
+		Float Sxy, Float Sxz, Float Syz) const {
 		Float sigmaSqr = wi.x * wi.x * Sxx + wi.y * wi.y * Syy + wi.z * wi.z * Szz +
 			2.f * (wi.x * wi.y * Sxy + wi.x * wi.z * Sxz + wi.y * wi.z * Syz);
 		return (sigmaSqr > 0.f) ? sqrtf(sigmaSqr) : 0.f;
 	}
 
-	Float ndf(const Vector &wm) const {
+	Float ndf(const Vector &wm, Float Sxx, Float Syy, Float Szz,
+		Float Sxy, Float Sxz, Float Syz) const {
 		Float detS = Sxx * Syy * Szz - Sxx * Syz * Syz - Syy * Sxz * Sxz - Szz * Sxy * Sxy + 2.f * Sxy * Sxz * Syz;
 		Float den = wm.x * wm.x * (Syy * Szz - Syz * Syz) + wm.y * wm.y * (Sxx * Szz - Sxz * Sxz) +
 			wm.z * wm.z * (Sxx * Syy - Sxy * Sxy) + 2.f * (wm.x * wm.y * (Sxz * Syz - Szz * Sxy) +
@@ -217,7 +217,6 @@ public:
 	MTS_DECLARE_CLASS()
 private:
 	ESGGXPhaseFunctionType m_sampleType;
-	Float Sxx, Syy, Szz, Sxy, Sxz, Syz;
 	Sampler *m_sampler;
 
 	GaussianFiberDistribution m_fiberDistr;

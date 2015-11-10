@@ -166,6 +166,16 @@ public:
 	/// For homogeneous media: return the extinction coefficient
 	inline const Spectrum &getSigmaT() const { return m_sigmaT; }
 
+	virtual const VolumeDataSource *getS1() const {
+		Log(EError, "%s::getS1() is not implemented!)", getClass()->getName().c_str());
+		return NULL;
+	}
+
+	virtual const VolumeDataSource *getS2() const {
+		Log(EError, "%s::getS2() is not implemented!)", getClass()->getName().c_str());
+		return NULL;
+	}
+
 	//! @}
 	// =============================================================
 

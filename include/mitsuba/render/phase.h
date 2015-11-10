@@ -55,6 +55,9 @@ struct MTS_EXPORT_RENDER PhaseFunctionSamplingRecord {
 	   rendering with non-reciprocal phase functions */
 	ETransportMode mode;
 
+	bool useSGGX;
+	Float Sxx, Syy, Szz, Sxy, Sxz, Syz;
+
 	/**
 	 * \brief Given a medium interaction and an incident direction,
 	 * construct a query record which can be used to sample an outgoing
@@ -71,8 +74,8 @@ struct MTS_EXPORT_RENDER PhaseFunctionSamplingRecord {
 	 */
 
 	inline PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
-		const Vector &wi, ETransportMode mode = ERadiance)
-		: mRec(mRec), wi(wi), mode(mode) { }
+		const Vector &wi, bool _useSGGX = false, ETransportMode mode = ERadiance);
+		
 
 	/*
 	 * \brief Given a medium interaction an an incident/exitant direction
@@ -93,8 +96,8 @@ struct MTS_EXPORT_RENDER PhaseFunctionSamplingRecord {
 	 *      The transported mode (\ref ERadiance or \ref EImportance)
 	 */
 	inline PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
-		const Vector &wi, const Vector &wo, ETransportMode mode = ERadiance)
-		: mRec(mRec), wi(wi),  wo(wo), mode(mode) { }
+			const Vector &wi, const Vector &wo, bool _useSGGX = false, 
+			ETransportMode mode = ERadiance);
 
 	/**
 	 * \brief Reverse the direction of light transport in the record
@@ -222,8 +225,6 @@ public:
 
 	/// Return a string representation
 	virtual std::string toString() const = 0;
-
-	virtual void setS(Float _Sxx, Float _Syy, Float _Szz, Float _Sxy, Float _Sxz, Float _Syz);
 
 	MTS_DECLARE_CLASS()
 protected:
