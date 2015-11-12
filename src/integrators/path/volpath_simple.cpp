@@ -134,9 +134,13 @@ public:
 							dRec, rRec.medium, maxInteractions,
 							rRec.nextSample2D(), rRec.sampler);
 
-					if (!value.isZero())
+					if (!value.isZero()) {
+						bool useSGGX = false;
+						if (phase->getClass()->getName() == "SGGXPhaseFunction")
+							useSGGX = true;
 						Li += throughput * value * phase->eval(
-								PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d));
+							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX));
+					}
 				}
 
 				/* Stop if multiple scattering was not requested, or if the path gets too long */
@@ -148,7 +152,11 @@ public:
 				/*             Phase function sampling / Multiple scattering            */
 				/* ==================================================================== */
 
-				PhaseFunctionSamplingRecord pRec(mRec, -ray.d);
+				bool useSGGX = false;
+				if (phase->getClass()->getName() == "SGGXPhaseFunction")
+					useSGGX = true;
+				PhaseFunctionSamplingRecord pRec(mRec, -ray.d, useSGGX);
+				
 				Float phaseVal = phase->sample(pRec, rRec.sampler);
 				if (phaseVal == 0)
 					break;

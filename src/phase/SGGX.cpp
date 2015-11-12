@@ -29,7 +29,8 @@ public:
 		else
 			Log(EError, "Unknown SGGX phase function type. Support specular and diffuse.");
 
-		m_fiberDistr = GaussianFiberDistribution(0.3f);
+		m_stddev = props.getFloat("stddev", -1.f);
+		m_fiberDistr = GaussianFiberDistribution(m_stddev);
 	}
 
 	SGGXPhaseFunction(Stream *stream, InstanceManager *manager)
@@ -47,6 +48,13 @@ public:
 		Properties props("independent");
 		m_sampler = static_cast<Sampler*>(PluginManager::getInstance()->createObject(MTS_CLASS(Sampler), props));
 		m_sampler->configure();
+
+		if (m_stddev != -1.f) {
+			Float sigma1 = m_fiberDistr.sigmaT(0.f) * 2.f;
+			Float sigma2 = sigma1;
+			Float sigma3 = m_fiberDistr.sigmaT(1.f) * 2.f;
+			D = Matrix3x3(Vector(sigma1 * sigma1, 0, 0), Vector(0, sigma2 * sigma2, 0), Vector(0, 0, sigma3 * sigma3));
+		}
 	}
 
 	void serialize(Stream *stream, InstanceManager *manager) const {
@@ -60,6 +68,11 @@ public:
 
 		Float Sxx = pRec.Sxx, Syy = pRec.Syy, Szz = pRec.Szz;
 		Float Sxy = pRec.Sxy, Sxz = pRec.Sxz, Syz = pRec.Syz;
+	
+		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+		if (fabsf(sqrSum) < 1e-6f)
+			return 0;
 
 		if (m_sampleType == ESpecular) {
 			Vector H = wi + wo;
@@ -84,12 +97,17 @@ public:
 
 		Float Sxx = pRec.Sxx, Syy = pRec.Syy, Szz = pRec.Szz;
 		Float Sxy = pRec.Sxy, Sxz = pRec.Sxz, Syz = pRec.Syz;
+		
+		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+		if (fabsf(sqrSum) < 1e-6f)
+			return 0;
 
 		Vector wm = sampleVNormal(wi, sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 
 		if (m_sampleType == ESpecular) {
 			Vector wo = -wi + 2.f * dot(wm, wi) * wm;
-			pRec.wo = wo;
+			pRec.wo = normalize(wo);
 			return 1.f;
 		}
 		else if (m_sampleType == EDiffuse) {
@@ -116,7 +134,7 @@ public:
 			Float y = r * sinf(phi);
 			Float z = sqrtf(1.f - x * x - y * y);
 			Vector wo = x * frame.s + y * frame.t + z * wm;
-			normalize(wo);
+			wo = normalize(wo);
 			pRec.wo = wo;
 			return 1.f;
 		}
@@ -175,7 +193,7 @@ public:
 		Vector Mi(invSqrtSii * Ski, invSqrtSii * Sji, invSqrtSii * Sii);
 		
 		Vector wm_kji = normalize(u * Mk + v * Mj + w * Mi);
-		return wm_kji.x * wk + wm_kji.y * wj + wm_kji.z * wi;
+		return normalize(wm_kji.x * wk + wm_kji.y * wj + wm_kji.z * wi);
 	}
 
 	Float sigma(const Vector &wi, Float Sxx, Float Syy, Float Szz,
@@ -183,6 +201,15 @@ public:
 		Float sigmaSqr = wi.x * wi.x * Sxx + wi.y * wi.y * Syy + wi.z * wi.z * Szz +
 			2.f * (wi.x * wi.y * Sxy + wi.x * wi.z * Sxz + wi.y * wi.z * Syz);
 		return (sigmaSqr > 0.f) ? sqrtf(sigmaSqr) : 0.f;
+	}
+
+	Float sigmaDir(const Vector &d, Float Sxx, Float Syy, Float Szz,
+		Float Sxy, Float Sxz, Float Syz) const {
+		return sigma(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+	}
+
+	Matrix3x3 getD() const {
+		return D;
 	}
 
 	Float ndf(const Vector &wm, Float Sxx, Float Syy, Float Szz,
@@ -220,6 +247,8 @@ private:
 	Sampler *m_sampler;
 
 	GaussianFiberDistribution m_fiberDistr;
+	Float m_stddev;
+	Matrix3x3 D;
 };
 
 

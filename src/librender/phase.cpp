@@ -1,6 +1,7 @@
 #include <mitsuba/render/phase.h>
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/volume.h>
+#include <mitsuba/core/frame.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -21,10 +22,23 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 	if (useSGGX) {
 		const VolumeDataSource *VolS1 = mRec.medium->getS1();
 		const VolumeDataSource *VolS2 = mRec.medium->getS2();
-		Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
-		Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
-		Sxx = S1[0]; Syy = S1[1], Szz = S1[2];
-		Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
+		if (VolS1 == NULL) {
+			Matrix3x3 D = mRec.medium->getPhaseFunction()->getD();
+			Vector w3 = mRec.orientation;
+			Frame frame(w3);
+			Matrix3x3 basis(frame.s, frame.t, w3);
+			Matrix3x3 basisT;
+			basis.transpose(basisT);
+			Matrix3x3 S = basis * D * basisT;
+			Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
+			Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
+		}
+		else {
+			Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
+			Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
+			Sxx = S1[0]; Syy = S1[1]; Szz = S1[2];
+			Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
+		}
 	}
 }
 
@@ -34,10 +48,23 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 	if (useSGGX) {
 		const VolumeDataSource *VolS1 = mRec.medium->getS1();
 		const VolumeDataSource *VolS2 = mRec.medium->getS2();
-		Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
-		Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
-		Sxx = S1[0]; Syy = S1[1], Szz = S1[2];
-		Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
+		if (VolS1 == NULL) {
+			Matrix3x3 D = mRec.medium->getPhaseFunction()->getD();
+			Vector w3 = mRec.orientation;
+			Frame frame(w3);
+			Matrix3x3 basis(frame.s, frame.t, w3);
+			Matrix3x3 basisT;
+			basis.transpose(basisT);
+			Matrix3x3 S = basis * D * basisT;
+			Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
+			Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
+		}
+		else {
+			Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
+			Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
+			Sxx = S1[0]; Syy = S1[1]; Szz = S1[2];
+			Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
+		}
 	}
 }
 
@@ -55,6 +82,19 @@ bool PhaseFunction::needsDirectionallyVaryingCoefficients() const {
 
 Float PhaseFunction::sigmaDir(Float cosTheta) const {
 	Log(EError, "%s::sigmaDir(Float) is not implemented (this is not "
+		"an anisotropic medium!)", getClass()->getName().c_str());
+	return 0.0f;
+}
+
+Matrix3x3 PhaseFunction::getD() const {
+	Log(EError, "%s::getD() is not implemented (Only for SGGX)", 
+		getClass()->getName().c_str());
+	return Matrix3x3();
+}
+
+Float PhaseFunction::sigmaDir(const Vector &d, Float Sxx, Float Syy, Float Szz,
+	Float Sxy, Float Sxz, Float Syz) const {
+	Log(EError, "%s::sigmaDir(Vector) is not implemented (this is not "
 		"an anisotropic medium!)", getClass()->getName().c_str());
 	return 0.0f;
 }

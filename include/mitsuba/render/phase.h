@@ -209,6 +209,12 @@ public:
 	 */
 	virtual Float sigmaDir(Float cosTheta) const;
 
+	// Only for SGGX
+	virtual Matrix3x3 getD() const;
+
+	virtual Float sigmaDir(const Vector &d, Float Sxx, Float Syy, Float Szz,
+		Float Sxy, Float Sxz, Float Syz) const;
+
 	/**
 	 * \brief Returns the maximum value take on on by \ref sigmaDirMax().
 	 * This is useful when implementing Woodcock tracking.

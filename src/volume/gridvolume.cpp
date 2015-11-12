@@ -575,6 +575,18 @@ public:
 			return Vector(0.0f);
 	}
 
+	Float lookupFloat(int x, int y, int z, int c) const {
+		if (m_channels == 1) {
+			const float *floatData = (float *)m_data;
+			return floatData[(z * m_res.y + y) * m_res.x + x];
+		}
+		else if (m_channels == 3) {
+			const float *floatData = (float *)m_data;
+			return floatData[((z * m_res.y + y) * m_res.x + x) * 3 + c];
+		}
+		return 0;
+	}
+
 	bool supportsFloatLookups() const { return m_channels == 1; }
 	bool supportsSpectrumLookups() const { return m_channels == 3; }
 	bool supportsVectorLookups() const { return m_channels == 3; }

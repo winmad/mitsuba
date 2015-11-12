@@ -136,6 +136,7 @@ public:
 			}
 		}
 		stream->writeSingleArray(data, res.x * res.y * res.z);
+		delete[] data;
 	}
 
 	Vector3i scale;

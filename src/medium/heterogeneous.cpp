@@ -237,8 +237,16 @@ public:
 		/* Assumes that the density medium does not
 		   contain values greater than one! */
 		m_maxDensity = m_scale * m_density->getMaximumFloatValue();
-		if (m_anisotropicMedium)
-			m_maxDensity *= m_phaseFunction->sigmaDirMax();
+		if (m_anisotropicMedium) {
+			if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction") {
+				// hard to bound... hack by microflake
+				// need to implement later!
+				m_maxDensity *= m_phaseFunction->sigmaDirMax();
+			}
+			else {
+				m_maxDensity *= m_phaseFunction->sigmaDirMax();
+			}
+		}
 		m_invMaxDensity = 1.0f/m_maxDensity;
 
 		if (m_stepSize == 0) {
@@ -254,7 +262,8 @@ public:
 						"parameter.");
 		}
 
-		if (m_anisotropicMedium && m_orientation.get() == NULL)
+		if (m_anisotropicMedium && m_orientation.get() == NULL && 
+			(m_S1.get() == NULL || m_S2.get() == NULL))
 			Log(EError, "Cannot use anisotropic phase function: "
 				"did not specify a particle orientation field!");
 	}
@@ -721,6 +730,41 @@ protected:
 	inline Float lookupDensity(const Point &p, const Vector &d) const {
 		Float density = m_density->lookupFloat(p);
 		if (m_anisotropicMedium && density != 0) {
+			if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction") {
+				if (m_S1 == NULL) {
+					Matrix3x3 D = getPhaseFunction()->getD();
+					Vector orientation = m_orientation->lookupVector(p);
+					Vector w3 = orientation;
+					Frame frame(w3);
+					Matrix3x3 basis(frame.s, frame.t, w3);
+					Matrix3x3 basisT;
+					basis.transpose(basisT);
+					Matrix3x3 S = basis * D * basisT;
+					Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
+					Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
+					Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+					//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+					if (fabsf(sqrSum) > 1e-6f)
+						density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+					else
+						return 0;
+					return density;
+				}
+				else {
+					Spectrum S1 = m_S1->lookupSpectrum(p);
+					Spectrum S2 = m_S2->lookupSpectrum(p);
+					Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
+					Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
+					Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+					//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+					if (fabsf(sqrSum) > 1e-6f)
+						density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+					else
+						return 0;
+					return density;
+				}
+			}
+
 			Vector orientation = m_orientation->lookupVector(p);
 			if (!orientation.isZero())
 				density *= m_phaseFunction->sigmaDir(dot(d, orientation));

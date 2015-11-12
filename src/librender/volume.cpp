@@ -54,6 +54,11 @@ Vector VolumeDataSource::lookupVector(const Point &p) const {
 	return Vector();
 }
 
+Float VolumeDataSource::lookupFloat(int x, int y, int z, int c) const {
+	Log(EError, "'%s': does not implement lookupFloat(gridPosition)!", getClass()->getName().c_str());
+	return 0;
+}
+
 bool VolumeDataSource::supportsFloatLookups() const {
 	return false;
 }
