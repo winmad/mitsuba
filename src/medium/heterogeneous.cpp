@@ -625,6 +625,17 @@ public:
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 				mRec.orientation = m_orientation != NULL
 					? m_orientation->lookupVector(mRec.p) : Vector(0.0f);
+
+// 				if (m_orientation != NULL) {
+// 					Spectrum spect = m_orientation->lookupSpectrum(mRec.p);
+// 					mRec.orientation.x = spect[0];
+// 					mRec.orientation.y = spect[1];
+// 					mRec.orientation.z = spect[2];
+// 					if (mRec.orientation.length() > 1e-6f)
+// 						mRec.orientation = normalize(mRec.orientation);
+// 					else
+// 						mRec.orientation = Vector(0.f);
+// 				}
 			}
 
 			Float expVal = math::fastexp(-integratedDensity);
@@ -674,6 +685,18 @@ public:
 						mRec.transmittance = Spectrum(0.0f);
 					mRec.orientation = m_orientation != NULL
 						? m_orientation->lookupVector(p) : Vector(0.0f);
+
+// 					if (m_orientation != NULL) {
+// 						Spectrum spect = m_orientation->lookupSpectrum(mRec.p);
+// 						mRec.orientation.x = spect[0];
+// 						mRec.orientation.y = spect[1];
+// 						mRec.orientation.z = spect[2];
+// 						if (mRec.orientation.length() > 1e-6f)
+// 							mRec.orientation = normalize(mRec.orientation);
+// 						else
+// 							mRec.orientation = Vector(0.f);
+// 					}
+
 					mRec.medium = this;
 					success = true;
 					break;
@@ -734,6 +757,19 @@ protected:
 				if (m_S1 == NULL) {
 					Matrix3x3 D = getPhaseFunction()->getD();
 					Vector orientation = m_orientation->lookupVector(p);
+
+// 					Spectrum spect = m_orientation->lookupSpectrum(p);
+// 					orientation.x = spect[0];
+// 					orientation.y = spect[1];
+// 					orientation.z = spect[2];
+// 					if (orientation.length() > 1e-6f)
+// 						orientation = normalize(orientation);
+// 					else
+// 						orientation = Vector(0.f);
+					
+					if (orientation.isZero())
+						return 0;
+
 					Vector w3 = orientation;
 					Frame frame(w3);
 					Matrix3x3 basis(frame.s, frame.t, w3);

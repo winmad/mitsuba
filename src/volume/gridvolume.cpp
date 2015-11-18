@@ -576,13 +576,25 @@ public:
 	}
 
 	Float lookupFloat(int x, int y, int z, int c) const {
-		if (m_channels == 1) {
-			const float *floatData = (float *)m_data;
-			return floatData[(z * m_res.y + y) * m_res.x + x];
+		if (m_volumeType == EFloat32) {
+			if (m_channels == 1) {
+				const float *floatData = (float *)m_data;
+				return floatData[(z * m_res.y + y) * m_res.x + x];
+			}
+			else if (m_channels == 3) {
+				const float3 *floatData = (float3 *)m_data;
+				return floatData[((z * m_res.y + y) * m_res.x + x)][c];
+			}
 		}
-		else if (m_channels == 3) {
-			const float *floatData = (float *)m_data;
-			return floatData[((z * m_res.y + y) * m_res.x + x) * 3 + c];
+		else if (m_volumeType == EQuantizedDirections) {
+			int index = (z * m_res.y + y) * m_res.x + x;
+			uint8_t theta = m_data[2 * index], phi = m_data[2 * index + 1];
+			if (c == 0)
+				return m_cosPhi[phi] * m_sinTheta[theta];
+			else if (c == 1)
+				return m_sinPhi[phi] * m_sinTheta[theta];
+			else
+				return m_cosTheta[theta];
 		}
 		return 0;
 	}

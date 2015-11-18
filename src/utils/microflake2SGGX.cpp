@@ -10,6 +10,8 @@
 #include <mitsuba/render/volume.h>
 #include <mitsuba/render/util.h>
 #include <mitsuba/render/phase.h>
+#include <mitsuba/core/fresolver.h>
+#include <mitsuba/core/properties.h>
 #include "../phase/microflake_fiber.h"
 
 MTS_NAMESPACE_BEGIN
@@ -19,11 +21,11 @@ public:
 	typedef std::vector<std::vector<std::vector<Vector> > > SData;
 
 	int run(int argc, char **argv) {
-		if (argc != 6) {
+		if (argc != 6 && argc != 8) {
 			cout << "Convert microflake phase function to SGGX phase function" << endl;
 			cout << "Syntax: mtsutil microflake2SGGX 0 <x> <y> <z> <stddev>" << endl;
 			cout << "Syntax: mtsutil microflake2SGGX 1 <grid_orientation_volume> <stddev> <S1_volume> <S2_volume>" << endl;
-			cout << "Syntax: mtsutil microflake2SGGX 2 <hgrid_orientation_volume> <stddev> <S1_volume> <S2_volume>" << endl;
+			cout << "Syntax: mtsutil microflake2SGGX 2 <hgrid_orientation_volume_dict> <stddev> <prefix> <orientation_suffix> <s1_suffix> <s2_suffix>" << endl;
 			return -1;
 		}
 
@@ -152,8 +154,58 @@ public:
 			gridWriteS(s1, bbox, s1File.get());
 			gridWriteS(s2, bbox, s2File.get());
 		}
-		else if (strcmp(argv[2], "1") == 0) {
+		else if (strcmp(argv[1], "2") == 0) {
+			fs::path resolved = Thread::getThread()->getFileResolver()->resolve(argv[2]);
+			Log(EInfo, "Loading hierarchical grid dictrionary \"%s\"", argv[2]);
+			ref<FileStream> stream = new FileStream(resolved, FileStream::EReadOnly);
+			stream->setByteOrder(Stream::ELittleEndian);
 
+			char *end_ptr = NULL;
+			stddev = strtod(argv[3], &end_ptr);
+			if (*end_ptr != '\0')
+				SLog(EError, "Could not parse floating point value");
+			GaussianFiberDistribution d(stddev);
+
+			Float xmin = stream->readSingle(), ymin = stream->readSingle(), zmin = stream->readSingle();
+			Float xmax = stream->readSingle(), ymax = stream->readSingle(), zmax = stream->readSingle();
+			AABB aabb = AABB(Point(xmin, ymin, zmin), Point(xmax, ymax, zmax));
+
+			Vector3i res = Vector3i(stream);
+			int nCells = res.x * res.y * res.z;
+
+			int numBlocks = 0;
+			while (!stream->isEOF()) {
+				Vector3i block = Vector3i(stream);
+				Assert(block.x >= 0 && block.y >= 0 && block.z >= 0
+					&& block.x < res.x && block.y < res.y && block.z < res.z);
+
+				Properties props("gridvolume");
+				props.setString("filename", formatString("%s%03i_%03i_%03i%s",
+					argv[4], block.x, block.y, block.z, argv[5]));
+				props.setBoolean("sendData", false);
+
+				VolumeDataSource *ori = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
+					createObject(MTS_CLASS(VolumeDataSource), props));
+				ori->configure();
+
+				Log(EInfo, "Loading grid %03i_%03i_%03i", block.x, block.y, block.z);
+
+				SData s1, s2;
+				gridOri2S(ori, d, s1, s2);
+
+				AABB bbox = ori->getAABB();
+
+				std::string s1Filename(formatString("%s%03i_%03i_%03i%s", argv[4], block.x, block.y, block.z, argv[6]));
+				std::string s2Filename(formatString("%s%03i_%03i_%03i%s", argv[4], block.x, block.y, block.z, argv[7]));
+				ref<FileStream> s1File = new FileStream(s1Filename.c_str(), FileStream::ETruncReadWrite);
+				ref<FileStream> s2File = new FileStream(s2Filename.c_str(), FileStream::ETruncReadWrite);
+
+				gridWriteS(s1, bbox, s1File.get());
+				gridWriteS(s2, bbox, s2File.get());
+				++numBlocks;
+			}
+			Log(EInfo, "%i blocks total, %s, resolution=%s", numBlocks,
+				aabb.toString().c_str(), res.toString().c_str());
 		}
 
 		return 0;
@@ -169,15 +221,13 @@ public:
 		}
 	}
 
-	void getSValue(Vector &w, const GaussianFiberDistribution &d, Vector &s1Val, Vector &s2Val) {
+	Vector6 getSValue(const Vector &w, const GaussianFiberDistribution &d) {
 		if (w.isZero()) {
-			s1Val = Vector(0.f);
-			s2Val = Vector(0.f);
-			return;
+			return Vector6(0.f);
 		}
 
-		Float gauss_sigma3 = d.sigmaT(1.f) * 2;
-		Float gauss_sigma1 = d.sigmaT(0.f) * 2;
+		Float gauss_sigma3 = d.sigmaT(1.f) * 2.f;
+		Float gauss_sigma1 = d.sigmaT(0.f) * 2.f;
 
 		Frame dFrame(w);
 		Vector w1 = dFrame.s;
@@ -197,8 +247,10 @@ public:
 		basis.transpose(basisT);
 		Matrix3x3 S = basis * D * basisT;
 
-		s1Val[0] = S.m[0][0]; s1Val[1] = S.m[1][1]; s1Val[2] = S.m[2][2];
-		s2Val[0] = S.m[0][1]; s2Val[1] = S.m[0][2]; s2Val[2] = S.m[1][2];
+		Vector6 res;
+		res[0] = S.m[0][0]; res[1] = S.m[1][1]; res[2] = S.m[2][2];
+		res[3] = S.m[0][1]; res[4] = S.m[0][2]; res[5] = S.m[1][2];
+		return res;
 	}
 
 	void gridOri2S(VolumeDataSource *ori, const GaussianFiberDistribution &d, SData &s1, SData &s2) {
@@ -212,10 +264,9 @@ public:
 			for (int j = 0; j < res.y; j++) {
 				for (int k = 0; k < res.z; k++) {
 					Vector w(ori->lookupFloat(i, j, k, 0), ori->lookupFloat(i, j, k, 1), ori->lookupFloat(i, j, k, 2));
-					Vector s1Val(0.f), s2Val(0.f);
-					getSValue(w, d, s1Val, s2Val);
-					s1[i][j][k] = s1Val;
-					s2[i][j][k] = s2Val;
+					Vector6 s = getSValue(w, d);
+					s1[i][j][k] = Vector3(s[0], s[1], s[2]);
+					s2[i][j][k] = Vector3(s[3], s[4], s[5]);
 				}
 			}
 		}
