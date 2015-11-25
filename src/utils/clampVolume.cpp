@@ -1,6 +1,6 @@
 /*
 	Add by Lifan Wu
-	Nov 3, 2015
+	Nov 22, 2015
 */
 
 #include <mitsuba/core/plugin.h>
@@ -12,29 +12,23 @@
 
 MTS_NAMESPACE_BEGIN
 
-class DownSampleVolume : public Utility {
+class ClampVolume : public Utility {
 public:
 	typedef std::vector<std::vector<std::vector<Vector> > > GridData;
 
 	int run(int argc, char **argv) {
-		if(argc != 7 && argc != 9) {
+		if (argc != 5 && argc != 7) {
 			cout << "Down-sample grid volume data by a scale" << endl;
-			cout << "Syntax: mtsutil downSampleVolume 0 <grid_volume> <scale x> <scale y> <scale z> <target_volume>" << endl;
-			cout << "Syntax: mtsutil downSampleVolume 1 <hgrid_volume_dict> <scale x> <scale y> <scale z> <prefix> <origin_suffix> <target_suffix>" << endl;
+			cout << "Syntax: mtsutil downSampleVolume 0 <grid_volume> <threshold> <target_volume>" << endl;
+			cout << "Syntax: mtsutil downSampleVolume 1 <hgrid_volume_dict> <threshold> <prefix> <origin_suffix> <target_suffix>" << endl;
 			return -1;
 		}
 
 		if (strcmp(argv[1], "0") == 0) {
 			char *end_ptr = NULL;
-			scale.x = strtol(argv[3], &end_ptr, 10);
+			m_threshold = strtod(argv[3], &end_ptr);
 			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.y = strtol(argv[4], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.z = strtol(argv[5], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
+				SLog(EError, "Could not parse floating point value");
 
 			Properties props("gridvolume");
 			props.setString("filename", argv[2]);
@@ -47,29 +41,21 @@ public:
 			Log(EInfo, "%s", originVol->getClass()->getName().c_str());
 			Log(EInfo, "res = (%d, %d, %d)", originVol->getResolution().x, originVol->getResolution().y, originVol->getResolution().z);
 			Log(EInfo, "channels = %d", originVol->getChannels());
-			Log(EInfo, "min = (%.6f, %.6f, %.6f)", originVol->getAABB().min.x, originVol->getAABB().min.y, originVol->getAABB().min.z);
-			Log(EInfo, "max = (%.6f, %.6f, %.6f)", originVol->getAABB().max.x, originVol->getAABB().max.y, originVol->getAABB().max.z);
 
 			AABB bbox = originVol->getAABB();
 
 			GridData s;
-			downSample(originVol, s);
+			clampVolume(originVol, s);
 
 			Log(EInfo, "finish down-sampling, save volume data to file");
-			ref<FileStream> outFile = new FileStream(argv[6], FileStream::ETruncReadWrite);
+			ref<FileStream> outFile = new FileStream(argv[4], FileStream::ETruncReadWrite);
 			writeVolume(s, bbox, originVol->getChannels(), outFile);
 		}
 		else if (strcmp(argv[1], "1") == 0) {
 			char *end_ptr = NULL;
-			scale.x = strtol(argv[3], &end_ptr, 10);
+			m_threshold = strtod(argv[3], &end_ptr);
 			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.y = strtol(argv[4], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.z = strtol(argv[5], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
+				SLog(EError, "Could not parse floating point value");
 
 			fs::path resolved = Thread::getThread()->getFileResolver()->resolve(argv[2]);
 			Log(EInfo, "Loading hierarchical grid dictrionary \"%s\"", argv[2]);
@@ -91,7 +77,7 @@ public:
 
 				Properties props("gridvolume");
 				props.setString("filename", formatString("%s%03i_%03i_%03i%s",
-					argv[6], block.x, block.y, block.z, argv[7]));
+					argv[4], block.x, block.y, block.z, argv[5]));
 				props.setBoolean("sendData", false);
 
 				VolumeDataSource *ori = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
@@ -103,9 +89,9 @@ public:
 				AABB bbox = ori->getAABB();
 
 				GridData s;
-				downSample(ori, s);
+				clampVolume(ori, s);
 
-				std::string filename(formatString("%s%03i_%03i_%03i%s", argv[6], block.x, block.y, block.z, argv[8]));
+				std::string filename(formatString("%s%03i_%03i_%03i%s", argv[4], block.x, block.y, block.z, argv[6]));
 				ref<FileStream> outFile = new FileStream(filename.c_str(), FileStream::ETruncReadWrite);
 
 				writeVolume(s, bbox, ori->getChannels(), outFile);
@@ -129,45 +115,28 @@ public:
 		}
 	}
 
-	void downSample(VolumeDataSource *ori, GridData &s) {
+	void clampVolume(VolumeDataSource *ori, GridData &s) {
 		int channels = ori->getChannels();
-		Vector3i originRes = ori->getResolution();
-
-		Vector3i res;
-		res.x = originRes.x / scale.x;
-		res.y = originRes.y / scale.y;
-		res.z = originRes.z / scale.z;
+		Vector3i res = ori->getResolution();
 
 		initS(s, res);
 
-		originRes.x -= originRes.x % scale.x;
-		originRes.y -= originRes.y % scale.y;
-		originRes.z -= originRes.z % scale.z;
-
-		for (int i = 0; i < originRes.x; i += scale.x) {
-			for (int j = 0; j < originRes.y; j += scale.y) {
-				for (int k = 0; k < originRes.z; k += scale.z) {
-					Vector sumValue(0.f);
-					Float cnt = 0.f;
-					for (int dx = 0; dx < scale.x; dx++) {
-						for (int dy = 0; dy < scale.y; dy++) {
-							for (int dz = 0; dz < scale.z; dz++) {
-								if (channels == 1) {
-									float v = ori->lookupFloat(i + dx, j + dy, k + dz, 0);
-									sumValue += Vector(v);
-									cnt += 1.f;
-								}
-								else {
-									Vector v(ori->lookupFloat(i + dx, j + dy, k + dz, 0),
-										ori->lookupFloat(i + dx, j + dy, k + dz, 1),
-										ori->lookupFloat(i + dx, j + dy, k + dz, 2));
-									sumValue += v;
-									cnt += 1.f;
-								}
-							}
-						}
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					if (channels == 1) {
+						// Only handle 1 channel
+						float v = ori->lookupFloat(i, j, k, 0);
+						if (v < m_threshold)
+							v = 0;
+						s[i][j][k] = Vector(v);
 					}
-					s[i / scale.x][j / scale.y][k / scale.z] = sumValue / cnt;
+					else {
+						// Undefined behavior
+						Vector v(ori->lookupFloat(i, j, k, 0),
+						ori->lookupFloat(i, j, k, 1),
+						ori->lookupFloat(i, j, k, 2));
+					}
 				}
 			}
 		}
@@ -209,10 +178,10 @@ public:
 		delete[] data;
 	}
 
-	Vector3i scale;
+	Float m_threshold;
 
 	MTS_DECLARE_UTILITY()
 };
 
-MTS_EXPORT_UTILITY(DownSampleVolume, "Down-sample volume")
+MTS_EXPORT_UTILITY(ClampVolume, "Clamp volume")
 MTS_NAMESPACE_END

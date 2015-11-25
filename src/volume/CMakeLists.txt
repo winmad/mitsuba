@@ -7,6 +7,8 @@ macro(add_volume)
   add_mts_plugin(${ARGN} TYPE volume)
 endmacro()
 
+add_volume(tiledvol    tiledvol.cpp)
+
 add_volume(constvolume constvolume.cpp)
 add_volume(gridvolume  gridvolume.cpp)
 add_volume(hgridvolume hgridvolume.cpp)

@@ -212,6 +212,12 @@ public:
 		m_cosPhi[255] = m_sinPhi[255] = 0;
 		m_cosTheta[255] = m_sinTheta[255] = 0;
 		m_densityMap[255] = 1.0f;
+		/*
+		std::ostringstream oss;
+		oss << "Data AABB: " << m_aabb.toString() << '\n';
+		oss << "Step size = " << m_stepSize;
+		Log(EInfo, oss.str().c_str());
+		*/
 	}
 
 	void loadFromFile(const fs::path &filename) {

@@ -12,6 +12,7 @@ include_directories(${ILMBASE_INCLUDE_DIRS})
 add_utility(downSampleVolume downSampleVolume.cpp)
 add_utility(microflake2SGGX  microflake2SGGX.cpp)
 add_utility(cmp              cmp.cpp)
+add_utility(clampVolume      clampVolume.cpp)
 
 add_utility(addimages      addimages.cpp)
 add_utility(joinrgb        joinrgb.cpp)

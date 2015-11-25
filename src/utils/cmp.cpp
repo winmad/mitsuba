@@ -35,7 +35,8 @@ public:
 		double relRmse = relRMSE(resImg, refImg, widthRes, heightRes);
 		double rmse = RMSE(resImg, refImg, widthRes, heightRes);
 
-		Log(EInfo, "Relative RMSE = %.6f", relRmse);
+		//Log(EInfo, "Relative RMSE = %.6f", relRmse);
+		Log(EInfo, "%s", argv[1]);
 		Log(EInfo, "RMSE = %.6f", rmse);
 	}
 
