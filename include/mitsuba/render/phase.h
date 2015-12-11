@@ -73,7 +73,7 @@ struct MTS_EXPORT_RENDER PhaseFunctionSamplingRecord {
 	 *      The transported mode (\ref ERadiance or \ref EImportance)
 	 */
 
-	inline PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
+	PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
 		const Vector &wi, bool _useSGGX = false, ETransportMode mode = ERadiance);
 		
 
@@ -95,7 +95,7 @@ struct MTS_EXPORT_RENDER PhaseFunctionSamplingRecord {
 	 * \param mode
 	 *      The transported mode (\ref ERadiance or \ref EImportance)
 	 */
-	inline PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
+	PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
 			const Vector &wi, const Vector &wo, bool _useSGGX = false, 
 			ETransportMode mode = ERadiance);
 

@@ -32,7 +32,7 @@ MTS_NAMESPACE_BEGIN
 /*! \addtogroup libcore */
 /*! @{ */
 
-#define writeLog Logger::writeLog
+//#define writeLog Logger::writeLog
 
 /// Write a Log message to the console (to be used within subclasses of <tt>Object</tt>)
 #define Log(level, fmt, ...) do { \

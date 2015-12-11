@@ -1,6 +1,6 @@
 /*
 	Add by Lifan Wu
-	Nov 22, 2015
+	Dec 09, 2015
 */
 
 #include <mitsuba/core/plugin.h>
@@ -12,24 +12,19 @@
 
 MTS_NAMESPACE_BEGIN
 
-class ClampVolume : public Utility {
+class Orientation2Albedo : public Utility {
 public:
 	typedef std::vector<std::vector<std::vector<Vector> > > GridData;
 
 	int run(int argc, char **argv) {
-		if (argc != 5 && argc != 7) {
-			cout << "Clamp grid volume data by a threshold" << endl;
-			cout << "Syntax: mtsutil clampVolume 0 <grid_volume> <threshold> <target_volume>" << endl;
-			cout << "Syntax: mtsutil clampVolume 1 <hgrid_volume_dict> <threshold> <prefix> <origin_suffix> <target_suffix>" << endl;
+		if (argc != 4 && argc != 6) {
+			cout << "Convert orientation volume to albedo volume" << endl;
+			cout << "Syntax: mtsutil orientation2Albedo 0 <orientation_volume> <albedo_volume>" << endl;
+			cout << "Syntax: mtsutil orientation2Albedo 1 <hgrid_volume_dict> <prefix> <orientation_suffix> <albedo_suffix>" << endl;
 			return -1;
 		}
 
 		if (strcmp(argv[1], "0") == 0) {
-			char *end_ptr = NULL;
-			m_threshold = strtod(argv[3], &end_ptr);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse floating point value");
-
 			Properties props("gridvolume");
 			props.setString("filename", argv[2]);
 			props.setBoolean("sendData", false);
@@ -41,22 +36,19 @@ public:
 			Log(EInfo, "%s", originVol->getClass()->getName().c_str());
 			Log(EInfo, "res = (%d, %d, %d)", originVol->getResolution().x, originVol->getResolution().y, originVol->getResolution().z);
 			Log(EInfo, "channels = %d", originVol->getChannels());
+			Log(EInfo, "min = (%.6f, %.6f, %.6f)", originVol->getAABB().min.x, originVol->getAABB().min.y, originVol->getAABB().min.z);
+			Log(EInfo, "max = (%.6f, %.6f, %.6f)", originVol->getAABB().max.x, originVol->getAABB().max.y, originVol->getAABB().max.z);
 
 			AABB bbox = originVol->getAABB();
 
 			GridData s;
-			clampVolume(originVol, s);
+			convert2Albedo(originVol, s);
 
-			Log(EInfo, "finish down-sampling, save volume data to file");
-			ref<FileStream> outFile = new FileStream(argv[4], FileStream::ETruncReadWrite);
+			Log(EInfo, "finish converting, save volume data to file");
+			ref<FileStream> outFile = new FileStream(argv[3], FileStream::ETruncReadWrite);
 			writeVolume(s, bbox, originVol->getChannels(), outFile);
 		}
 		else if (strcmp(argv[1], "1") == 0) {
-			char *end_ptr = NULL;
-			m_threshold = strtod(argv[3], &end_ptr);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse floating point value");
-
 			fs::path resolved = Thread::getThread()->getFileResolver()->resolve(argv[2]);
 			Log(EInfo, "Loading hierarchical grid dictrionary \"%s\"", argv[2]);
 			ref<FileStream> stream = new FileStream(resolved, FileStream::EReadOnly);
@@ -77,7 +69,7 @@ public:
 
 				Properties props("gridvolume");
 				props.setString("filename", formatString("%s%03i_%03i_%03i%s",
-					argv[4], block.x, block.y, block.z, argv[5]));
+					argv[3], block.x, block.y, block.z, argv[4]));
 				props.setBoolean("sendData", false);
 
 				VolumeDataSource *ori = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
@@ -89,9 +81,9 @@ public:
 				AABB bbox = ori->getAABB();
 
 				GridData s;
-				clampVolume(ori, s);
+				convert2Albedo(ori, s);
 
-				std::string filename(formatString("%s%03i_%03i_%03i%s", argv[4], block.x, block.y, block.z, argv[6]));
+				std::string filename(formatString("%s%03i_%03i_%03i%s", argv[3], block.x, block.y, block.z, argv[5]));
 				ref<FileStream> outFile = new FileStream(filename.c_str(), FileStream::ETruncReadWrite);
 
 				writeVolume(s, bbox, ori->getChannels(), outFile);
@@ -115,28 +107,20 @@ public:
 		}
 	}
 
-	void clampVolume(VolumeDataSource *ori, GridData &s) {
+	void convert2Albedo(VolumeDataSource *ori, GridData &s) {
 		int channels = ori->getChannels();
 		Vector3i res = ori->getResolution();
 
 		initS(s, res);
 
-		for (int i = 0; i < res.x; i++) {
-			for (int j = 0; j < res.y; j++) {
-				for (int k = 0; k < res.z; k++) {
-					if (channels == 1) {
-						// Only handle 1 channel
-						float v = ori->lookupFloat(i, j, k, 0);
-						if (v < m_threshold)
-							v = 0;
-						s[i][j][k] = Vector(v);
-					}
-					else {
-						// Undefined behavior
-						Vector v(ori->lookupFloat(i, j, k, 0),
+		Assert(channels == 3);
+		for (int i = 0; i < res[0]; i++) {
+			for (int j = 0; j < res[1]; j++) {
+				for (int k = 0; k < res[2]; k++) {
+					Vector v(ori->lookupFloat(i, j, k, 0),
 						ori->lookupFloat(i, j, k, 1),
 						ori->lookupFloat(i, j, k, 2));
-					}
+					s[i][j][k] = Vector(fabsf(v.x), fabsf(v.y), fabsf(v.z));
 				}
 			}
 		}
@@ -178,10 +162,10 @@ public:
 		delete[] data;
 	}
 
-	Float m_threshold;
+	Vector3i scale;
 
 	MTS_DECLARE_UTILITY()
 };
 
-MTS_EXPORT_UTILITY(ClampVolume, "Clamp volume")
+MTS_EXPORT_UTILITY(Orientation2Albedo, "Convert orientation volume to albedo volume")
 MTS_NAMESPACE_END

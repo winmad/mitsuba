@@ -116,6 +116,8 @@ public:
 			m_dataAABB.max = props.getPoint("max");
 		}
 
+		m_scale = props.getSpectrum("scale", Spectrum(1.f));
+
 		/**
 		 * When 'sendData' is set to false, only the filename
 		 * is transmitted. A following unserialization of the
@@ -132,6 +134,7 @@ public:
 			: VolumeDataSource(stream, manager) {
 		m_volumeToWorld = Transform(stream);
 		m_dataAABB = AABB(stream);
+		m_scale = Spectrum(stream);
 		m_sendData = stream->readBool();
 		if (m_sendData) {
 			m_volumeType = (EVolumeType) stream->readInt();
@@ -172,6 +175,7 @@ public:
 
 		m_volumeToWorld.serialize(stream);
 		m_dataAABB.serialize(stream);
+		m_scale.serialize(stream);
 		stream->writeBool(m_sendData);
 
 		if (m_sendData) {
@@ -313,6 +317,10 @@ public:
 			return float3((float) (value[0]*v), (float) (value[1]*v), (float) (value[2]*v));
 		}
 
+		inline float3 operator*(float3 v) const {
+			return float3(value[0] * v.value[0], value[1] * v.value[1], value[2] * v.value[2]);
+		}
+
 		inline float3 operator+(const float3 &f2) const {
 			return float3(value[0]+f2.value[0], value[1]+f2.value[1], value[2]+f2.value[2]);
 		}
@@ -367,10 +375,10 @@ public:
 					d110 = floatData[(z2*m_res.y + y2)*m_res.x + x1],
 					d111 = floatData[(z2*m_res.y + y2)*m_res.x + x2];
 
-				return ((d000*_fx + d001*fx)*_fy +
+				return (((d000*_fx + d001*fx)*_fy +
 						(d010*_fx + d011*fx)*fy)*_fz +
 					   ((d100*_fx + d101*fx)*_fy +
-						(d110*_fx + d111*fx)*fy)*fz;
+						(d110*_fx + d111*fx)*fy)*fz) * m_scale[0];
 			}
 			case EUInt8: {
 				const Float
@@ -383,10 +391,10 @@ public:
 					d110 = m_densityMap[m_data[(z2*m_res.y + y2)*m_res.x + x1]],
 					d111 = m_densityMap[m_data[(z2*m_res.y + y2)*m_res.x + x2]];
 
-				return ((d000*_fx + d001*fx)*_fy +
+				return (((d000*_fx + d001*fx)*_fy +
 						(d010*_fx + d011*fx)*fy)*_fz +
 					   ((d100*_fx + d101*fx)*_fy +
-						(d110*_fx + d111*fx)*fy)*fz;
+						(d110*_fx + d111*fx)*fy)*fz) * m_scale[0];
 			}
 			default:
 				return 0.0f;
@@ -420,10 +428,10 @@ public:
 					&d110 = spectrumData[(z2*m_res.y + y2)*m_res.x + x1],
 					&d111 = spectrumData[(z2*m_res.y + y2)*m_res.x + x2];
 
-				return (((d000*_fx + d001*fx)*_fy +
+				return ((((d000*_fx + d001*fx)*_fy +
 						 (d010*_fx + d011*fx)*fy)*_fz +
 						((d100*_fx + d101*fx)*_fy +
-						 (d110*_fx + d111*fx)*fy)*fz).toSpectrum();
+						 (d110*_fx + d111*fx)*fy)*fz) * float3(m_scale[0], m_scale[1], m_scale[2])).toSpectrum();
 				}
 			case EUInt8: {
 				const float3
@@ -460,10 +468,10 @@ public:
 						m_densityMap[m_data[3*((z2*m_res.y + y2)*m_res.x + x2)+1]],
 						m_densityMap[m_data[3*((z2*m_res.y + y2)*m_res.x + x2)+2]]);
 
-				return (((d000*_fx + d001*fx)*_fy +
+				return ((((d000*_fx + d001*fx)*_fy +
 						 (d010*_fx + d011*fx)*fy)*_fz +
 						((d100*_fx + d101*fx)*_fy +
-						 (d110*_fx + d111*fx)*fy)*fz).toSpectrum();
+						(d110*_fx + d111*fx)*fy)*fz) * float3(m_scale[0], m_scale[1], m_scale[2])).toSpectrum();
 
 				}
 			default: return Spectrum(0.0f);
@@ -585,11 +593,11 @@ public:
 		if (m_volumeType == EFloat32) {
 			if (m_channels == 1) {
 				const float *floatData = (float *)m_data;
-				return floatData[(z * m_res.y + y) * m_res.x + x];
+				return floatData[(z * m_res.y + y) * m_res.x + x] * m_scale[0];
 			}
 			else if (m_channels == 3) {
 				const float3 *floatData = (float3 *)m_data;
-				return floatData[((z * m_res.y + y) * m_res.x + x)][c];
+				return floatData[((z * m_res.y + y) * m_res.x + x)][c] * m_scale[c];
 			}
 		}
 		else if (m_volumeType == EQuantizedDirections) {
@@ -659,6 +667,8 @@ protected:
 	Float m_cosTheta[256], m_sinTheta[256];
 	Float m_cosPhi[256], m_sinPhi[256];
 	Float m_densityMap[256];
+
+	Spectrum m_scale;
 };
 
 MTS_IMPLEMENT_CLASS_S(GridDataSource, false, VolumeDataSource);
