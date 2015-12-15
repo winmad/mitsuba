@@ -36,6 +36,8 @@ public:
 	SGGXPhaseFunction(Stream *stream, InstanceManager *manager)
 		: PhaseFunction(stream, manager) {
 		m_sampleType = (ESGGXPhaseFunctionType)stream->readInt();
+		m_stddev = stream->readFloat();
+		m_fiberDistr = GaussianFiberDistribution(m_stddev);
 		configure();
 	}
 
@@ -60,6 +62,7 @@ public:
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		PhaseFunction::serialize(stream, manager);
 		stream->writeInt((int)m_sampleType);
+		stream->writeFloat(m_stddev);
 	}
 
 	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
