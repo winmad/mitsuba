@@ -209,6 +209,8 @@ public:
 		m_density = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_albedo = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_orientation = static_cast<VolumeDataSource *>(manager->getInstance(stream));
+		m_S1 = static_cast<VolumeDataSource *>(manager->getInstance(stream));
+		m_S2 = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_stepSize = stream->readFloat();
 		configure();
 	}
@@ -221,6 +223,8 @@ public:
 		manager->serialize(stream, m_density.get());
 		manager->serialize(stream, m_albedo.get());
 		manager->serialize(stream, m_orientation.get());
+		manager->serialize(stream, m_S1.get());
+		manager->serialize(stream, m_S2.get());
 		stream->writeFloat(m_stepSize);
 	}
 
