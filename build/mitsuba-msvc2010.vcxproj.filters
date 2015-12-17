@@ -1079,6 +1079,9 @@
     <ClCompile Include="..\src\utils\fillEmptyVoxels.cpp">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\volume\gridvol_simple.cpp">
+      <Filter>Source Files\volume</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

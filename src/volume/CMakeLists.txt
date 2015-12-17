@@ -8,6 +8,7 @@ macro(add_volume)
 endmacro()
 
 add_volume(tiledvol    tiledvol.cpp)
+add_volume(gridvolumeSimple gridvol_simple.cpp)
 
 add_volume(constvolume constvolume.cpp)
 add_volume(gridvolume  gridvolume.cpp)
