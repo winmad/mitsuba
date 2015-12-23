@@ -86,6 +86,10 @@ public:
 
 	Spectrum sampleRay(Ray &ray, const Point2 &pixelSample,
 			const Point2 &otherSample, Float timeSample) const {
+		/* Record pixel index, added by Lifan */
+		ray.index.x = (int)std::floor(pixelSample.x);
+		ray.index.y = (int)std::floor(pixelSample.y);
+
 		ray.time = sampleTime(timeSample);
 		ray.mint = Epsilon;
 		ray.maxt = std::numeric_limits<Float>::infinity();

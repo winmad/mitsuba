@@ -1082,6 +1082,9 @@
     <ClCompile Include="..\src\volume\gridvol_simple.cpp">
       <Filter>Source Files\volume</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\integrators\path\volpath_simple_diff.cpp">
+      <Filter>Source Files\integrators\path</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

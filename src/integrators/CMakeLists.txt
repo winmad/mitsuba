@@ -11,9 +11,12 @@ macro(add_bidir)
   add_integrator(${ARGN} MTS_BIDIR)
 endmacro()
 
+add_integrator(volpath_simple_diff  path/volpath_simple_diff.cpp)
+
 add_integrator(aaf      aaf/aaf.cpp)
 add_integrator(info    info/info.cpp)
 add_integrator(lightcuts    lightcuts/lightcuts.cpp)
+
 add_integrator(ao       direct/ao.cpp)
 add_integrator(direct   direct/direct.cpp)
 add_integrator(path     path/path.cpp)

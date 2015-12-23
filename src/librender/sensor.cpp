@@ -114,6 +114,10 @@ Spectrum Sensor::sampleRayDifferential(RayDifferential &ray,
 	Spectrum result = sampleRay(ray, samplePosition,
 		apertureSample, timeSample);
 
+	/* Record pixel index, added by Lifan */
+	ray.index.x = (int)std::floor(samplePosition.x);
+	ray.index.y = (int)std::floor(samplePosition.y);
+
 	/* Sample a ray for X+1 */
 	Ray tempRay;
 	sampleRay(tempRay, samplePosition + Vector2(1, 0),

@@ -1,5 +1,7 @@
 Import('env', 'sys', 'plugins')
 
+plugins += env.SharedLibrary('volpath_simple_diff', ['path/volpath_simple_diff.cpp'])
+
 plugins += env.SharedLibrary('aaf', ['aaf/aaf.cpp'])
 plugins += env.SharedLibrary('info', ['info/info.cpp'])
 

@@ -292,6 +292,10 @@ public:
 
 	Spectrum sampleRay(Ray &ray, const Point2 &pixelSample,
 			const Point2 &otherSample, Float timeSample) const {
+		/* Record pixel index, added by Lifan */
+		ray.index.x = (int)std::floor(pixelSample.x);
+		ray.index.y = (int)std::floor(pixelSample.y);
+
 		Point2 tmp = warp::squareToUniformDiskConcentric(otherSample)
 			* m_apertureRadius;
 		ray.time = sampleTime(timeSample);
@@ -323,6 +327,10 @@ public:
 
 	Spectrum sampleRayDifferential(RayDifferential &ray, const Point2 &pixelSample,
 			const Point2 &otherSample, Float timeSample) const {
+		/* Record pixel index, added by Lifan */
+		ray.index.x = (int)std::floor(pixelSample.x);
+		ray.index.y = (int)std::floor(pixelSample.y);
+
 		Point2 tmp = warp::squareToUniformDiskConcentric(otherSample)
 			* m_apertureRadius;
 		ray.time = sampleTime(timeSample);

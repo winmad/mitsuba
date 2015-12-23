@@ -137,6 +137,11 @@ public:
 	Spectrum sampleRay(Ray &ray, const Point2 &pixelSample,
 			const Point2 &otherSample, Float timeSample) const {
 		ray.time = sampleTime(timeSample);
+
+		/* Record pixel index, added by Lifan */
+		ray.index.x = (int)std::floor(pixelSample.x);
+		ray.index.y = (int)std::floor(pixelSample.y);
+
 		const Transform &trafo = m_worldTransform->eval(ray.time);
 
 		/* Compute the corresponding position on the
@@ -157,6 +162,11 @@ public:
 	Spectrum sampleRayDifferential(RayDifferential &ray, const Point2 &pixelSample,
 			const Point2 &otherSample, Float timeSample) const {
 		ray.time = sampleTime(timeSample);
+
+		/* Record pixel index, added by Lifan */
+		ray.index.x = (int)std::floor(pixelSample.x);
+		ray.index.y = (int)std::floor(pixelSample.y);
+
 		const Transform &trafo = m_worldTransform->eval(ray.time);
 
 		/* Compute the corresponding position on the
