@@ -446,6 +446,10 @@ public:
 	/// Serialize this integrator to a binary data stream
 	void serialize(Stream *stream, InstanceManager *manager) const;
 
+	virtual void renderBlock(const Scene *scene, const Sensor *sensor,
+		Sampler *sampler, ImageBlock *block, const bool &stop,
+		const std::vector< TPoint2<uint8_t> > &points) const;
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Create a integrator

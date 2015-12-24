@@ -25,6 +25,7 @@
 
 #include <mitsuba/render/scene.h>
 #include <mitsuba/core/statistics.h>
+#include <mitsuba/render/integrator.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -86,20 +87,151 @@ static StatsCounter avgPathLength("Volumetric path tracer", "Average path length
 */
 class SimpleDiffVolumetricPathTracer : public MonteCarloIntegrator {
 public:
-	SimpleDiffVolumetricPathTracer(const Properties &props) : MonteCarloIntegrator(props) { }
+	SimpleDiffVolumetricPathTracer(const Properties &props) : MonteCarloIntegrator(props) {
+		height = props.getInteger("height");
+		width = props.getInteger("width");
+		spp = props.getInteger("spp");
+		pixelNum = height * width;
+	}
 
 	/// Unserialize from a binary data stream
 	SimpleDiffVolumetricPathTracer(Stream *stream, InstanceManager *manager)
-		: MonteCarloIntegrator(stream, manager) { }
+		: MonteCarloIntegrator(stream, manager) {
+		height = stream->readInt();
+		width = stream->readInt();
+		spp = stream->readInt();
+		configure();
+	}
 
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec) const {
+	void serialize(Stream *stream, InstanceManager *manager) const {
+		MonteCarloIntegrator::serialize(stream, manager);
+		stream->writeInt(height);
+		stream->writeInt(width);
+		stream->writeInt(spp);
+	}
+
+	void configure() {
+		pixelNum = height * width;
+
+		LdA = new Spectrum[pixelNum];
+		TdA = new Spectrum[pixelNum];
+
+		for (int i = 0; i < pixelNum; i++) {
+			LdA[i] = Spectrum(0.f);
+			TdA[i] = Spectrum(0.f);
+		}
+	}
+
+	~SimpleDiffVolumetricPathTracer() {
+		if (LdA != NULL)
+			delete[] LdA;
+		if (TdA != NULL)
+			delete[] TdA;
+	}
+
+	void renderBlock(const Scene *scene,
+		const Sensor *sensor, Sampler *sampler, ImageBlock *block,
+		const bool &stop, const std::vector< TPoint2<uint8_t> > &points) const {
+
+		Float diffScaleFactor = 1.0f /
+			std::sqrt((Float)sampler->getSampleCount());
+
+		bool needsApertureSample = sensor->needsApertureSample();
+		bool needsTimeSample = sensor->needsTimeSample();
+
+		RadianceQueryRecord rRec(scene, sampler);
+		Point2 apertureSample(0.5f);
+		Float timeSample = 0.5f;
+		RayDifferential sensorRay;
+
+		block->clear();
+
+		uint32_t queryType = RadianceQueryRecord::ESensorRay;
+
+		if (!sensor->getFilm()->hasAlpha()) /* Don't compute an alpha channel if we don't have to */
+			queryType &= ~RadianceQueryRecord::EOpacity;
+
+		for (size_t i = 0; i < points.size(); ++i) {
+			Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
+			int index = offset.x + offset.y * width;
+
+			if (stop)
+				break;
+
+			sampler->generate(offset);
+
+			for (size_t j = 0; j < sampler->getSampleCount(); j++) {
+				rRec.newQuery(queryType, sensor->getMedium());
+				Point2 samplePos(Point2(offset) + Vector2(rRec.nextSample2D()));
+
+				if (needsApertureSample)
+					apertureSample = rRec.nextSample2D();
+				if (needsTimeSample)
+					timeSample = rRec.nextSample1D();
+
+				Spectrum spec = sensor->sampleRayDifferential(
+					sensorRay, samplePos, apertureSample, timeSample);
+
+				sensorRay.scaleDifferential(diffScaleFactor);
+
+				Spectrum oneTdA(0.f);
+				Spectrum oneLdA(0.f);
+
+				spec *= Li(sensorRay, rRec, oneTdA, oneLdA);
+
+				block->put(samplePos, spec, rRec.alpha);
+				TdA[index] += oneTdA / Float(spp);
+				LdA[index] += oneLdA / Float(spp);
+
+				sampler->advance();
+			}
+		}
+
+		Float *data = new Float[(int)points.size() * 3]; 		
+		
+		std::string outfile = formatString("LdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
+		for (int i = 0; i < points.size(); i++) {
+			Point2i p = Point2i(points[i]);
+			int localIndex = p.x + p.y * block->getWidth();
+			Point2i offset = p + Vector2i(block->getOffset());
+			int globalIndex = offset.x + offset.y * width;
+			Spectrum color(LdA[globalIndex]);
+			for (int c = 0; c < 3; c++) {
+				data[3 * localIndex + c] = color[c];
+			}
+		}
+		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
+		
+		/*
+		outfile = formatString("TdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
+		for (int i = 0; i < points.size(); i++) {
+			Point2i p = Point2i(points[i]);
+			int localIndex = p.x + p.y * block->getWidth();
+			Point2i offset = p + Vector2i(block->getOffset());
+			int globalIndex = offset.x + offset.y * width;
+			Spectrum color(TdA[globalIndex] / Float(spp));
+			for (int c = 0; c < 3; c++) {
+				data[3 * localIndex + c] = color[c];
+			}
+		}
+		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());		
+		*/
+		delete[] data;
+	}
+
+	Spectrum Li(const RayDifferential &ray,
+		RadianceQueryRecord &rRec) const {
+		return Spectrum(0.f);
+	}
+
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, 
+		Spectrum &TdA, Spectrum &LdA) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
 		MediumSamplingRecord mRec;
 		RayDifferential ray(r);
 		Spectrum Li(0.0f);
-		int index = ray.index.x + ray.index.y * width;
 
 		bool nullChain = true, scattered = false;
 		Float eta = 1.0f;
@@ -130,7 +262,7 @@ public:
 
 				Spectrum val = mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				throughput *= val;
-				TdA[index] = throughput + TdA[index] * val;
+				TdA = throughput + TdA * val;
 
 				/* ==================================================================== */
 				/*                     Direct illumination sampling                     */
@@ -153,7 +285,7 @@ public:
 						Spectrum val = value * phase->eval(
 							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX));
 						Li += throughput * val;
-						LdA[index] += TdA[index] * val;
+						LdA += TdA * val;
 					}
 				}
 
@@ -176,7 +308,7 @@ public:
 					break;
 				
 				throughput *= phaseVal;
-				TdA[index] *= phaseVal;
+				TdA *= phaseVal;
 
 				/* Trace a ray in this direction */
 				ray = Ray(mRec.p, pRec.wo, ray.time);
@@ -194,7 +326,7 @@ public:
 				if (rRec.medium) {
 					Spectrum val = mRec.transmittance / mRec.pdfFailure;
 					throughput *= val;
-					TdA[index] *= val;
+					TdA *= val;
 				}
 
 				if (!its.isValid()) {
@@ -211,7 +343,7 @@ public:
 						}
 
 						Li += value;
-						LdA[index] += TdA[index] * val;
+						LdA += TdA * val;
 					}
 					break;
 				}
@@ -221,14 +353,14 @@ public:
 					&& (!m_hideEmitters || scattered)) {
 					Spectrum val = its.Le(-ray.d);
 					Li += throughput * val;
-					LdA[index] += TdA[index] * val;
+					LdA += TdA * val;
 				}
 
 				/* Include radiance from a subsurface integrator if requested */
 				if (its.hasSubsurface() && (rRec.type & RadianceQueryRecord::ESubsurfaceRadiance)) {
 					Spectrum val = its.LoSub(scene, rRec.sampler, -ray.d, rRec.depth);
 					Li += throughput * val;
-					LdA[index] += TdA[index] * val;
+					LdA += TdA * val;
 				}
 
 				/* Prevent light leaks due to the use of shading normals */
@@ -264,7 +396,7 @@ public:
 							woDotGeoN * Frame::cosTheta(bRec.wo) > 0) {
 							Spectrum val = value * bsdf->eval(bRec);
 							Li += throughput * val;
-							LdA[index] += TdA[index] * val;
+							LdA += TdA * val;
 						}
 					}
 				}
@@ -313,7 +445,7 @@ public:
 				/* Keep track of the throughput, medium, and relative
 				refractive index along the path */
 				throughput *= bsdfVal;
-				TdA[index] *= bsdfVal;
+				TdA *= bsdfVal;
 
 				eta *= bRec.eta;
 				if (its.isMediumTransition())
@@ -335,97 +467,16 @@ public:
 				if (rRec.nextSample1D() >= q)
 					break;
 				throughput /= q;
-				TdA[index] /= q;
+				TdA /= q;
 			}
 		}
 		avgPathLength.incrementBase();
 		avgPathLength += rRec.depth;
+
 		return Li;
 	}
-
-	bool preprocess(const Scene *scene, RenderQueue *queue, const RenderJob *job,
-		int sceneResID, int sensorResID, int samplerResID) {
-		if (!MonteCarloIntegrator::preprocess(scene, queue, job, sceneResID, sensorResID, samplerResID))
-			return false;
-
-		Sensor *sensor = static_cast<Sensor*>(Scheduler::getInstance()->getResource(sensorResID));
-
-		spp = sensor->getSampler()->getSampleCount();
-		Log(EInfo, "spp = %d", spp);
-
-		Vector2i filmSize = sensor->getFilm()->getSize();
-
-		pixelNum = filmSize.x * filmSize.y;
-		width = filmSize.x;
-		height = filmSize.y;
-
-		LdA = new Spectrum[pixelNum];
-		TdA = new Spectrum[pixelNum];
-
-		for (int i = 0; i < pixelNum; i++) {
-			LdA[i] = Spectrum(0.f);
-			TdA[i] = Spectrum(0.f);
-		}
-
-		return true;
-	}
-
-	void postprocess(const Scene *scene, RenderQueue *queue,
-		const RenderJob *job, int sceneResID, int sensorResID,
-		int samplerResID) {
-		const Film *film = scene->getSensor()->getFilm();
-		const Bitmap *bitmap = film->getImageBlock()->getBitmap();
-		ref<Bitmap> img = new Bitmap(*bitmap);
-
-		Float *data = new Float[pixelNum * 3];
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				Spectrum color(img->getPixel(Point2i(x, y)));
-				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * width) + c] = color[c];
-				}
-			}
-		}
-		savePfm("origin.pfm", data, width, height);
-
-		for (int i = 0; i < pixelNum; i++) {
-			LdA[i] /= (Float)spp;
-			TdA[i] /= (Float)spp;
-		}
-
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				int index = x + y * width;
-				Spectrum color(TdA[index]);
-				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * width) + c] = color[c];
-				}
-			}
-		}
-		savePfm("TdA.pfm", data, width, height);
-
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				int index = x + y * width;
-				Spectrum color(LdA[index]);
-				for (int c = 0; c < 3; c++) {
-					data[3 * (x + y * width) + c] = color[c];
-				}
-			}
-		}
-		savePfm("LdA.pfm", data, width, height);
-
-		delete[] data;
-
-		delete[] TdA;
-		delete[] LdA;
-	}
-
-	void serialize(Stream *stream, InstanceManager *manager) const {
-		MonteCarloIntegrator::serialize(stream, manager);
-	}
-
-	void savePfm(char *fileName, float *data, int width, int height) {
+	
+	void savePfm(const char *fileName, float *data, int width, int height) const {
 		char header[512];
 		sprintf(header, "PF\n%d %d\n-1.000000\n", width, height);
 
