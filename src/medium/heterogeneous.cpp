@@ -224,6 +224,7 @@ public:
 		/* hetero albedo */
 		m_segmentation = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_numClusters = stream->readInt();
+		m_albedoScales.resize(m_numClusters);
 		for (int i = 0; i < m_numClusters; i++) {
 			m_albedoScales[i] = Spectrum(stream);
 		}
