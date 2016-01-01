@@ -9,6 +9,7 @@ endmacro()
 
 include_directories(${ILMBASE_INCLUDE_DIRS})
 
+add_utility(albedoCluster    albedoCluster.cpp)
 add_utility(downSampleVolume downSampleVolume.cpp)
 add_utility(microflake2SGGX  microflake2SGGX.cpp)
 add_utility(cmp              cmp.cpp)

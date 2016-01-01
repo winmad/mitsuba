@@ -636,6 +636,7 @@
     <ClCompile Include="..\src\integrators\misc\motion.cpp" />
     <ClCompile Include="..\src\integrators\misc\multichannel.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_diff.cpp" />
+    <ClCompile Include="..\src\integrators\path\volpath_simple_scale_diff.cpp" />
     <ClCompile Include="..\src\librender\lightcutter.cpp" />
     <ClCompile Include="..\src\librender\trimesh.cpp">
     </ClCompile>
@@ -950,6 +951,7 @@
     </ClCompile>
     <ClCompile Include="..\src\rfilters\gaussian.cpp">
     </ClCompile>
+    <ClCompile Include="..\src\utils\albedoCluster.cpp" />
     <ClCompile Include="..\src\utils\clampVolume.cpp" />
     <ClCompile Include="..\src\utils\cmp.cpp" />
     <ClCompile Include="..\src\utils\createGridVolume.cpp" />

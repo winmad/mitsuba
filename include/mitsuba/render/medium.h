@@ -63,6 +63,9 @@ public:
 	/// Records the probability density of sampling a medium interaction at p
 	Float pdfSuccess;
 
+	int clusterIndex;
+	Spectrum albedoScale;
+
 	/**
 	 * \brief Records the probability density of sampling a medium
 	 * interaction in the reverse direction

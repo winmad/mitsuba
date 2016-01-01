@@ -40,8 +40,21 @@ public:
 		Log(EInfo, "bbox = (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", bbox.min.x, bbox.min.y, bbox.min.z,
 			bbox.max.x, bbox.max.y, bbox.max.z);
 
-		GridData albedo;
-		initS(albedo, Vector3i(2, 2, 1));
+		GridData s;
+		initS(s, Vector3i(2, 2, 2));
+		s[1][1][1] = s[0][1][0] = s[0][0][1] = s[1][0][0] = Vector(0.95, 0.1, 0.1);
+		s[0][0][0] = s[0][1][1] = s[1][1][0] = s[1][0][1] = Vector(0.95, 0.64, 0.37);
+
+		for (int i = 0; i < 2; i++)
+			for (int j = 0; j < 2; j++)
+				for (int k = 0; k < 2; k++) {
+					s[i][j][k] += Vector(rand() % 10000 * 1e-5f, rand() % 10000 * 1e-5f, rand() % 10000 * 1e-5f);
+					int index = (k * 2 + j) * 2 + i;
+					Log(EInfo, "index %d: (%.6f, %.6f, %.6f)", index, s[i][j][k].x, s[i][j][k].y, s[i][j][k].z);
+				}
+
+// 		GridData albedo;
+// 		initS(albedo, Vector3i(2, 2, 1));
 		
 		// fov: 1, scale: 2
 // 		albedo[0][0][0] = Vector(0.935257f, 0.09f, 0.09f);
@@ -90,19 +103,19 @@ public:
 // 			}
 // 		}
 
-		GridData s;
-		initS(s, res);
-
-		for (int i = 0; i < res[0]; i++) {
-			for (int j = 0; j < res[1]; j++) {
-				for (int k = 0; k < res[2]; k++) {
-					Vector v(originVol->lookupFloat(i, j, k, 0),
-						originVol->lookupFloat(i, j, k, 1),
-						originVol->lookupFloat(i, j, k, 2));
-					s[i][j][k] = v * 0.8f;
-				}
-			}
-		}
+// 		GridData s;
+// 		initS(s, res);
+// 
+// 		for (int i = 0; i < res[0]; i++) {
+// 			for (int j = 0; j < res[1]; j++) {
+// 				for (int k = 0; k < res[2]; k++) {
+// 					Vector v(originVol->lookupFloat(i, j, k, 0),
+// 						originVol->lookupFloat(i, j, k, 1),
+// 						originVol->lookupFloat(i, j, k, 2));
+// 					s[i][j][k] = v * 0.8f;
+// 				}
+// 			}
+// 		}
 
 		ref<FileStream> outFile = new FileStream(argv[2], FileStream::ETruncReadWrite);
 		//writeVolume(s, newBBox, channels, outFile);

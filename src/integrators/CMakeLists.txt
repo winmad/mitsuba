@@ -11,6 +11,7 @@ macro(add_bidir)
   add_integrator(${ARGN} MTS_BIDIR)
 endmacro()
 
+add_integrator(volpath_simple_scale_diff  path/volpath_simple_scale_diff.cpp)
 add_integrator(volpath_simple_diff  path/volpath_simple_diff.cpp)
 
 add_integrator(aaf      aaf/aaf.cpp)

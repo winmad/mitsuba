@@ -199,6 +199,14 @@ public:
 			m_method = ESimpsonQuadrature;
 		else
 			Log(EError, "Unsupported integration method \"%s\"!", method.c_str());
+
+		/* hetero albedo */
+		m_numClusters = props.getInteger("numClusters", 1);
+		m_albedoScales.resize(m_numClusters);
+		for (int i = 0; i < m_numClusters; i++) {
+			std::string name = formatString("albedoScale%02i", i);
+			m_albedoScales[i] = props.getSpectrum(name, Spectrum(1.f));
+		}
 	}
 
 	/* Unserialize from a binary data stream */
@@ -212,6 +220,13 @@ public:
 		m_S1 = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_S2 = static_cast<VolumeDataSource *>(manager->getInstance(stream));
 		m_stepSize = stream->readFloat();
+
+		/* hetero albedo */
+		m_segmentation = static_cast<VolumeDataSource *>(manager->getInstance(stream));
+		m_numClusters = stream->readInt();
+		for (int i = 0; i < m_numClusters; i++) {
+			m_albedoScales[i] = Spectrum(stream);
+		}
 		configure();
 	}
 
@@ -226,6 +241,13 @@ public:
 		manager->serialize(stream, m_S1.get());
 		manager->serialize(stream, m_S2.get());
 		stream->writeFloat(m_stepSize);
+
+		/* hetero albedo */
+		manager->serialize(stream, m_segmentation.get());
+		stream->writeInt(m_numClusters);
+		for (int i = 0; i < m_numClusters; i++) {
+			m_albedoScales[i].serialize(stream);
+		}
 	}
 
 	void configure() {
@@ -234,6 +256,15 @@ public:
 			Log(EError, "No density specified!");
 		if (m_albedo.get() == NULL)
 			Log(EError, "No albedo specified!");
+
+		/* hetero albedo */
+		if (m_numClusters > 1 && m_segmentation.get() != NULL) {
+			m_useDiffAlbedoScales = true;
+		}
+		else {
+			m_useDiffAlbedoScales = false;
+		}
+
 		m_densityAABB = m_density->getAABB();
 		m_anisotropicMedium =
 			m_phaseFunction->needsDirectionallyVaryingCoefficients();
@@ -291,6 +322,9 @@ public:
 			} else if (name == "S2") {
 				Assert(volume->supportsSpectrumLookups());
 				m_S2 = volume;
+			} else if (name == "segmentation") {
+				Assert(volume->supportsFloatLookups());
+				m_segmentation = volume;
 			} else {
 				Medium::addChild(name, child);
 			}
@@ -624,8 +658,19 @@ public:
 					mRec.t, densityAtMinT, densityAtT)) {
 				mRec.p = ray(mRec.t);
 				success = true;
-				Spectrum albedo = m_albedo->lookupSpectrum(mRec.p);
+				Spectrum albedo;
+				int clusterIndex = 0;
+				if (m_useDiffAlbedoScales) {
+					albedo = m_albedo->lookupSpectrum(mRec.p);
+					clusterIndex = (int)m_segmentation->lookupFloat(mRec.p);
+					albedo *= m_albedoScales[clusterIndex];
+				}
+				else {
+					albedo = m_albedo->lookupSpectrum(mRec.p) * m_albedoScales[0];
+				}
 				mRec.sigmaS = albedo * densityAtT;
+				mRec.clusterIndex = clusterIndex;
+				mRec.albedoScale = m_albedoScales[clusterIndex];
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 				mRec.orientation = m_orientation != NULL
 					? m_orientation->lookupVector(mRec.p) : Vector(0.0f);
@@ -681,8 +726,19 @@ public:
 				if (densityAtT * m_invMaxDensity > sampler->next1D()) {
 					mRec.t = t;
 					mRec.p = p;
-					Spectrum albedo = m_albedo->lookupSpectrum(p);
+					Spectrum albedo;
+					int clusterIndex = 0;
+					if (m_useDiffAlbedoScales) {
+						albedo = m_albedo->lookupSpectrum(mRec.p);
+						clusterIndex = (int)m_segmentation->lookupFloat(mRec.p);
+						albedo *= m_albedoScales[clusterIndex];
+					}
+					else {
+						albedo = m_albedo->lookupSpectrum(mRec.p) * m_albedoScales[0];
+					}
 					mRec.sigmaS = albedo * densityAtT;
+					mRec.clusterIndex = clusterIndex;
+					mRec.albedoScale = m_albedoScales[clusterIndex];
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 					mRec.transmittance = Spectrum(densityAtT != 0.0f ? 1.0f / densityAtT : 0);
 					if (!std::isfinite(mRec.transmittance[0])) // prevent rare overflow warnings
@@ -718,10 +774,19 @@ public:
 			Float mintDensity = lookupDensity(ray(ray.mint), ray.d) * m_scale;
 			Float maxtDensity = 0.0f;
 			Spectrum maxtAlbedo(0.0f);
+			int clusterIndex = 0;
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
 				maxtDensity = lookupDensity(p, ray.d) * m_scale;
-				maxtAlbedo = m_albedo->lookupSpectrum(p);
+				//maxtAlbedo = m_albedo->lookupSpectrum(p);
+				if (m_useDiffAlbedoScales) {
+					maxtAlbedo = m_albedo->lookupSpectrum(p);
+					clusterIndex = (int)m_segmentation->lookupFloat(p);
+					maxtAlbedo *= m_albedoScales[clusterIndex];
+				}
+				else {
+					maxtAlbedo = m_albedo->lookupSpectrum(p) * m_albedoScales[0];
+				}
 			}
 			mRec.transmittance = Spectrum(expVal);
 			mRec.pdfFailure = expVal;
@@ -731,6 +796,9 @@ public:
 			mRec.sigmaA = Spectrum(maxtDensity) - mRec.sigmaS;
 			mRec.time = ray.time;
 			mRec.medium = this;
+			
+			mRec.clusterIndex = clusterIndex;
+			mRec.albedoScale = m_albedoScales[clusterIndex];
 		} else {
 			Log(EError, "eval(): unsupported integration method!");
 		}
@@ -826,6 +894,11 @@ protected:
 	AABB m_densityAABB;
 	Float m_maxDensity;
 	Float m_invMaxDensity;
+
+	bool m_useDiffAlbedoScales;
+	int m_numClusters;
+	ref<VolumeDataSource> m_segmentation;
+	std::vector<Spectrum> m_albedoScales;
 };
 
 MTS_IMPLEMENT_CLASS_S(HeterogeneousMedium, false, Medium)
