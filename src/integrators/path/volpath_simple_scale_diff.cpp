@@ -284,7 +284,8 @@ public:
 				Spectrum val = mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				throughput *= val;
 
-				thrAlbedoSegs |= (1 << mRec.clusterIndex);
+				if (thrAlbedoSegs == 0)
+					thrAlbedoSegs |= (1 << mRec.clusterIndex);
 				for (int k = 0; k < numClusters; k++) {
 					if (k == mRec.clusterIndex) {
 						TdA[k] = throughput * val / mRec.albedoScale + TdA[k] * val;
