@@ -1100,6 +1100,18 @@
     <ClCompile Include="..\src\utils\upSampleVolume.cpp">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\volume\instancedvol.cpp">
+      <Filter>Source Files\volume</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\volume\shellmap2.cpp">
+      <Filter>Source Files\volume</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\medium\heterogeneous2.cpp">
+      <Filter>Source Files\medium</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\librender\volume2.cpp">
+      <Filter>Source Files\librender</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
@@ -1796,6 +1808,12 @@
       <Filter>Header Files\mitsuba\render</Filter>
     </ClInclude>
     <ClInclude Include="..\include\mitsuba\render\lightcutter.h">
+      <Filter>Header Files\mitsuba\render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\volume\tetra.h">
+      <Filter>Source Files\volume</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\mitsuba\render\volume2.h">
       <Filter>Header Files\mitsuba\render</Filter>
     </ClInclude>
   </ItemGroup>

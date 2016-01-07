@@ -119,6 +119,7 @@
     <ClInclude Include="..\include\mitsuba\render\lightcutter.h" />
     <ClInclude Include="..\include\mitsuba\render\lightnode.h" />
     <ClInclude Include="..\include\mitsuba\render\lighttree.h" />
+    <ClInclude Include="..\include\mitsuba\render\volume2.h" />
     <ClInclude Include="..\src\converter\converter.h">
     </ClInclude>
     <ClInclude Include="..\src\bsdfs\irawan.h">
@@ -575,6 +576,7 @@
     </ClInclude>
     <ClInclude Include="..\include\mitsuba\mitsuba.h">
     </ClInclude>
+    <ClInclude Include="..\src\volume\tetra.h" />
   </ItemGroup>
   <ItemGroup Label="Source Files">
     <ClCompile Include="..\src\converter\mtsimport.cpp">
@@ -690,6 +692,7 @@
     </ClCompile>
     <ClCompile Include="..\src\librender\renderproc.cpp">
     </ClCompile>
+    <ClCompile Include="..\src\librender\volume2.cpp" />
     <ClCompile Include="..\src\librender\vpl.cpp">
     </ClCompile>
     <ClCompile Include="..\src\librender\photon.cpp">
@@ -706,6 +709,7 @@
     </ClCompile>
     <ClCompile Include="..\src\librender\imageblock.cpp">
     </ClCompile>
+    <ClCompile Include="..\src\medium\heterogeneous2.cpp" />
     <ClCompile Include="..\src\phase\SGGX.cpp" />
     <ClCompile Include="..\src\samplers\stratified.cpp">
     </ClCompile>
@@ -964,6 +968,8 @@
     <ClCompile Include="..\src\utils\splitGridVolume.cpp" />
     <ClCompile Include="..\src\utils\upSampleVolume.cpp" />
     <ClCompile Include="..\src\volume\gridvol_simple.cpp" />
+    <ClCompile Include="..\src\volume\instancedvol.cpp" />
+    <ClCompile Include="..\src\volume\shellmap2.cpp" />
     <ClCompile Include="..\src\volume\tiledvol.cpp" />
     <ClCompile Include="..\src\volume\volcache.cpp">
     </ClCompile>

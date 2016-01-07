@@ -9,3 +9,4 @@ endmacro()
 
 add_medium(homogeneous   homogeneous.cpp maxexp.h)
 add_medium(heterogeneous heterogeneous.cpp)
+add_medium(heterogeneous2 heterogeneous2.cpp)

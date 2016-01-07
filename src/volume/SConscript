@@ -1,5 +1,7 @@
 Import('env', 'plugins')
 
+plugins += env.SharedLibrary('instancedvol', ['instancedvol.cpp'])
+plugins += env.SharedLibrary('shellmap2', ['shellmap2.cpp'])
 plugins += env.SharedLibrary('tiledvol', ['tiledvol.cpp'])
 plugins += env.SharedLibrary('gridvolumeSimple', ['gridvol_simple.cpp'])
 

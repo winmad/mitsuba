@@ -47,6 +47,7 @@ set(HDRS
   ${INCLUDE_DIR}/trimesh.h
   ${INCLUDE_DIR}/util.h
   ${INCLUDE_DIR}/volume.h
+  ${INCLUDE_DIR}/volume2.h
   ${INCLUDE_DIR}/vpl.h
   ${INCLUDE_DIR}/lightnode.h
   ${INCLUDE_DIR}/lighttree.h
@@ -87,6 +88,7 @@ set(SRCS
   trimesh.cpp
   util.cpp
   volume.cpp
+  volume2.cpp
   vpl.cpp
   lightcutter.cpp
 )
