@@ -36,6 +36,7 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 		else {
 			Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
 			Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
+			// fix SGGX volumeToWorld rotation!!!
 			Sxx = S1[0]; Syy = S1[1]; Szz = S1[2];
 			Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
 		}
@@ -62,6 +63,7 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 		else {
 			Spectrum S1 = VolS1->lookupSpectrum(mRec.p);
 			Spectrum S2 = VolS2->lookupSpectrum(mRec.p);
+			// fix SGGX volumeToWorld rotation!!!
 			Sxx = S1[0]; Syy = S1[1]; Szz = S1[2];
 			Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
 		}

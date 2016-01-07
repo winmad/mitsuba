@@ -565,7 +565,7 @@ protected:
 
         m_volume->lookupBundle(p, &density, &orientation, s, NULL);
 		if (density != 0 && !orientation.isZero())
-            return density*m_phaseFunction->sigmaDir(p, dot(d, orientation));
+            return density*m_phaseFunction->sigmaDir(dot(d, orientation));
         else
 			return 0.0f;
 	}

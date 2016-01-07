@@ -31,7 +31,8 @@ public:
 
     virtual bool supportsBundleLookups() const;
     virtual void lookupBundle(const Point &p,
-        Float *density, Vector *direction, Spectrum *albedo, Float *gloss) const;
+        Float *density, Vector *direction, Spectrum *albedo, Float *gloss,
+		Spectrum *s1, Spectrum *s2, Float *segmentation) const;
 
     virtual Float getMaximumFloatValueEx(uint32_t id) const = 0;
 

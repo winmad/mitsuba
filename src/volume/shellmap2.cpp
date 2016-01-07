@@ -163,11 +163,16 @@ public:
 	}
 
     void lookupBundle(const Point &_p,
-        Float *density, Vector *direction, Spectrum *albedo, Float *gloss) const {
+        Float *density, Vector *direction, Spectrum *albedo, Float *gloss,
+		Spectrum *s1, Spectrum *s2, Float *segmentation) const {
         if ( density ) *density = 0.0f;
         if ( direction ) *direction = Vector(0.0f);
         if ( albedo ) *albedo = Spectrum(0.0f);
         if ( gloss ) *gloss = 0.0f;
+		
+		if (s1) *s1 = Spectrum(0.f);
+		if (s2) *s2 = Spectrum(0.f);
+		if (segmentation) *segmentation = 0.f;
 
 		Point q = m_worldToVolume.transformAffine(_p);
 		Point p;
@@ -177,14 +182,17 @@ public:
 		    TangentSpace tang;
             if ( m_shell.lookupPoint(q, p, norm, tang) ) {
                 clampPoint(p);
-                m_block->lookupBundle(m_textureToData.transformAffine(p), density, direction, albedo, gloss);
+                m_block->lookupBundle(m_textureToData.transformAffine(p), density, direction, albedo, gloss,
+					s1, s2, segmentation);
                 *direction = m_volumeToWorld(direction->x*tang.dpdu + direction->y*tang.dpdv + direction->z*norm);
+				// s1, s2 might be not consistent with orientation
 		        if ( !direction->isZero() ) *direction = normalize(*direction);
             }
         } else {
             if ( m_shell.lookupPoint(q, p) ) {
                 clampPoint(p);
-                m_block->lookupBundle(m_textureToData.transformAffine(p), density, NULL, albedo, gloss);
+                m_block->lookupBundle(m_textureToData.transformAffine(p), density, NULL, albedo, gloss,
+					s1, s2, segmentation);
             }
         }
     }

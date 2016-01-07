@@ -862,6 +862,8 @@ protected:
 				else {
 					Spectrum S1 = m_S1->lookupSpectrum(p);
 					Spectrum S2 = m_S2->lookupSpectrum(p);
+					// fix SGGX volumeToWorld rotation!!!
+
 					Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
 					Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
 					Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
