@@ -92,6 +92,7 @@ public:
 		width = props.getInteger("width");
 		spp = props.getInteger("spp");
 		pixelNum = height * width;
+		prefix = props.getString("prefix", "");
 	}
 
 	/// Unserialize from a binary data stream
@@ -100,6 +101,7 @@ public:
 		height = stream->readInt();
 		width = stream->readInt();
 		spp = stream->readInt();
+		prefix = stream->readString();
 		configure();
 	}
 
@@ -108,6 +110,7 @@ public:
 		stream->writeInt(height);
 		stream->writeInt(width);
 		stream->writeInt(spp);
+		stream->writeString(prefix);
 	}
 
 	void configure() {
@@ -189,7 +192,7 @@ public:
 
 		Float *data = new Float[(int)points.size() * 3]; 		
 		
-		std::string outfile = formatString("LdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
+		std::string outfile = prefix + formatString("LdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
 		for (int i = 0; i < points.size(); i++) {
 			Point2i p = Point2i(points[i]);
 			int localIndex = p.x + p.y * block->getWidth();
@@ -506,6 +509,8 @@ public:
 	int spp;
 	Spectrum *LdA;
 	Spectrum *TdA;
+
+	std::string prefix;
 
 	MTS_DECLARE_CLASS()
 };

@@ -69,7 +69,7 @@ public:
 				
 				bool flag = true;
 				for (int j = 0; j < i; j++) {
-					if (dist2(centers[0][j], data[k]) < 1e-2f) {
+					if (dist2(centers[0][j], data[k]) < 1e-6f) {
 						flag = false;
 						break;
 					}
@@ -95,7 +95,7 @@ public:
 			// converged?
 			bool flag = true;
 			for (int i = 0; i < numClusters; i++) {
-				if (dist2(centers[1 - now][i], centers[now][i]) > 1e-3f) {
+				if (dist2(centers[1 - now][i], centers[now][i]) > 1e-8f) {
 					flag = false;
 					break;
 				}
@@ -117,7 +117,7 @@ public:
 	int run(int argc, char **argv) {
 		if (argc != 4) {
 			cout << "Use k-means for albedo voxels clustering" << endl;
-			cout << "Syntax: mtsutil downSampleVolume <albedo_volume> <number_of_clusters> <segmentation_volume>" << endl;
+			cout << "Syntax: mtsutil albedoCluster <albedo_volume> <number_of_clusters> <segmentation_volume>" << endl;
 			return -1;
 		}
 

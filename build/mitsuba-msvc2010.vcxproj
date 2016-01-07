@@ -952,14 +952,17 @@
     <ClCompile Include="..\src\rfilters\gaussian.cpp">
     </ClCompile>
     <ClCompile Include="..\src\utils\albedoCluster.cpp" />
+    <ClCompile Include="..\src\utils\albedoRemapping.cpp" />
     <ClCompile Include="..\src\utils\clampVolume.cpp" />
     <ClCompile Include="..\src\utils\cmp.cpp" />
     <ClCompile Include="..\src\utils\createGridVolume.cpp" />
+    <ClCompile Include="..\src\utils\downSampleAlbedo.cpp" />
     <ClCompile Include="..\src\utils\downSampleVolume.cpp" />
     <ClCompile Include="..\src\utils\fillEmptyVoxels.cpp" />
     <ClCompile Include="..\src\utils\microflake2SGGX.cpp" />
     <ClCompile Include="..\src\utils\orientation2Albedo.cpp" />
     <ClCompile Include="..\src\utils\splitGridVolume.cpp" />
+    <ClCompile Include="..\src\utils\upSampleVolume.cpp" />
     <ClCompile Include="..\src\volume\gridvol_simple.cpp" />
     <ClCompile Include="..\src\volume\tiledvol.cpp" />
     <ClCompile Include="..\src\volume\volcache.cpp">

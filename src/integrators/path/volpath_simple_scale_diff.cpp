@@ -75,6 +75,7 @@ public:
 		spp = props.getInteger("spp");
 		numClusters = props.getInteger("numClusters", 1);
 		pixelNum = height * width;
+		prefix = props.getString("prefix", "");
 	}
 
 	/// Unserialize from a binary data stream
@@ -84,6 +85,7 @@ public:
 		width = stream->readInt();
 		spp = stream->readInt();
 		numClusters = stream->readInt();
+		prefix = stream->readString();
 		configure();
 	}
 
@@ -93,6 +95,7 @@ public:
 		stream->writeInt(width);
 		stream->writeInt(spp);
 		stream->writeInt(numClusters);
+		stream->writeString(prefix);
 	}
 
 	void configure() {
@@ -194,7 +197,7 @@ public:
 		Float *data = new Float[(int)points.size() * 3];
 
 		for (int k = 0; k < numClusters; k++) {
-			std::string outfile = formatString("LdA_s%02i_%03i_%03i.pfm", k, block->getOffset().x, block->getOffset().y);
+			std::string outfile = prefix + formatString("LdA_s%02i_%03i_%03i.pfm", k, block->getOffset().x, block->getOffset().y);
 			for (int i = 0; i < points.size(); i++) {
 				Point2i p = Point2i(points[i]);
 				int localIndex = p.x + p.y * block->getWidth();
@@ -208,7 +211,7 @@ public:
 			savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
 		}
 
-		std::string outfile = formatString("image_seg_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
+		std::string outfile = prefix + formatString("image_seg_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
 		for (int i = 0; i < points.size(); i++) {
 			Point2i p = Point2i(points[i]);
 			int localIndex = p.x + p.y * block->getWidth();
@@ -573,6 +576,8 @@ public:
 	std::vector<Spectrum*> TdA;
 
 	int *imageSeg;
+
+	std::string prefix;
 
 	MTS_DECLARE_CLASS()
 };
