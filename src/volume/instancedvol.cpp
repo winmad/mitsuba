@@ -4,7 +4,7 @@
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/mmap.h>
 #include <mitsuba/core/math.h>
-
+#include <mitsuba/core/frame.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -25,6 +25,11 @@ public:
 
         m_densityFile = props.getString("densityFile");
         m_orientationFile = props.getString("orientationFile", "");
+
+		m_S1File = props.getString("S1File", "");
+		m_S2File = props.getString("S2File", "");
+
+		m_segmentationFile = props.getString("segmentationFile", "");
 
         m_indexedAlbedo = false;
         if ( props.hasProperty("albedo") )
@@ -87,7 +92,7 @@ public:
         else
             m_blockFile = props.getString("blockFile");
 
-        for ( int i = 0; i < 3; ++i ) m_data[i] = NULL;
+        for ( int i = 0; i < 6; ++i ) m_data[i] = NULL;
 	}
 
 
@@ -98,6 +103,11 @@ public:
 
         m_densityFile = stream->readString();
         m_orientationFile = stream->readString();
+
+		m_S1File = stream->readString();
+		m_S2File = stream->readString();
+		m_segmentationFile = stream->readString();
+
         m_albedoFile = stream->readString();
         m_albedo = ( m_albedoFile == "" ? Spectrum(stream) : Spectrum(0.0f) );
         m_indexedAlbedo = ( m_albedoFile == "" ? false : stream->readBool() );
@@ -118,13 +128,13 @@ public:
             stream->readIntArray(&m_blockID[0], m_blockID.size());
         }
 
-        for ( int i = 0; i < 3; ++i ) m_data[i] = NULL;
+        for ( int i = 0; i < 6; ++i ) m_data[i] = NULL;
 		configure();
 	}
 
 
 	virtual ~InstancedVolume() {
-        for ( int i = 0; i < 3; ++i )
+        for ( int i = 0; i < 6; ++i )
             if ( !m_mmap[i].get() && m_data[i] ) delete m_data[i];
     }
 
@@ -137,6 +147,11 @@ public:
 
         stream->writeString(m_densityFile);
         stream->writeString(m_orientationFile);
+
+		stream->writeString(m_S1File);
+		stream->writeString(m_S2File);
+		stream->writeString(m_segmentationFile);
+
         stream->writeString(m_albedoFile);
         if ( m_albedoFile == "" )
             m_albedo.serialize(stream);
@@ -164,6 +179,7 @@ public:
         if ( !m_ready )
         {
             m_hasOrientation = (m_orientationFile != "");
+			m_hasSGGXVolume = (m_S1File != "" && m_S2File != "");
 
             /* Load stuff */
             loadFromFile(m_densityFile, 0, "density");
@@ -171,6 +187,14 @@ public:
                 loadFromFile(m_orientationFile, 1, "orientation");
             if ( m_albedoFile != "" )
                 loadFromFile(m_albedoFile, 2, "albedo");
+
+			if (m_hasSGGXVolume) {
+				loadFromFile(m_S1File, 3, "S1");
+				loadFromFile(m_S2File, 4, "S2");
+			}
+
+			if (m_segmentationFile != "")
+				loadFromFile(m_segmentationFile, 5, "segmentation");
 
             if ( m_blockFile != "" )
             {
@@ -444,7 +468,8 @@ public:
 
 
     void lookupBundle(const Point &p, Float *density, Vector *direction,
-        Spectrum *albedo, Float *gloss) const
+        Spectrum *albedo, Float *gloss, 
+		Spectrum *s1, Spectrum *s2, Float *segmentation) const
     {
         Assert( gloss == NULL );
 
@@ -454,6 +479,11 @@ public:
             if ( density ) *density = 0.0f;
             if ( direction ) *direction = Vector(0.0f);
             if ( albedo ) *albedo = Spectrum(0.0f);
+			
+			if (s1) *s1 = Spectrum(0.f);
+			if (s2) *s2 = Spectrum(0.f);
+			if (segmentation) *segmentation = 0.f;
+
             return;
         }
 
@@ -538,6 +568,75 @@ public:
                 }
             }
         }
+
+		if (s1) {
+			Assert(m_hasSGGXVolume);
+			Assert(s2 != NULL);
+
+			Spectrum s1value, s2value;
+			switch (m_volumeType[3])
+			{
+			case EFloat32:
+			{
+				const float3 *s1Data = (float3 *)m_data[3];
+				const float3 *s2Data = (float3 *)m_data[4];
+				s1value = s1Data[idx].toSpectrum();
+				s2value = s2Data[idx].toSpectrum();
+			}
+			break;
+			default:
+				s1value = Spectrum(0.0f);
+				s2value = Spectrum(0.f);
+			}
+
+			if (!s1value.isZero()) {
+				Matrix3x3 Q;
+				Float eig[3];
+
+				Matrix3x3 S(s1value[0], s2value[0], s2value[1], 
+					s2value[0], s1value[1], s2value[2], 
+					s2value[1], s2value[2], s1value[2]);
+				S.symEig(Q, eig);
+				// eig[0] < eig[1] == eig[2]
+				Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+				w3 = m_volumeToWorld(w3);
+
+				if (!w3.isZero()) {
+					w3 = normalize(w3);
+					Frame frame(w3);
+
+					Matrix3x3 basis(frame.s, frame.t, w3);
+					Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+					Matrix3x3 basisT;
+					basis.transpose(basisT);
+					S = basis * D * basisT;
+
+					(*s1)[0] = S.m[0][0]; (*s1)[1] = S.m[1][1]; (*s1)[2] = S.m[2][2];
+					(*s2)[0] = S.m[0][1]; (*s2)[1] = S.m[0][2]; (*s2)[2] = S.m[1][2];
+				}
+				else {
+					*s1 = Spectrum(0.f);
+					*s2 = Spectrum(0.f);
+				}
+			}
+			else {
+				*s1 = Spectrum(0.f);
+				*s2 = Spectrum(0.f);
+			}
+		}
+
+		if (segmentation) {
+			switch (m_volumeType[5])
+			{
+			case EFloat32:
+			{
+				const float *floatData = (float *)m_data[5];
+				*segmentation = floatData[idx];
+			}
+			break;
+				*segmentation = 0.0f;
+			}
+		}
     }
 
 
@@ -565,6 +664,14 @@ public:
 	Float getStepSize() const { return m_stepSize; }
 	Float getMaximumFloatValue() const { return 1.0f; }
     Float getMaximumFloatValueEx(uint32_t id) const { return 1.0f; }
+
+	bool hasOrientation() const {
+		return m_hasOrientation;
+	}
+
+	bool hasSGGXVolume() const {
+		return m_hasSGGXVolume;
+	}
 
 	std::string toString() const {
 		std::ostringstream oss;
@@ -621,6 +728,12 @@ protected:
     Spectrum m_albedo;
     bool m_indexedAlbedo;
 
+	std::string m_S1File;
+	std::string m_S2File;
+	bool m_hasSGGXVolume;
+
+	std::string m_segmentationFile;
+
     Spectrum m_yarnColor1, m_yarnColor2;
     int m_yarnSplit;
 
@@ -632,10 +745,12 @@ protected:
     Vector2i m_reso;
     std::vector<int> m_blockID;
 
-    ref<MemoryMappedFile> m_mmap[3];
-	uint8_t *m_data[3];
-	EVolumeType m_volumeType[3];
-    int m_channels[3];
+	// 0: density, 1: orientation, 2: albedo
+	// 3: s1, 4: s2, 5: segmentation
+    ref<MemoryMappedFile> m_mmap[6];
+	uint8_t *m_data[6];
+	EVolumeType m_volumeType[6];
+    int m_channels[6];
 
 	Vector3i m_dataReso;
 	Transform m_volumeToWorld, m_worldToVolume;

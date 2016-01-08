@@ -196,6 +196,8 @@ public:
 			return block->lookupVector(_p);
 	}
 
+	// SGGX with rotation may not work with hgridvolume...
+
 	Float getMaximumFloatValue() const {
 		return m_maxFloatValue;
 	}

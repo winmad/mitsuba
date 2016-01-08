@@ -81,6 +81,11 @@ int VolumeDataSource::getChannels() const {
 	return 0;
 }
 
+Transform VolumeDataSource::getVolumeToWorld() const {
+	Log(EError, "'%s': does not implement getVolumeToWorld()!", getClass()->getName().c_str());
+	return Transform();
+}
+
 MTS_IMPLEMENT_CLASS(VolumeDataSource, true, ConfigurableObject)
 MTS_NAMESPACE_END
 

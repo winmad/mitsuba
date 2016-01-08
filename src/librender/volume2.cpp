@@ -58,5 +58,13 @@ void VolumeDataSourceEx::lookupBundle(const Point &p,
 	Log(EError, "'%s': does not implement lookup()!", getClass()->getName().c_str());
 }
 
+bool VolumeDataSourceEx::hasOrientation() const {
+	return false;
+}
+
+bool VolumeDataSourceEx::hasSGGXVolume() const {
+	return false;
+}
+
 MTS_IMPLEMENT_CLASS(VolumeDataSourceEx, true, VolumeDataSource)
 MTS_NAMESPACE_END

@@ -87,6 +87,16 @@ public:
 			Log(EInfo, "%.6f %.6f %.6f", S.m[1][0], S.m[1][1], S.m[1][2]);
 			Log(EInfo, "%.6f %.6f %.6f", S.m[2][0], S.m[2][1], S.m[2][2]);
 
+			Matrix3x3 Q;
+			Float eig[3];
+			S.symEig(Q, eig);
+
+			Log(EInfo, "Frame = ");
+			Log(EInfo, "%.6f %.6f %.6f", Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+			Log(EInfo, "%.6f %.6f %.6f", Q.m[0][1], Q.m[1][1], Q.m[2][1]);	
+			Log(EInfo, "%.6f %.6f %.6f", Q.m[0][2], Q.m[1][2], Q.m[2][2]);
+			Log(EInfo, "sigma_3 = %.6f, sigma_1 = %.6f, sigma_2 = %.6f", sqrt(eig[0]), sqrt(eig[1]), sqrt(eig[2]));
+			/*
 			Log(EInfo, "===== test property of sigma =====");
 
 			int numTheta = 180;
@@ -127,6 +137,7 @@ public:
 			result /= numTheta * numPhi;
 			Log(EInfo, "max sigmaT = %.6f", maxSigmaT);
 			Log(EInfo, "average error in sigma is %.6f", result);
+			*/
 		}
 		else if (strcmp(argv[1], "1") == 0) {
 			Properties props("gridvolume");

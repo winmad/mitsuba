@@ -317,6 +317,10 @@ public:
 		delete[] ptr;
 	}
 
+	Transform getVolumeToWorld() const {
+		return m_volumeToWorld;
+	}
+
 	Float getMaximumFloatValue() const {
 		return m_nested->getMaximumFloatValue();
 	}

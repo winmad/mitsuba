@@ -78,6 +78,8 @@ public:
 
 	virtual int getChannels() const;
 
+	virtual Transform getVolumeToWorld() const;
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor

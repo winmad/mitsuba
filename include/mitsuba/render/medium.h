@@ -22,6 +22,7 @@
 
 #include <mitsuba/core/netobject.h>
 #include <mitsuba/core/aabb.h>
+#include <mitsuba/render/volume2.h>
 
 MTS_NAMESPACE_BEGIN
 /**
@@ -176,6 +177,11 @@ public:
 
 	virtual const VolumeDataSource *getS2() const {
 		Log(EError, "%s::getS2() is not implemented!)", getClass()->getName().c_str());
+		return NULL;
+	}
+
+	virtual const VolumeDataSourceEx *getShellmap() const {
+		Log(EError, "%s::getShellmap() is not implemented!", getClass()->getName().c_str());
 		return NULL;
 	}
 

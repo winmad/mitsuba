@@ -17,6 +17,7 @@
 */
 
 #include <mitsuba/render/scene.h>
+#include <mitsuba/render/medium.h>
 #include <mitsuba/render/volume2.h>
 #include <mitsuba/core/statistics.h>
 #include <boost/algorithm/string.hpp>
@@ -81,6 +82,14 @@ public:
 			m_method = ESimpsonQuadrature;
 		else
 			Log(EError, "Unsupported integration method \"%s\"!", method.c_str());
+
+		/* hetero albedo */
+		m_numClusters = props.getInteger("numClusters", 1);
+		m_albedoScales.resize(m_numClusters);
+		for (int i = 0; i < m_numClusters; i++) {
+			std::string name = formatString("albedoScale%02i", i);
+			m_albedoScales[i] = props.getSpectrum(name, Spectrum(1.f));
+		}
 	}
 
 	/* Unserialize from a binary data stream */
@@ -90,6 +99,13 @@ public:
 		m_scale = stream->readFloat();
 		m_volume = static_cast<VolumeDataSourceEx *>(manager->getInstance(stream));
 		m_stepSize = stream->readFloat();
+
+		/* hetero albedo */
+		m_numClusters = stream->readInt();
+		m_albedoScales.resize(m_numClusters);
+		for (int i = 0; i < m_numClusters; i++) {
+			m_albedoScales[i] = Spectrum(stream);
+		}
 		configure();
 	}
 
@@ -103,6 +119,12 @@ public:
 		stream->writeFloat(m_scale);
 		manager->serialize(stream, m_volume.get());
 		stream->writeFloat(m_stepSize);
+
+		/* hetero albedo */
+		stream->writeInt(m_numClusters);
+		for (int i = 0; i < m_numClusters; i++) {
+			m_albedoScales[i].serialize(stream);
+		}
 	}
 
 	void configure() {
@@ -112,6 +134,14 @@ public:
 		m_volumeAABB = m_volume->getAABB();
         if ( !m_volumeAABB.isValid() )
             Log(EError, "Invalid volume AABB!");
+
+		/* hetero albedo */
+		if (m_numClusters > 1) {
+			m_useDiffAlbedoScales = true;
+		}
+		else {
+			m_useDiffAlbedoScales = false;
+		}
 
 		/* Assumes that the density medium does not 
 		   contain values greater than one! */
@@ -458,8 +488,27 @@ public:
 				mRec.p = ray(mRec.t);
 				success = true;
 				Spectrum albedo;
-                m_volume->lookupBundle(mRec.p, NULL, &mRec.orientation, &albedo, NULL);
+				Float fClusterIndex = 0.f;
+				int clusterIndex = 0;
+
+				if (m_volume->hasOrientation())
+					m_volume->lookupBundle(mRec.p, NULL, &mRec.orientation, &albedo, NULL,
+					NULL, NULL, &fClusterIndex);
+				else
+					m_volume->lookupBundle(mRec.p, NULL, NULL, &albedo, NULL,
+					NULL, NULL, &fClusterIndex);
+
+				if (m_useDiffAlbedoScales) {
+					clusterIndex = (int)fClusterIndex;
+					albedo *= m_albedoScales[clusterIndex];
+				}
+				else {
+					albedo *= m_albedoScales[0];
+				}
+
 				mRec.sigmaS = albedo * densityAtT;
+				mRec.clusterIndex = clusterIndex;
+				mRec.albedoScale = m_albedoScales[clusterIndex];
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 			}
 
@@ -503,8 +552,27 @@ public:
 					mRec.t = t;
 					mRec.p = p;
 					Spectrum albedo;
-                    m_volume->lookupBundle(p, NULL, &mRec.orientation, &albedo, NULL);
+					Float fClusterIndex = 0.f;
+					int clusterIndex = 0;
+					
+					if (m_volume->hasOrientation())
+						m_volume->lookupBundle(p, NULL, &mRec.orientation, &albedo, NULL,
+						NULL, NULL, &fClusterIndex);
+					else
+						m_volume->lookupBundle(p, NULL, NULL, &albedo, NULL,
+						NULL, NULL, &fClusterIndex);
+					
+					if (m_useDiffAlbedoScales) {
+						clusterIndex = (int)fClusterIndex;
+						albedo *= m_albedoScales[clusterIndex];
+					}
+					else {
+						albedo *= m_albedoScales[0];
+					}
+					
 					mRec.sigmaS = albedo * densityAtT;
+					mRec.clusterIndex = clusterIndex;
+					mRec.albedoScale = m_albedoScales[clusterIndex];
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
                     // XXX - what if a single channel has a 0 intensity value?
 					mRec.transmittance = mRec.sigmaS.isZero() 
@@ -526,9 +594,18 @@ public:
 			Float mintDensity = lookupDensity(ray(ray.mint), ray.d) * m_scale;
 			Float maxtDensity = 0.0f;
 			Spectrum maxtAlbedo(0.0f);
+			Float fClusterIndex = 0.f;
+			int clusterIndex = 0;
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
-				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo) * m_scale;
+				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &fClusterIndex) * m_scale;
+				if (m_useDiffAlbedoScales) {
+					clusterIndex = (int)fClusterIndex;
+					maxtAlbedo *= m_albedoScales[clusterIndex];
+				}
+				else {
+					maxtAlbedo *= m_albedoScales[0];
+				}
 			}
 			mRec.transmittance = Spectrum(expVal);
 			mRec.pdfFailure = expVal;
@@ -538,6 +615,9 @@ public:
 			mRec.sigmaA = Spectrum(maxtDensity) - mRec.sigmaS;
 			mRec.time = ray.time;
 			mRec.medium = this;
+
+			mRec.clusterIndex = clusterIndex;
+			mRec.albedoScale = m_albedoScales[clusterIndex];
 		} else {
 			Log(EError, "eval(): unsupported integration method!");
 		}
@@ -545,6 +625,10 @@ public:
 
 	bool isHomogeneous() const {
 		return false;
+	}
+
+	const VolumeDataSourceEx *getShellmap() const {
+		return m_volume.get();
 	}
 
 	std::string toString() const {
@@ -559,15 +643,60 @@ public:
 
 	MTS_DECLARE_CLASS()
 protected:
-	inline Float lookupDensity(const Point &p, const Vector &d, Spectrum *s = NULL) const {
+	inline Float lookupDensity(const Point &p, const Vector &d, Spectrum *albedo = NULL, Float *clusterIndex = NULL) const {
         Float density;
         Vector orientation;
+		Spectrum S1;
+		Spectrum S2;
 
-        m_volume->lookupBundle(p, &density, &orientation, s, NULL);
-		if (density != 0 && !orientation.isZero())
-            return density*m_phaseFunction->sigmaDir(dot(d, orientation));
-        else
-			return 0.0f;
+		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
+			if (!m_volume->hasSGGXVolume()) {
+				Matrix3x3 D = getPhaseFunction()->getD();
+				m_volume->lookupBundle(p, &density, &orientation, albedo, NULL,
+					NULL, NULL, clusterIndex);
+
+				if (density == 0 || orientation.isZero())
+					return 0.f;
+
+				Vector w3 = orientation;
+				Frame frame(w3);
+				Matrix3x3 basis(frame.s, frame.t, w3);
+				Matrix3x3 basisT;
+				basis.transpose(basisT);
+				Matrix3x3 S = basis * D * basisT;
+				Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
+				Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
+				Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+				if (fabsf(sqrSum) > 1e-6f)
+					density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+				else
+					return 0.f;
+				return density;
+			}
+			else {
+				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
+					&S1, &S2, clusterIndex);
+				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
+				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
+
+				Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+				if (fabsf(sqrSum) > 1e-6f)
+					density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+				else
+					return 0;
+				return density;
+			}
+		}
+		else {
+			m_volume->lookupBundle(p, &density, &orientation, albedo, NULL,
+				NULL, NULL, clusterIndex);
+			if (density != 0 && !orientation.isZero())
+				return density*m_phaseFunction->sigmaDir(dot(d, orientation));
+			else
+				return 0.0f;
+		}
 	}
 
 protected:
@@ -579,6 +708,10 @@ protected:
 	AABB m_volumeAABB;
 	Float m_maxDensity;
 	Float m_invMaxDensity;
+
+	bool m_useDiffAlbedoScales;
+	int m_numClusters;
+	std::vector<Spectrum> m_albedoScales;
 };
 
 MTS_IMPLEMENT_CLASS_S(HeterogeneousMediumEx, false, Medium)

@@ -119,6 +119,10 @@ public:
         } else
             return Vector(0.0f);
 	}
+
+	Transform getVolumeToWorld() const {
+		return m_volumeToWorld * m_block->getVolumeToWorld();
+	}
 	
 	bool supportsFloatLookups() const { return m_block->supportsFloatLookups(); }
     bool supportsSpectrumLookups() const { return m_block->supportsSpectrumLookups(); }

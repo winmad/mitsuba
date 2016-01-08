@@ -862,17 +862,46 @@ protected:
 				else {
 					Spectrum S1 = m_S1->lookupSpectrum(p);
 					Spectrum S2 = m_S2->lookupSpectrum(p);
-					// fix SGGX volumeToWorld rotation!!!
 
 					Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
 					Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
-					Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
-					//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
-					if (fabsf(sqrSum) > 1e-6f)
-						density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
-					else
+
+					// handle orientation transform
+					Transform volumeToWorld = m_S1->getVolumeToWorld();
+
+					Matrix3x3 Q;
+					Float eig[3];
+
+					Matrix3x3 S(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
+					S.symEig(Q, eig);
+					// eig[0] < eig[1] == eig[2]
+					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+					w3 = volumeToWorld(w3);
+
+					if (!w3.isZero()) {
+						w3 = normalize(w3);
+						Frame frame(w3);
+
+						Matrix3x3 basis(frame.s, frame.t, w3);
+						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+						Matrix3x3 basisT;
+						basis.transpose(basisT);
+						S = basis * D * basisT;
+
+						Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
+						Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
+
+						Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+						//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+						if (fabsf(sqrSum) > 1e-6f)
+							density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+						else
+							return 0;
+						return density;
+					}
+					else {
 						return 0;
-					return density;
+					}
 				}
 			}
 

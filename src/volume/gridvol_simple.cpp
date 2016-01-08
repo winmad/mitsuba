@@ -334,6 +334,10 @@ public:
 	Float getStepSize() const { return m_stepSize; }
 	Float getMaximumFloatValue() const { return 1.0f; }
 
+	Transform getVolumeToWorld() const {
+		return m_volumeToWorld;
+	}
+
 	std::string toString() const {
 		std::ostringstream oss;
 		oss << "GridVolume[" << endl

@@ -626,6 +626,10 @@ public:
 		return m_channels;
 	}
 
+	Transform getVolumeToWorld() const {
+		return m_volumeToWorld;
+	}
+
 	Float getMaximumFloatValue() const {
 		return 1.0f;
 	}

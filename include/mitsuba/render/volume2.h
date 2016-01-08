@@ -36,6 +36,9 @@ public:
 
     virtual Float getMaximumFloatValueEx(uint32_t id) const = 0;
 
+	virtual bool hasOrientation() const;
+	virtual bool hasSGGXVolume() const;
+
 	MTS_DECLARE_CLASS()
 protected:
 	/// Virtual destructor
