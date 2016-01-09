@@ -41,6 +41,36 @@ public:
 			bbox.max.x, bbox.max.y, bbox.max.z);
 
 		GridData s;
+		initS(s, res);
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					Vector v(originVol->lookupFloat(i, j, k, 0),
+						originVol->lookupFloat(i, j, k, 1),
+						originVol->lookupFloat(i, j, k, 2));
+
+					if (fabs(v.x) > fabs(v.y) & fabs(v.x) > fabs(v.z)) {
+						if (v.x > 0.f)
+							s[i][j][k] = Vector(1.f, 0.f, 0.f);
+						else
+							s[i][j][k] = Vector(-1.f, 0.f, 0.f);
+					}
+					else if (fabs(v.y) > fabs(v.x) && fabs(v.y) > fabs(v.z)) {
+						if (v.y > 0)
+							s[i][j][k] = Vector(0.f, 1.f, 0.f);
+						else
+							s[i][j][k] = Vector(0.f, -1.f, 0.f);
+					}
+					else {
+						s[i][j][k] = Vector(0.f);
+					}
+				}
+			}
+		}
+
+		/*
+		GridData s;
 		initS(s, Vector3i(2, 2, 2));
 		s[1][1][1] = s[0][1][0] = s[0][0][1] = s[1][0][0] = Vector(0.95, 0.1, 0.1);
 		s[0][0][0] = s[0][1][1] = s[1][1][0] = s[1][0][1] = Vector(0.95, 0.64, 0.37);
@@ -52,6 +82,7 @@ public:
 					int index = (k * 2 + j) * 2 + i;
 					Log(EInfo, "index %d: (%.6f, %.6f, %.6f)", index, s[i][j][k].x, s[i][j][k].y, s[i][j][k].z);
 				}
+		*/
 
 // 		GridData albedo;
 // 		initS(albedo, Vector3i(2, 2, 1));

@@ -163,6 +163,8 @@ public:
 
 			sampler->generate(offset);
 
+			Float cntLdA = 0.f;
+
 			for (size_t j = 0; j < sampler->getSampleCount(); j++) {
 				rRec.newQuery(queryType, sensor->getMedium());
 				Point2 samplePos(Point2(offset) + Vector2(rRec.nextSample2D()));
@@ -183,10 +185,28 @@ public:
 				spec *= Li(sensorRay, rRec, oneTdA, oneLdA);
 
 				block->put(samplePos, spec, rRec.alpha);
-				TdA[index] += oneTdA / Float(spp);
-				LdA[index] += oneLdA / Float(spp);
+
+				bool goodSample = true;
+				for (int c = 0; c < 3; c++) {
+					if (!std::isfinite(oneLdA[c]) || oneLdA[c] < 0) {
+						goodSample = false;
+						break;
+					}
+				}
+				
+				if (goodSample) {
+					LdA[index] += oneLdA;
+					cntLdA += 1.f;
+				}
 
 				sampler->advance();
+			}
+
+			if (cntLdA > 0.f) {
+				LdA[index] /= cntLdA;
+			}
+			else {
+				LdA[index] = Spectrum(0.f);
 			}
 		}
 

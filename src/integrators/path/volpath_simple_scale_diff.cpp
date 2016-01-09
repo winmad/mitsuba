@@ -153,6 +153,8 @@ public:
 		if (!sensor->getFilm()->hasAlpha()) /* Don't compute an alpha channel if we don't have to */
 			queryType &= ~RadianceQueryRecord::EOpacity;
 
+		std::vector<Float> cntLdA(numClusters);
+
 		for (size_t i = 0; i < points.size(); ++i) {
 			Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
 			int index = offset.x + offset.y * width;
@@ -161,6 +163,10 @@ public:
 				break;
 
 			sampler->generate(offset);
+
+			for (int k = 0; k < numClusters; k++) {
+				cntLdA[k] = 0.f;
+			}
 
 			for (size_t j = 0; j < sampler->getSampleCount(); j++) {
 				rRec.newQuery(queryType, sensor->getMedium());
@@ -184,13 +190,34 @@ public:
 
 				block->put(samplePos, spec, rRec.alpha);
 
-				for (int i = 0; i < numClusters; i++) {
-					TdA[i][index] += oneTdA[i] / Float(spp);
-					LdA[i][index] += oneLdA[i] / Float(spp);
+				for (int k = 0; k < numClusters; k++) {
+					bool goodSample = true;
+
+					for (int c = 0; c < 3; c++) {
+						if (!std::isfinite(oneLdA[k][c]) || oneLdA[k][c] < 0) {
+							goodSample = false;
+							break;
+						}
+					}
+
+					if (goodSample) {
+						LdA[k][index] += oneLdA[k];
+						cntLdA[k] += 1.f;
+					}
 				}
+
 				imageSeg[index] |= albedoSegs;
 
 				sampler->advance();
+			}
+
+			for (int k = 0; k < numClusters; k++) {
+				if (cntLdA[k] > 0.f) {
+					LdA[k][index] /= cntLdA[k];
+				}
+				else {
+					LdA[k][index] = Spectrum(0.f);
+				}
 			}
 		}
 
