@@ -577,6 +577,7 @@
     <ClInclude Include="..\include\mitsuba\mitsuba.h">
     </ClInclude>
     <ClInclude Include="..\src\volume\tetra.h" />
+    <ClInclude Include="..\src\volume\tetra2.h" />
   </ItemGroup>
   <ItemGroup Label="Source Files">
     <ClCompile Include="..\src\converter\mtsimport.cpp">
@@ -710,6 +711,7 @@
     <ClCompile Include="..\src\librender\imageblock.cpp">
     </ClCompile>
     <ClCompile Include="..\src\medium\heterogeneous2.cpp" />
+    <ClCompile Include="..\src\medium\heterogeneous3.cpp" />
     <ClCompile Include="..\src\phase\SGGX.cpp" />
     <ClCompile Include="..\src\samplers\stratified.cpp">
     </ClCompile>

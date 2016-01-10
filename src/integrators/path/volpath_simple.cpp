@@ -138,8 +138,26 @@ public:
 						bool useSGGX = false;
 						if (phase->getClass()->getName() == "SGGXPhaseFunction")
 							useSGGX = true;
-						Li += throughput * value * phase->eval(
-							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX));
+
+						PhaseFunctionSamplingRecord pRec(mRec, -ray.d, dRec.d, useSGGX);
+						Li += throughput * value * phase->eval(pRec);
+						/*
+						bool flag = true;
+						if (fabs(pRec.Sxx - mRec.s1[0]) > 1e-6f)
+							flag = false;
+						if (fabs(pRec.Syy - mRec.s1[1]) > 1e-6f)
+							flag = false;
+						if (fabs(pRec.Szz - mRec.s1[2]) > 1e-6f)
+							flag = false;
+						if (fabs(pRec.Sxy - mRec.s2[0]) > 1e-6f)
+							flag = false;
+						if (fabs(pRec.Sxz - mRec.s2[1]) > 1e-6f)
+							flag = false;
+						if (fabs(pRec.Syz - mRec.s2[2]) > 1e-6f)
+							flag = false;
+						if (!flag)
+							Log(EInfo, "error, S matrix doesn't agree");
+						*/
 					}
 				}
 
@@ -156,6 +174,23 @@ public:
 				if (phase->getClass()->getName() == "SGGXPhaseFunction")
 					useSGGX = true;
 				PhaseFunctionSamplingRecord pRec(mRec, -ray.d, useSGGX);
+				/*
+				bool flag = true;
+				if (fabs(pRec.Sxx - mRec.s1[0]) > 1e-6f)
+					flag = false;
+				if (fabs(pRec.Syy - mRec.s1[1]) > 1e-6f)
+					flag = false;
+				if (fabs(pRec.Szz - mRec.s1[2]) > 1e-6f)
+					flag = false;
+				if (fabs(pRec.Sxy - mRec.s2[0]) > 1e-6f)
+					flag = false;
+				if (fabs(pRec.Sxz - mRec.s2[1]) > 1e-6f)
+					flag = false;
+				if (fabs(pRec.Syz - mRec.s2[2]) > 1e-6f)
+					flag = false;
+				if (!flag)
+					Log(EInfo, "error, S matrix doesn't agree");
+				*/
 				
 				Float phaseVal = phase->sample(pRec, rRec.sampler);
 				if (phaseVal == 0)
@@ -184,7 +219,7 @@ public:
 						&& (!m_hideEmitters || scattered)) {
 						Spectrum value = throughput * scene->evalEnvironment(ray);
 						if (rRec.medium)
-							value *= rRec.medium->evalTransmittance(ray);
+							value *= rRec.medium->evalTransmittance(ray, rRec.sampler);
 						Li += value;
 					}
 					break;

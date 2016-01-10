@@ -68,7 +68,7 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 			}
 		}
 		// Heterogeneous2
-		else {
+		else if (mRec.medium->getClass()->getName() == "HeterogeneousMedium2") {
 			const VolumeDataSourceEx *shellmap = mRec.medium->getShellmap();
 			if (!shellmap->hasSGGXVolume()) {
 				Matrix3x3 D = mRec.medium->getPhaseFunction()->getD();
@@ -88,6 +88,11 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 				Sxx = S1[0]; Syy = S1[1]; Szz = S1[2];
 				Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
 			}
+		}
+		// Heterogeneous3
+		else {
+			Sxx = mRec.s1[0]; Syy = mRec.s1[1]; Szz = mRec.s1[2];
+			Sxy = mRec.s2[0]; Sxz = mRec.s2[1]; Syz = mRec.s2[2];
 		}
 	}
 }
@@ -144,7 +149,7 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 			}
 		}
 		// Heterogeneous2
-		else {
+		else if (mRec.medium->getClass()->getName() == "HeterogeneousMedium2") {
 			const VolumeDataSourceEx *shellmap = mRec.medium->getShellmap();
 			if (!shellmap->hasSGGXVolume()) {
 				Matrix3x3 D = mRec.medium->getPhaseFunction()->getD();
@@ -164,6 +169,11 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 				Sxx = S1[0]; Syy = S1[1]; Szz = S1[2];
 				Sxy = S2[0]; Sxz = S2[1]; Syz = S2[2];
 			}
+		}
+		// Heterogeneous3
+		else {
+			Sxx = mRec.s1[0]; Syy = mRec.s1[1]; Szz = mRec.s1[2];
+			Sxy = mRec.s2[0]; Sxz = mRec.s2[1]; Syz = mRec.s2[2];
 		}
 	}
 }

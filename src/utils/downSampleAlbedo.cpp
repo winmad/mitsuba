@@ -88,6 +88,7 @@ public:
 		originRes.y -= originRes.y % scale.y;
 		originRes.z -= originRes.z % scale.z;
 
+#pragma omp parallel for
 		for (int i = 0; i < originRes.x; i += scale.x) {
 			for (int j = 0; j < originRes.y; j += scale.y) {
 				for (int k = 0; k < originRes.z; k += scale.z) {

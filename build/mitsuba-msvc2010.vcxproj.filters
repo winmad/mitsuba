@@ -1112,6 +1112,9 @@
     <ClCompile Include="..\src\librender\volume2.cpp">
       <Filter>Source Files\librender</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\medium\heterogeneous3.cpp">
+      <Filter>Source Files\medium</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
@@ -1815,6 +1818,9 @@
     </ClInclude>
     <ClInclude Include="..\include\mitsuba\render\volume2.h">
       <Filter>Header Files\mitsuba\render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\volume\tetra2.h">
+      <Filter>Source Files\volume</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

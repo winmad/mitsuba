@@ -490,13 +490,15 @@ public:
 				Spectrum albedo;
 				Float fClusterIndex = 0.f;
 				int clusterIndex = 0;
+				Spectrum s1(0.f);
+				Spectrum s2(0.f);
 
 				if (m_volume->hasOrientation())
 					m_volume->lookupBundle(mRec.p, NULL, &mRec.orientation, &albedo, NULL,
-					NULL, NULL, &fClusterIndex);
+						NULL, NULL, &fClusterIndex);
 				else
 					m_volume->lookupBundle(mRec.p, NULL, NULL, &albedo, NULL,
-					NULL, NULL, &fClusterIndex);
+						&s1, &s2, &fClusterIndex);
 
 				if (m_useDiffAlbedoScales) {
 					clusterIndex = (int)fClusterIndex;
@@ -510,6 +512,8 @@ public:
 				mRec.clusterIndex = clusterIndex;
 				mRec.albedoScale = m_albedoScales[clusterIndex];
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
+				mRec.s1 = s1;
+				mRec.s2 = s2;
 			}
 
 			Float expVal = math::fastexp(-integratedDensity);
@@ -554,13 +558,15 @@ public:
 					Spectrum albedo;
 					Float fClusterIndex = 0.f;
 					int clusterIndex = 0;
+					Spectrum s1(0.f);
+					Spectrum s2(0.f);
 					
 					if (m_volume->hasOrientation())
 						m_volume->lookupBundle(p, NULL, &mRec.orientation, &albedo, NULL,
-						NULL, NULL, &fClusterIndex);
+							NULL, NULL, &fClusterIndex);
 					else
 						m_volume->lookupBundle(p, NULL, NULL, &albedo, NULL,
-						NULL, NULL, &fClusterIndex);
+							&s1, &s2, &fClusterIndex);
 					
 					if (m_useDiffAlbedoScales) {
 						clusterIndex = (int)fClusterIndex;
@@ -574,6 +580,8 @@ public:
 					mRec.clusterIndex = clusterIndex;
 					mRec.albedoScale = m_albedoScales[clusterIndex];
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
+					mRec.s1 = s1;
+					mRec.s2 = s2;
                     // XXX - what if a single channel has a 0 intensity value?
 					mRec.transmittance = mRec.sigmaS.isZero() 
 						? Spectrum(0.0f) : albedo/mRec.sigmaS;
@@ -596,9 +604,11 @@ public:
 			Spectrum maxtAlbedo(0.0f);
 			Float fClusterIndex = 0.f;
 			int clusterIndex = 0;
+			Spectrum s1(0.f);
+			Spectrum s2(0.f);
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
-				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &fClusterIndex) * m_scale;
+				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &s1, &s2, &fClusterIndex) * m_scale;
 				if (m_useDiffAlbedoScales) {
 					clusterIndex = (int)fClusterIndex;
 					maxtAlbedo *= m_albedoScales[clusterIndex];
@@ -613,6 +623,8 @@ public:
 			mRec.pdfSuccessRev = expVal * mintDensity;
 			mRec.sigmaS = maxtAlbedo * maxtDensity;
 			mRec.sigmaA = Spectrum(maxtDensity) - mRec.sigmaS;
+			mRec.s1 = s1;
+			mRec.s2 = s2;
 			mRec.time = ray.time;
 			mRec.medium = this;
 
@@ -643,11 +655,15 @@ public:
 
 	MTS_DECLARE_CLASS()
 protected:
-	inline Float lookupDensity(const Point &p, const Vector &d, Spectrum *albedo = NULL, Float *clusterIndex = NULL) const {
+	inline Float lookupDensity(const Point &p, const Vector &d, Spectrum *albedo = NULL, 
+		Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *clusterIndex = NULL) const {
         Float density;
         Vector orientation;
 		Spectrum S1;
 		Spectrum S2;
+
+		if (s1) *s1 = Spectrum(0.f);
+		if (s2) *s2 = Spectrum(0.f);
 
 		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
 			if (!m_volume->hasSGGXVolume()) {
@@ -666,6 +682,7 @@ protected:
 				Matrix3x3 S = basis * D * basisT;
 				Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
 				Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
+
 				Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
 				if (fabsf(sqrSum) > 1e-6f)
@@ -679,6 +696,11 @@ protected:
 					&S1, &S2, clusterIndex);
 				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
 				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
+
+				if (s1 && s2) {
+					(*s1)[0] = Sxx; (*s1)[1] = Syy; (*s1)[2] = Szz;
+					(*s2)[0] = Sxy; (*s2)[1] = Sxz; (*s2)[2] = Syz;
+				}
 
 				Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))

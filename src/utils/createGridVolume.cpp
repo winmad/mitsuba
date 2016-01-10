@@ -42,6 +42,21 @@ public:
 
 		GridData s;
 		initS(s, res);
+
+		Vector red(0.95, 0.1, 0.1);
+		Vector blue(0.1, 0.1, 0.95);
+
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					Float x = (res.x - 1.f - i) / (Float)(res.x - 1.f);
+					s[i][j][k] = red * x + blue * (1.f - x);
+				}
+			}
+		}
+
+		/*
 #pragma omp parallel for
 		for (int i = 0; i < res.x; i++) {
 			for (int j = 0; j < res.y; j++) {
@@ -68,6 +83,7 @@ public:
 				}
 			}
 		}
+		*/
 
 		/*
 		GridData s;

@@ -14,20 +14,20 @@ MTS_NAMESPACE_BEGIN
 
 class AlbedoCluster : public Utility {
 public:
-	typedef Point Pt;
-	typedef Vector Vec;
+	typedef TPoint3<double> Pt;
+	typedef TVector3<double> Vec;
 
-	inline Float dist2(const Pt &u, const Pt &v) {
+	inline double dist2(const Pt &u, const Pt &v) {
 		return (u - v).lengthSquared();
 	}
 
 	void assignCluster(int now) {
 #pragma omp parallel for
 		for (int i = 0; i < N; i++) {
-			Float minDist2 = 1e10f;
+			double minDist2 = 1e10;
 			float k = -1.f;
 			for (int j = 0; j < numClusters; j++) {
-				Float d = dist2(data[i], centers[now][j]);
+				double d = dist2(data[i], centers[now][j]);
 				if (d < minDist2) {
 					minDist2 = d;
 					k = (float)j;
@@ -39,22 +39,27 @@ public:
 
 	void updateCenters(int now) {
 		for (int i = 0; i < numClusters; i++) {
-			cnt[i] = 0.f;
-			centers[1 - now][i] = Pt(0.f);
+			cnt[i] = 0;
+			centers[1 - now][i] = Pt(0.0);
 		}
 
 		for (int i = 0; i < N; i++) {
 			int k = (int)segs[i];
 			centers[1 - now][k] += data[i];
-			cnt[k] += 1.f;
+			cnt[k] += 1;
 		}
 
 		for (int i = 0; i < numClusters; i++) {
-			if (cnt[i] > 0.f)
-				centers[1 - now][i] /= cnt[i];
+			if (cnt[i] > 0)
+				centers[1 - now][i] /= (double)cnt[i];
 			else
-				centers[1 - now][i] = centers[now][i];
+				centers[1 - now][i] = Pt(1e8);
 		}
+
+		for (int i = 0; i < numClusters; i++) {
+			Log(EInfo, "cluster %d: %d", i, cnt[i]);
+		}
+		Log(EInfo, "total: %d", N);
 	}
 
 	void initCluster() {
@@ -69,7 +74,7 @@ public:
 				
 				bool flag = true;
 				for (int j = 0; j < i; j++) {
-					if (dist2(centers[0][j], data[k]) < 1e-6f) {
+					if (dist2(centers[0][j], data[k]) < 1e-6) {
 						flag = false;
 						break;
 					}
@@ -95,7 +100,7 @@ public:
 			// converged?
 			bool flag = true;
 			for (int i = 0; i < numClusters; i++) {
-				if (dist2(centers[1 - now][i], centers[now][i]) > 1e-8f) {
+				if (dist2(centers[1 - now][i], centers[now][i]) > 1e-8) {
 					flag = false;
 					break;
 				}
@@ -109,7 +114,7 @@ public:
 				Log(EInfo, "center %d, (%.8f, %.8f, %.8f)", i, centers[now][i].x, centers[now][i].y, centers[now][i].z);
 			}
 
-			if (iter > 1000 || flag)
+			if (iter > 100 || flag)
 				break;
 		}
 	}
@@ -148,6 +153,8 @@ public:
 		hasht.clear();
 		diffIndices.clear();
 
+		double spaceTerm = 0.1;
+
 		data.resize(N);
 		for (int i = 0; i < res.x; i++) {
 			for (int j = 0; j < res.y; j++) {
@@ -157,6 +164,11 @@ public:
 					for (int c = 0; c < 3; c++) {
 						p[c] = originVol->lookupFloat(i, j, k, c);
 					}
+					/*
+					Point3 pos((i + 1.f) / res.x, (j + 1.f) / res.y, (k + 1.f) / res.z);
+					pos *= spaceTerm;
+					p[3] = pos[0]; p[4] = pos[1]; p[5] = pos[2];
+					*/
 					data[index] = p;
 
 					int hashValue = hashFunc(p);
@@ -185,7 +197,7 @@ public:
 	}
 
 	inline int hashFunc(const Pt &u) {
-		return (int)(u.x * 1e2f) * 10000 + (int)(u.y * 1e2f) * 100 + (int)(u.z * 1e2f);
+		return (int)(u.x * 1e2) * 10000 + (int)(u.y * 1e2) * 100 + (int)(u.z * 1e2);
 	}
 
 	void writeVolume(AABB &bbox, int channels, Stream *stream) {
@@ -216,7 +228,7 @@ public:
 	int numClusters;
 	Vector3i res;
 	int N;
-	std::vector<Float> cnt;
+	std::vector<int> cnt;
 	std::vector<Pt> centers[2];
 	std::vector<Pt> data;
 	float *segs;

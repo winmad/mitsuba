@@ -102,15 +102,15 @@ public:
 		pixelNum = height * width;
 
 		LdA.resize(numClusters);
-		TdA.resize(numClusters);
+		//TdA.resize(numClusters);
 
 		for (int i = 0; i < numClusters; i++) {
 			LdA[i] = new Spectrum[pixelNum];
-			TdA[i] = new Spectrum[pixelNum];
+			//TdA[i] = new Spectrum[pixelNum];
 
 			for (int j = 0; j < pixelNum; j++) {
 				LdA[i][j] = Spectrum(0.f);
-				TdA[i][j] = Spectrum(0.f);
+				//TdA[i][j] = Spectrum(0.f);
 			}
 		}
 
@@ -123,8 +123,8 @@ public:
 		for (int i = 0; i < numClusters; i++) {
 			if (LdA[i] != NULL)
 				delete[] LdA[i];
-			if (TdA[i] != NULL)
-				delete[] TdA[i];
+			//if (TdA[i] != NULL)
+			//	delete[] TdA[i];
 		}
 
 		if (imageSeg != NULL)
@@ -408,7 +408,7 @@ public:
 						Spectrum val = scene->evalEnvironment(ray);
 						Spectrum value = throughput * val;
 						if (rRec.medium) {
-							Spectrum tmp = rRec.medium->evalTransmittance(ray);
+							Spectrum tmp = rRec.medium->evalTransmittance(ray, rRec.sampler);
 							value *= tmp;
 							val *= tmp;
 						}
@@ -600,7 +600,7 @@ public:
 	int height, width, pixelNum;
 	int spp;
 	std::vector<Spectrum*> LdA;
-	std::vector<Spectrum*> TdA;
+	//std::vector<Spectrum*> TdA;
 
 	int *imageSeg;
 

@@ -67,6 +67,12 @@ public:
 	int clusterIndex;
 	Spectrum albedoScale;
 
+	Spectrum s1;
+	Spectrum s2;
+
+	bool hasExtraInfo;
+	Point extra;
+
 	/**
 	 * \brief Records the probability density of sampling a medium
 	 * interaction in the reverse direction

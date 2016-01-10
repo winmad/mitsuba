@@ -117,19 +117,23 @@ public:
 		pixelNum = height * width;
 
 		LdA = new Spectrum[pixelNum];
-		TdA = new Spectrum[pixelNum];
+		//TdA = new Spectrum[pixelNum];
 
 		for (int i = 0; i < pixelNum; i++) {
 			LdA[i] = Spectrum(0.f);
-			TdA[i] = Spectrum(0.f);
+			//TdA[i] = Spectrum(0.f);
 		}
+
+		imageSeg = new int[pixelNum];
+		for (int i = 0; i < pixelNum; i++)
+			imageSeg[i] = 0;
 	}
 
 	~SimpleDiffVolumetricPathTracer() {
 		if (LdA != NULL)
 			delete[] LdA;
-		if (TdA != NULL)
-			delete[] TdA;
+		//if (TdA != NULL)
+		//	delete[] TdA;
 	}
 
 	void renderBlock(const Scene *scene,
@@ -181,8 +185,9 @@ public:
 
 				Spectrum oneTdA(0.f);
 				Spectrum oneLdA(0.f);
+				int albedoSegs = 0;
 
-				spec *= Li(sensorRay, rRec, oneTdA, oneLdA);
+				spec *= Li(sensorRay, rRec, oneTdA, oneLdA, albedoSegs);
 
 				block->put(samplePos, spec, rRec.alpha);
 
@@ -198,6 +203,8 @@ public:
 					LdA[index] += oneLdA;
 					cntLdA += 1.f;
 				}
+
+				imageSeg[index] |= albedoSegs;
 
 				sampler->advance();
 			}
@@ -225,6 +232,19 @@ public:
 		}
 		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
 		
+		outfile = prefix + formatString("image_seg_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
+		for (int i = 0; i < points.size(); i++) {
+			Point2i p = Point2i(points[i]);
+			int localIndex = p.x + p.y * block->getWidth();
+			Point2i offset = p + Vector2i(block->getOffset());
+			int globalIndex = offset.x + offset.y * width;
+			Spectrum color(imageSeg[globalIndex]);
+			for (int c = 0; c < 3; c++) {
+				data[3 * localIndex + c] = color[c];
+			}
+		}
+		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
+
 		/*
 		outfile = formatString("TdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
 		for (int i = 0; i < points.size(); i++) {
@@ -248,7 +268,7 @@ public:
 	}
 
 	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, 
-		Spectrum &TdA, Spectrum &LdA) const {
+		Spectrum &TdA, Spectrum &LdA, int &albedoSegs) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
@@ -266,6 +286,8 @@ public:
 
 		if (m_maxDepth == 1)
 			rRec.type &= RadianceQueryRecord::EEmittedRadiance;
+
+		int thrAlbedoSegs = 0;
 
 		/**
 		* Note: the logic regarding maximum path depth may appear a bit
@@ -285,6 +307,9 @@ public:
 
 				Spectrum val = mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 				throughput *= val;
+
+				if (thrAlbedoSegs == 0)
+					thrAlbedoSegs |= 1;
 				TdA = throughput + TdA * val;
 
 				/* ==================================================================== */
@@ -308,6 +333,8 @@ public:
 						Spectrum val = value * phase->eval(
 							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX));
 						Li += throughput * val;
+						
+						albedoSegs |= thrAlbedoSegs;
 						LdA += TdA * val;
 					}
 				}
@@ -360,12 +387,14 @@ public:
 						Spectrum val = scene->evalEnvironment(ray);
 						Spectrum value = throughput * val;
 						if (rRec.medium) {
-							Spectrum tmp = rRec.medium->evalTransmittance(ray);
+							Spectrum tmp = rRec.medium->evalTransmittance(ray, rRec.sampler);
 							value *= tmp;
 							val *= tmp;
 						}
 
 						Li += value;
+
+						albedoSegs |= thrAlbedoSegs;
 						LdA += TdA * val;
 					}
 					break;
@@ -376,6 +405,8 @@ public:
 					&& (!m_hideEmitters || scattered)) {
 					Spectrum val = its.Le(-ray.d);
 					Li += throughput * val;
+
+					albedoSegs |= thrAlbedoSegs;
 					LdA += TdA * val;
 				}
 
@@ -383,6 +414,8 @@ public:
 				if (its.hasSubsurface() && (rRec.type & RadianceQueryRecord::ESubsurfaceRadiance)) {
 					Spectrum val = its.LoSub(scene, rRec.sampler, -ray.d, rRec.depth);
 					Li += throughput * val;
+
+					albedoSegs |= thrAlbedoSegs;
 					LdA += TdA * val;
 				}
 
@@ -419,6 +452,8 @@ public:
 							woDotGeoN * Frame::cosTheta(bRec.wo) > 0) {
 							Spectrum val = value * bsdf->eval(bRec);
 							Li += throughput * val;
+
+							albedoSegs |= thrAlbedoSegs;
 							LdA += TdA * val;
 						}
 					}
@@ -528,7 +563,9 @@ public:
 	int height, width, pixelNum;
 	int spp;
 	Spectrum *LdA;
-	Spectrum *TdA;
+	//Spectrum *TdA;
+
+	int *imageSeg;
 
 	std::string prefix;
 
