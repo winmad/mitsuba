@@ -16,6 +16,11 @@ class CreateGridVolume : public Utility {
 public:
 	typedef std::vector<std::vector<std::vector<Vector> > > GridData;
 
+	inline Float gaussian(Float sqrSigma, int dx, int dy, int dz) const {
+		Float sqrDist = dx * dx + dy * dy + dz * dz;
+		return std::expf(-sqrDist / (2 * sqrSigma));
+	}
+
 	int run(int argc, char **argv) {
 		if (argc != 3) {
 			cout << "Create a new grid volume" << endl;
@@ -40,9 +45,85 @@ public:
 		Log(EInfo, "bbox = (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", bbox.min.x, bbox.min.y, bbox.min.z,
 			bbox.max.x, bbox.max.y, bbox.max.z);
 
+		GridData density;
+		initS(density, res);
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					Float v = originVol->lookupFloat(i, j, k, 0);
+					density[i][j][k] = Vector(v);
+				}
+			}
+		}
+
 		GridData s;
 		initS(s, res);
 
+		Float sigma = 1.f;
+		Float sqrSigma = sigma * sigma;
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					Float ratio = (res.x - 1.f - i) / (Float)(res.x - 1.f);
+					int filterSize = math::roundToInt(ratio * 0.f + (1.f - ratio) * 4.f);
+
+					Float sumDensity = 0.f;
+					Float sumWeight = 0.f;
+					for (int dx = -filterSize; dx <= filterSize; dx++) {
+						for (int dy = -filterSize; dy <= filterSize; dy++) {
+							for (int dz = -filterSize; dz <= filterSize; dz++) {
+								if (i + dx < 0 || i + dx >= res.x ||
+									j + dy < 0 || j + dy >= res.y ||
+									k + dz < 0 || k + dz >= res.z)
+									continue;
+								Float weight = 1.f;//gaussian(sqrSigma, dx, dy, dz);
+								sumDensity += density[i + dx][j + dy][k + dz][0] * weight;
+								sumWeight += weight;
+							}
+						}
+					}
+
+					if (sumWeight > 0.f)
+						sumDensity /= sumWeight;
+					else
+						sumDensity = 0.f;
+
+					s[i][j][k] = Vector(sumDensity);
+				}
+			}
+		}
+		channels = 1;
+
+		/*
+		channels = 1;
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					Vector v(originVol->lookupFloat(i, j, k, 0),
+						originVol->lookupFloat(i, j, k, 1),
+						originVol->lookupFloat(i, j, k, 2));
+
+					if (v.x == 0 && v.y == 0 && v.z == 0) {
+						s[i][j][k] = Vector(3.f);
+					}
+					else if (v.z > v.x && v.x > v.y) {
+						s[i][j][k] = Vector(0.f);
+					}
+					else if (v.x > v.y && v.y > v.z) {
+						s[i][j][k] = Vector(1.f);
+					}
+					else {
+						s[i][j][k] = Vector(2.f);
+					}
+				}
+			}
+		}
+		*/
+
+		/*
 		Vector red(0.95, 0.1, 0.1);
 		Vector blue(0.1, 0.1, 0.95);
 
@@ -55,6 +136,7 @@ public:
 				}
 			}
 		}
+		*/
 
 		/*
 #pragma omp parallel for

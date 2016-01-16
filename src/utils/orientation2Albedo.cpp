@@ -120,7 +120,8 @@ public:
 					Vector v(ori->lookupFloat(i, j, k, 0),
 						ori->lookupFloat(i, j, k, 1),
 						ori->lookupFloat(i, j, k, 2));
-					s[i][j][k] = Vector(fabsf(v.x), fabsf(v.y), fabsf(v.z));
+					//s[i][j][k] = Vector(fabsf(v.x), fabsf(v.y), fabsf(v.z));
+					s[i][j][k] = v;
 				}
 			}
 		}
