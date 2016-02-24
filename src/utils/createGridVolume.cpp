@@ -18,7 +18,7 @@ public:
 
 	inline Float gaussian(Float sqrSigma, int dx, int dy, int dz) const {
 		Float sqrDist = dx * dx + dy * dy + dz * dz;
-		return std::expf(-sqrDist / (2 * sqrSigma));
+		return expf(-sqrDist / (2 * sqrSigma));
 	}
 
 	int run(int argc, char **argv) {
