@@ -76,6 +76,8 @@ public:
 		numClusters = props.getInteger("numClusters", 1);
 		pixelNum = height * width;
 		prefix = props.getString("prefix", "");
+		m_maxScattering = props.getInteger("maxScattering", -1);
+
 	}
 
 	/// Unserialize from a binary data stream
@@ -86,6 +88,7 @@ public:
 		spp = stream->readInt();
 		numClusters = stream->readInt();
 		prefix = stream->readString();
+		m_maxScattering = stream->readInt();
 		configure();
 	}
 
@@ -96,6 +99,7 @@ public:
 		stream->writeInt(spp);
 		stream->writeInt(numClusters);
 		stream->writeString(prefix);
+		stream->writeInt(m_maxScattering);
 	}
 
 	void configure() {
@@ -295,13 +299,16 @@ public:
 
 		int thrAlbedoSegs = 0;
 
+		int numScattering = 0;
+
 		/**
 		* Note: the logic regarding maximum path depth may appear a bit
 		* strange. This is necessary to get this integrator's output to
 		* exactly match the output of other integrators under all settings
 		* of this parameter.
 		*/
-		while (rRec.depth <= m_maxDepth || m_maxDepth < 0) {
+		while ((rRec.depth <= m_maxDepth || m_maxDepth < 0) &&
+			(numScattering <= m_maxScattering || m_maxScattering < 0)) {
 			/* ==================================================================== */
 			/*                 Radiative Transfer Equation sampling                 */
 			/* ==================================================================== */
@@ -324,6 +331,8 @@ public:
 						TdA[k] *= val;
 					}
 				}
+
+				numScattering++;
 
 				/* ==================================================================== */
 				/*                     Direct illumination sampling                     */
@@ -605,6 +614,8 @@ public:
 	int *imageSeg;
 
 	std::string prefix;
+
+	int m_maxScattering;
 
 	MTS_DECLARE_CLASS()
 };

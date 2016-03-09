@@ -79,11 +79,21 @@ static StatsCounter avgPathLength("Volumetric path tracer", "Average path length
  */
 class SimpleVolumetricPathTracer : public MonteCarloIntegrator {
 public:
-	SimpleVolumetricPathTracer(const Properties &props) : MonteCarloIntegrator(props) { }
+	SimpleVolumetricPathTracer(const Properties &props) : MonteCarloIntegrator(props) {
+		m_maxScattering = props.getInteger("maxScattering", -1);
+	}
 
 	/// Unserialize from a binary data stream
 	SimpleVolumetricPathTracer(Stream *stream, InstanceManager *manager)
-	 : MonteCarloIntegrator(stream, manager) { }
+	 : MonteCarloIntegrator(stream, manager) {
+		m_maxScattering = stream->readInt();
+		configure();
+	}
+
+	void serialize(Stream *stream, InstanceManager *manager) const {
+		MonteCarloIntegrator::serialize(stream, manager);
+		stream->writeInt(m_maxScattering);
+	}
 
 	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec) const {
 		/* Some aliases and local variables */
@@ -103,13 +113,16 @@ public:
 		if (m_maxDepth == 1)
 			rRec.type &= RadianceQueryRecord::EEmittedRadiance;
 
+		int numScattering = 0;
+
 		/**
 		 * Note: the logic regarding maximum path depth may appear a bit
 		 * strange. This is necessary to get this integrator's output to
 		 * exactly match the output of other integrators under all settings
 		 * of this parameter.
 		 */
-		while (rRec.depth <= m_maxDepth || m_maxDepth < 0) {
+		while ((rRec.depth <= m_maxDepth || m_maxDepth < 0) &&
+			(numScattering <= m_maxScattering || m_maxScattering < 0)) {
 			/* ==================================================================== */
 			/*                 Radiative Transfer Equation sampling                 */
 			/* ==================================================================== */
@@ -120,6 +133,8 @@ public:
 				const PhaseFunction *phase = rRec.medium->getPhaseFunction();
 
 				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
+
+				numScattering++;
 
 				/* ==================================================================== */
 				/*                     Direct illumination sampling                     */
@@ -339,10 +354,6 @@ public:
 		return Li;
 	}
 
-	void serialize(Stream *stream, InstanceManager *manager) const {
-		MonteCarloIntegrator::serialize(stream, manager);
-	}
-
 	std::string toString() const {
 		std::ostringstream oss;
 		oss << "SimpleVolumetricPathTracer[" << endl
@@ -352,6 +363,8 @@ public:
 			<< "]";
 		return oss.str();
 	}
+
+	int m_maxScattering;
 
 	MTS_DECLARE_CLASS()
 };

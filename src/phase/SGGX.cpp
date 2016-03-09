@@ -17,7 +17,9 @@ class SGGXPhaseFunction : public PhaseFunction {
 public:
 	enum ESGGXPhaseFunctionType {
 		ESpecular = 0x01,
-		EDiffuse  = 0x02
+		EDiffuse = 0x02,
+		EMixed = 0x03,
+		EPhong = 0x04
 	};
 
 	SGGXPhaseFunction(const Properties &props) : PhaseFunction(props) {
@@ -26,6 +28,11 @@ public:
 			m_sampleType = ESpecular;
 		else if (typeStr == "diffuse")
 			m_sampleType = EDiffuse;
+		else if (typeStr == "mixed") {
+			m_sampleType = EMixed;
+			m_mixedWeight = props.getFloat("mixedWeight", 1.f);
+			m_mixedWeight = math::clamp(m_mixedWeight, 0.f, 1.f);
+		}
 		else
 			Log(EError, "Unknown SGGX phase function type. Support specular and diffuse.");
 
@@ -38,6 +45,9 @@ public:
 		m_sampleType = (ESGGXPhaseFunctionType)stream->readInt();
 		m_stddev = stream->readFloat();
 		m_fiberDistr = GaussianFiberDistribution(m_stddev);
+
+		m_mixedWeight = stream->readFloat();
+
 		configure();
 	}
 
@@ -63,6 +73,7 @@ public:
 		PhaseFunction::serialize(stream, manager);
 		stream->writeInt((int)m_sampleType);
 		stream->writeFloat(m_stddev);
+		stream->writeFloat(m_mixedWeight);
 	}
 
 	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
@@ -90,6 +101,21 @@ public:
 		else if (m_sampleType == EDiffuse) {
 			Vector wm = sampleVNormal(wi, m_sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 			return 1.f * INV_PI * std::max(0.f, dot(wo, wm));
+		}
+		else if (m_sampleType == EMixed) {
+			Vector H = wi + wo;
+			Float length = H.length();
+
+			if (length == 0)
+				return 0.f;
+
+			H /= length;
+			Float p1 = 0.25f * ndf(H, Sxx, Syy, Szz, Sxy, Sxz, Syz) / sigma(wi, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+
+			Vector wm = sampleVNormal(wi, m_sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+			Float p2 = 1.f * INV_PI * std::max(0.f, dot(wo, wm));
+
+			return p1 * m_mixedWeight + p2 * (1.f - m_mixedWeight);
 		}
 		else
 			return 0;
@@ -140,6 +166,44 @@ public:
 			wo = normalize(wo);
 			pRec.wo = wo;
 			return 1.f;
+		}
+		else if (m_sampleType == EMixed) {
+			Float flag = sampler->next1D();
+			if (flag < m_mixedWeight) {
+				// specular
+				Vector wo = -wi + 2.f * dot(wm, wi) * wm;
+				pRec.wo = normalize(wo);
+				return 1.f;
+			}
+			else {
+				// diffuse
+				Float u1 = sampler->next1D();
+				Float u2 = sampler->next1D();
+
+				Frame frame(wm);
+				Float r1 = 2.f * u1 - 1.f;
+				Float r2 = 2.f * u2 - 1.f;
+
+				Float phi, r;
+				if (r1 == 0 && r2 == 0) {
+					r = phi = 0;
+				}
+				else if (r1 * r1 > r2 * r2) {
+					r = r1;
+					phi = (M_PI / 4.f) * (r2 / r1);
+				}
+				else {
+					r = r2;
+					phi = (M_PI / 2.f) - (r1 / r2) * (M_PI / 4.f);
+				}
+				Float x = r * cosf(phi);
+				Float y = r * sinf(phi);
+				Float z = sqrtf(1.f - x * x - y * y);
+				Vector wo = x * frame.s + y * frame.t + z * wm;
+				wo = normalize(wo);
+				pRec.wo = wo;
+				return 1.f;
+			}
 		}
 		else
 			return 0.f;
@@ -252,6 +316,8 @@ private:
 	GaussianFiberDistribution m_fiberDistr;
 	Float m_stddev;
 	Matrix3x3 D;
+
+	Float m_mixedWeight;
 };
 
 

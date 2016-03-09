@@ -18,13 +18,13 @@ public:
 
 	inline Float gaussian(Float sqrSigma, int dx, int dy, int dz) const {
 		Float sqrDist = dx * dx + dy * dy + dz * dz;
-		return std::expf(-sqrDist / (2 * sqrSigma));
+		return std::exp(-sqrDist / (2 * sqrSigma));
 	}
 
 	int run(int argc, char **argv) {
 		if (argc != 3) {
 			cout << "Create a new grid volume" << endl;
-			cout << "Syntax: mtsutil createGridVolume <existing_grid_volume> <new_grid_volume>" << endl;
+			cout << "Syntax: mtsutil createGridVolume <existing_grid_volume_1> <existing_grid_volume_2> <new_grid_volume>" << endl;
 			return -1;
 		}
 
@@ -44,6 +44,64 @@ public:
 		Log(EInfo, "res = (%d, %d, %d)", originVol->getResolution().x, originVol->getResolution().y, originVol->getResolution().z);
 		Log(EInfo, "bbox = (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", bbox.min.x, bbox.min.y, bbox.min.z,
 			bbox.max.x, bbox.max.y, bbox.max.z);
+		/*
+		Properties props2("gridvolume");
+		props2.setString("filename", argv[2]);
+		props2.setBoolean("sendData", false);
+
+		VolumeDataSource *vol2 = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(VolumeDataSource), props2));
+		vol2->configure();
+		*/
+		 
+		// creating albedo
+
+		Vector left(0.98, 0.1, 0.1);
+		Vector middle(0.95, 0.1, 0.1);
+		Vector right(0.8, 0.1, 0.1);
+
+		GridData s;
+		initS(s, res);
+
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					Float x = (Float)(i) / (Float)(res.x - 1.f);
+
+					if (x < 0.5f)
+						s[i][j][k] = left;
+					else
+						s[i][j][k] = right;
+
+					/*
+					if (x < 0.5f) {
+						Float u = x * 2;
+						s[i][j][k] = left * (1.f - u * u) + middle * u * u;
+					}
+					else {
+						Float u = (x - 0.5f) * 2 - 1.f;
+						s[i][j][k] = middle * u * u + right * (1.f - u * u);
+					}
+					*/
+// 					x = 1.f - x;
+// 					if (x < 0.2f)
+// 						s[i][j][k] = Vector(0.99f, 0.3f, 0.3f);
+// 					else if (x < 0.4f)
+// 						s[i][j][k] = Vector(0.3f, 0.99f, 0.3f);
+// 					else if (x < 0.6f)
+// 						s[i][j][k] = Vector(0.6f, 0.1f, 0.9f);
+// 					else if (x < 0.8f)
+// 						s[i][j][k] = Vector(0.9f, 0.45f, 0.1f);
+// 					else
+// 						s[i][j][k] = Vector(0.2f, 0.2f, 0.99f);
+				}
+			}
+		}
+		
+
+		/*
+		// density filtering
 
 		GridData density;
 		initS(density, res);
@@ -67,7 +125,13 @@ public:
 			for (int j = 0; j < res.y; j++) {
 				for (int k = 0; k < res.z; k++) {
 					Float ratio = (res.x - 1.f - i) / (Float)(res.x - 1.f);
-					int filterSize = math::roundToInt(ratio * 0.f + (1.f - ratio) * 4.f);
+					int filterSize;
+					
+					//filterSize = math::roundToInt(ratio * 0.f + (1.f - ratio) * 4.f);
+					if (ratio > 0.6)
+						filterSize = 0;
+					else
+						filterSize = 4;
 
 					Float sumDensity = 0.f;
 					Float sumWeight = 0.f;
@@ -95,6 +159,7 @@ public:
 			}
 		}
 		channels = 1;
+		*/
 
 		/*
 		channels = 1;
@@ -122,21 +187,33 @@ public:
 			}
 		}
 		*/
-
 		/*
-		Vector red(0.95, 0.1, 0.1);
-		Vector blue(0.1, 0.1, 0.95);
-
+		channels = 1;
 #pragma omp parallel for
 		for (int i = 0; i < res.x; i++) {
 			for (int j = 0; j < res.y; j++) {
 				for (int k = 0; k < res.z; k++) {
-					Float x = (res.x - 1.f - i) / (Float)(res.x - 1.f);
-					s[i][j][k] = red * x + blue * (1.f - x);
+					Vector v(originVol->lookupFloat(i, j, k, 0),
+						originVol->lookupFloat(i, j, k, 1),
+						originVol->lookupFloat(i, j, k, 2));
+
+					if (v.x == 0 && v.y == 0 && v.z == 0) {
+						s[i][j][k] = Vector(3.f);
+					}
+					else if (v.z > v.x && v.x > v.y) {
+						s[i][j][k] = Vector(0.f);
+					}
+					else if (v.x > v.y && v.y > v.z) {
+						s[i][j][k] = Vector(1.f);
+					}
+					else {
+						s[i][j][k] = Vector(2.f);
+					}
 				}
 			}
 		}
 		*/
+
 
 		/*
 #pragma omp parallel for
@@ -246,7 +323,7 @@ public:
 // 			}
 // 		}
 
-		ref<FileStream> outFile = new FileStream(argv[2], FileStream::ETruncReadWrite);
+		ref<FileStream> outFile = new FileStream(argv[argc - 1], FileStream::ETruncReadWrite);
 		//writeVolume(s, newBBox, channels, outFile);
 		writeVolume(s, bbox, channels, outFile);
 
