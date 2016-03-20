@@ -269,7 +269,7 @@ public:
 							Frame tangFrame;
 							tangFrame.s = dpdu; tangFrame.t = dpdv; tangFrame.n = norm;
 
-							density = lookupDensity(q, ray.d, tangFrame) * m_scale;
+							density = lookupDensity(q, ray.d, tangFrame, sampler) * m_scale;
 							/*
                             m_volume->lookupBundle(q, &density, &orientation, NULL, NULL,
 								NULL, NULL, NULL);
@@ -365,6 +365,7 @@ public:
 			int clusterIndex = 0;
 			Spectrum s1;
 			Spectrum s2;
+			Float pdfLobe;
 
             if ( m_shell.m_tetra[id].inside(m_shell.m_vtxPosition, p, bb) ) {
                 const uint32_t *tmp = m_shell.m_tetra[id].idx;
@@ -392,8 +393,9 @@ public:
 					tangFrame.s = dpdu; tangFrame.t = dpdv; tangFrame.n = norm;
 					
 					if (m_volume->hasOrientation()) {
-						density = lookupDensity(q, ray.d, tangFrame, &orientation, &albedo, 
-							&s1, &s2, &fClusterIndex) * m_scale;
+						density = lookupDensity(q, ray.d, tangFrame, sampler,
+							&orientation, &albedo, &fClusterIndex,
+							&s1, &s2, &pdfLobe) * m_scale;
 
 						/*
 						m_volume->lookupBundle(q, &density, &orientation, &albedo, NULL,
@@ -407,13 +409,14 @@ public:
 						*/
 					}
 					else {
-						density = lookupDensity(q, ray.d, tangFrame, NULL, &albedo, 
-							&s1, &s2, &fClusterIndex) * m_scale;
+						density = lookupDensity(q, ray.d, tangFrame, sampler, 
+							NULL, &albedo, &fClusterIndex,
+							&s1, &s2, &pdfLobe) * m_scale;
 					}
                 }
                 else {
-                    m_volume->lookupBundle(q, &density, NULL, &albedo, NULL,
-						NULL, NULL, &fClusterIndex);
+					m_volume->lookupBundle(q, sampler, &density, NULL, &albedo, NULL, 
+						&fClusterIndex, NULL, NULL, NULL);
                     density *= m_scale;	
                 }
 
@@ -484,9 +487,9 @@ public:
     MTS_DECLARE_CLASS()
 
 protected:
-	inline Float lookupDensity(const Point &p, const Vector &d, const Frame &tangFrame, 
-		Vector *_orientation = NULL, Spectrum *albedo = NULL,
-		Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *clusterIndex = NULL) const {
+	inline Float lookupDensity(const Point &p, const Vector &d, const Frame &tangFrame, Sampler *sampler,
+		Vector *_orientation = NULL, Spectrum *albedo = NULL, Float *clusterIndex = NULL,
+		Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *pdfLobe = NULL) const {
 		Float density;
 		Vector orientation;
 		Spectrum S1;
@@ -499,8 +502,8 @@ protected:
 		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
 			if (!m_volume->hasSGGXVolume()) {
 				Matrix3x3 D = getPhaseFunction()->getD();
-				m_volume->lookupBundle(p, &density, &orientation, albedo, NULL,
-					NULL, NULL, clusterIndex);
+				m_volume->lookupBundle(p, sampler, &density, &orientation, albedo, NULL, 
+					clusterIndex, NULL, NULL, NULL);
 				orientation = orientation.x * tangFrame.s + orientation.y * tangFrame.t + orientation.z * tangFrame.n;
 				
 				// seems missing in original implementation
@@ -533,8 +536,8 @@ protected:
 				return density;
 			}
 			else {
-				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
-					&S1, &S2, clusterIndex);
+				m_volume->lookupBundle(p, sampler, &density, NULL, albedo, NULL, 
+					clusterIndex, &S1, &S2, pdfLobe);
 				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
 				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
 
@@ -583,8 +586,8 @@ protected:
 			}
 		}
 		else {
-			m_volume->lookupBundle(p, &density, &orientation, albedo, NULL,
-				NULL, NULL, clusterIndex);
+			m_volume->lookupBundle(p, sampler, &density, &orientation, albedo, NULL, 
+				clusterIndex, NULL, NULL, NULL);
 			orientation = orientation.x * tangFrame.s + orientation.y * tangFrame.t + orientation.z * tangFrame.n;
 
 			// seems missing in original implementation

@@ -1,3 +1,4 @@
+#include <mitsuba/render/scene.h>
 #include <mitsuba/render/volume2.h>
 #include <mitsuba/core/mstream.h>
 #include <mitsuba/core/fresolver.h>
@@ -19,17 +20,37 @@ public:
 	};
 
 
-	InstancedVolume(const Properties &props) : VolumeDataSourceEx(props), m_ready(false)
+	InstancedVolume(const Properties &props) : VolumeDataSourceEx(props), m_ready(false),
+		phaseIdx(4), lobeComponents(3)
     {
 		m_volumeToWorld = props.getTransform("toWorld", Transform());
 
         m_densityFile = props.getString("densityFile");
         m_orientationFile = props.getString("orientationFile", "");
 
-		m_S1File = props.getString("S1File", "");
-		m_S2File = props.getString("S2File", "");
-
 		m_segmentationFile = props.getString("segmentationFile", "");
+
+		m_numSGGXLobes = props.getInteger("SGGXlobes", 0);
+		m_phaseCdfFiles.resize(m_numSGGXLobes);
+		m_S1Files.resize(m_numSGGXLobes);
+		m_S2Files.resize(m_numSGGXLobes);
+		for (int i = 0; i < m_numSGGXLobes; i++) {
+			std::string s1name, s2name, cdfname;
+			if (i == 0)
+			{
+				s1name = "S1File";
+				s2name = "S2File";
+				cdfname = "cdfFile";
+			}
+			else {
+				s1name = formatString("S1File%02i", i);
+				s2name = formatString("S2File%02i", i);
+				cdfname = formatString("cdfFile%02i", i);
+			}
+			m_S1Files[i] = props.getString(s1name, "");
+			m_S2Files[i] = props.getString(s2name, "");
+			m_phaseCdfFiles[i] = props.getString(cdfname, "");
+		}
 
         m_indexedAlbedo = false;
         if ( props.hasProperty("albedo") )
@@ -92,21 +113,35 @@ public:
         else
             m_blockFile = props.getString("blockFile");
 
-        for ( int i = 0; i < 6; ++i ) m_data[i] = NULL;
+		m_numVolumes = phaseIdx + lobeComponents * m_numSGGXLobes;
+		m_mmap.resize(m_numVolumes);
+		m_data.resize(m_numVolumes);
+		m_volumeType.resize(m_numVolumes);
+		m_channels.resize(m_numVolumes);
+        for ( int i = 0; i < m_numVolumes; ++i ) m_data[i] = NULL;
 	}
 
 
 	InstancedVolume(Stream *stream, InstanceManager *manager) 
-		: VolumeDataSourceEx(stream, manager), m_ready(false)
+		: VolumeDataSourceEx(stream, manager), m_ready(false),
+		phaseIdx(4), lobeComponents(3)
     {
 		m_volumeToWorld = Transform(stream);
 
         m_densityFile = stream->readString();
         m_orientationFile = stream->readString();
 
-		m_S1File = stream->readString();
-		m_S2File = stream->readString();
 		m_segmentationFile = stream->readString();
+
+		m_numSGGXLobes = stream->readInt();
+		m_S1Files.resize(m_numSGGXLobes);
+		m_S2Files.resize(m_numSGGXLobes);
+		m_phaseCdfFiles.resize(m_numSGGXLobes);
+		for (int i = 0; i < m_numSGGXLobes; i++) {
+			m_S1Files[i] = stream->readString();
+			m_S2Files[i] = stream->readString();
+			m_phaseCdfFiles[i] = stream->readString();
+		}
 
         m_albedoFile = stream->readString();
         m_albedo = ( m_albedoFile == "" ? Spectrum(stream) : Spectrum(0.0f) );
@@ -128,13 +163,18 @@ public:
             stream->readIntArray(&m_blockID[0], m_blockID.size());
         }
 
-        for ( int i = 0; i < 6; ++i ) m_data[i] = NULL;
+		m_numVolumes = phaseIdx + lobeComponents * m_numSGGXLobes;
+		m_mmap.resize(m_numVolumes);
+		m_data.resize(m_numVolumes);
+		m_volumeType.resize(m_numVolumes);
+		m_channels.resize(m_numVolumes);
+		for (int i = 0; i < m_numVolumes; ++i) m_data[i] = NULL;
 		configure();
 	}
 
 
 	virtual ~InstancedVolume() {
-        for ( int i = 0; i < 6; ++i )
+        for ( int i = 0; i < m_numVolumes; ++i )
             if ( !m_mmap[i].get() && m_data[i] ) delete m_data[i];
     }
 
@@ -148,9 +188,14 @@ public:
         stream->writeString(m_densityFile);
         stream->writeString(m_orientationFile);
 
-		stream->writeString(m_S1File);
-		stream->writeString(m_S2File);
 		stream->writeString(m_segmentationFile);
+
+		stream->writeInt(m_numSGGXLobes);
+		for (int i = 0; i < m_numSGGXLobes; i++) {
+			stream->writeString(m_S1Files[i]);
+			stream->writeString(m_S2Files[i]);
+			stream->writeString(m_phaseCdfFiles[i]);
+		}
 
         stream->writeString(m_albedoFile);
         if ( m_albedoFile == "" )
@@ -179,7 +224,7 @@ public:
         if ( !m_ready )
         {
             m_hasOrientation = (m_orientationFile != "");
-			m_hasSGGXVolume = (m_S1File != "" && m_S2File != "");
+			m_hasSGGXVolume = (m_numSGGXLobes > 0);
 
             /* Load stuff */
             loadFromFile(m_densityFile, 0, "density");
@@ -188,13 +233,16 @@ public:
             if ( m_albedoFile != "" )
                 loadFromFile(m_albedoFile, 2, "albedo");
 
-			if (m_hasSGGXVolume) {
-				loadFromFile(m_S1File, 3, "S1");
-				loadFromFile(m_S2File, 4, "S2");
-			}
-
 			if (m_segmentationFile != "")
-				loadFromFile(m_segmentationFile, 5, "segmentation");
+				loadFromFile(m_segmentationFile, 3, "segmentation");
+
+			if (m_hasSGGXVolume) {
+				for (int i = 0; i < m_numSGGXLobes; i++) {
+					loadFromFile(m_S1Files[i], phaseIdx + lobeComponents * i, "S1");
+					loadFromFile(m_S2Files[i], phaseIdx + lobeComponents * i + 1, "S2");
+					loadFromFile(m_phaseCdfFiles[i], phaseIdx + lobeComponents * i + 2, "cdf");
+				}
+			}
 
             if ( m_blockFile != "" )
             {
@@ -468,8 +516,8 @@ public:
 
 
     void lookupBundle(const Point &p, Float *density, Vector *direction,
-        Spectrum *albedo, Float *gloss, 
-		Spectrum *s1, Spectrum *s2, Float *segmentation) const
+		Spectrum *albedo, Float *gloss, Float *segmentation,
+		std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe) const
     {
         Assert( gloss == NULL );
 
@@ -480,8 +528,9 @@ public:
             if ( direction ) *direction = Vector(0.0f);
             if ( albedo ) *albedo = Spectrum(0.0f);
 			
-			if (s1) *s1 = Spectrum(0.f);
-			if (s2) *s2 = Spectrum(0.f);
+			if (s1) s1->clear();
+			if (s2) s2->clear();
+			if (cdfLobe) cdfLobe->clear();
 			if (segmentation) *segmentation = 0.f;
 
             return;
@@ -569,72 +618,102 @@ public:
             }
         }
 
-		if (s1) {
-			Assert(m_hasSGGXVolume);
-			Assert(s2 != NULL);
-
-			Spectrum s1value, s2value;
+		if (segmentation) {
 			switch (m_volumeType[3])
 			{
 			case EFloat32:
 			{
-				const float3 *s1Data = (float3 *)m_data[3];
-				const float3 *s2Data = (float3 *)m_data[4];
-				s1value = s1Data[idx].toSpectrum();
-				s2value = s2Data[idx].toSpectrum();
-			}
-			break;
-			default:
-				s1value = Spectrum(0.0f);
-				s2value = Spectrum(0.f);
-			}
-
-			if (!s1value.isZero()) {
-				Matrix3x3 Q;
-				Float eig[3];
-
-				Matrix3x3 S(s1value[0], s2value[0], s2value[1], 
-					s2value[0], s1value[1], s2value[2], 
-					s2value[1], s2value[2], s1value[2]);
-				S.symEig(Q, eig);
-				// eig[0] < eig[1] == eig[2]
-				Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-				w3 = m_volumeToWorld(w3);
-
-				if (!w3.isZero()) {
-					w3 = normalize(w3);
-					Frame frame(w3);
-
-					Matrix3x3 basis(frame.s, frame.t, w3);
-					Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-					Matrix3x3 basisT;
-					basis.transpose(basisT);
-					S = basis * D * basisT;
-
-					(*s1)[0] = S.m[0][0]; (*s1)[1] = S.m[1][1]; (*s1)[2] = S.m[2][2];
-					(*s2)[0] = S.m[0][1]; (*s2)[1] = S.m[0][2]; (*s2)[2] = S.m[1][2];
-				}
-				else {
-					*s1 = Spectrum(0.f);
-					*s2 = Spectrum(0.f);
-				}
-			}
-			else {
-				*s1 = Spectrum(0.f);
-				*s2 = Spectrum(0.f);
-			}
-		}
-
-		if (segmentation) {
-			switch (m_volumeType[5])
-			{
-			case EFloat32:
-			{
-				const float *floatData = (float *)m_data[5];
+				const float *floatData = (float *)m_data[3];
 				*segmentation = floatData[idx];
 			}
 			break;
-				*segmentation = 0.0f;
+			*segmentation = 0.0f;
+			}
+		}
+
+		if (s1) {
+			Assert(m_hasSGGXVolume);
+			Assert(s2 != NULL);
+			Assert(cdfLobe != NULL);
+
+			/*
+			std::vector<Float> cdfs;
+			cdfs.push_back(0.f);
+			for (int i = 0; i < m_numSGGXLobes; i++) {
+				const float *floatData = (float *)m_data[phaseIdx + lobeComponents * i + 2];
+				cdfs.push_back(floatData[idx]);
+			}
+
+			Float rnd = sampler->next1D();
+			int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
+			lobeIdx = math::clamp(lobeIdx, 0, m_numSGGXLobes - 1);
+			*/
+
+			for (int i = 0; i < m_numSGGXLobes; i++) {
+				int s1VolumeIdx = phaseIdx + lobeComponents * i;
+				int s2VolumeIdx = phaseIdx + lobeComponents * i + 1;
+				int cdfVolumeIdx = phaseIdx + lobeComponents * i + 2;
+
+				Spectrum s1value, s2value;
+				Float cdf;
+
+				switch (m_volumeType[s1VolumeIdx])
+				{
+				case EFloat32:
+				{
+					const float3 *s1Data = (float3 *)m_data[s1VolumeIdx];
+					const float3 *s2Data = (float3 *)m_data[s2VolumeIdx];
+					const float *floatData = (float *)m_data[cdfVolumeIdx];
+					s1value = s1Data[idx].toSpectrum();
+					s2value = s2Data[idx].toSpectrum();
+					cdf = floatData[idx];
+				}
+				break;
+				default:
+					s1value = Spectrum(0.f);
+					s2value = Spectrum(0.f);
+					cdf = 0.f;
+				}
+
+				cdfLobe->push_back(cdf);
+
+				if (!s1value.isZero()) {
+					Matrix3x3 Q;
+					Float eig[3];
+
+					Matrix3x3 S(s1value[0], s2value[0], s2value[1],
+						s2value[0], s1value[1], s2value[2],
+						s2value[1], s2value[2], s1value[2]);
+					S.symEig(Q, eig);
+					// eig[0] < eig[1] == eig[2]
+					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+					w3 = m_volumeToWorld(w3);
+
+					if (!w3.isZero()) {
+						w3 = normalize(w3);
+						Frame frame(w3);
+
+						Matrix3x3 basis(frame.s, frame.t, w3);
+						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+						Matrix3x3 basisT;
+						basis.transpose(basisT);
+						S = basis * D * basisT;
+
+						s1value[0] = S.m[0][0]; s1value[1] = S.m[1][1]; s1value[2] = S.m[2][2];
+						s2value[0] = S.m[0][1]; s2value[1] = S.m[0][2]; s2value[2] = S.m[1][2];
+					}
+					else {
+						s1value = Spectrum(0.f);
+						s2value = Spectrum(0.f);
+					}
+				}
+				else {
+					s1value = Spectrum(0.f);
+					s2value = Spectrum(0.f);
+				}
+				
+				s1->push_back(s1value);
+				s2->push_back(s2value);
 			}
 		}
     }
@@ -728,11 +807,13 @@ protected:
     Spectrum m_albedo;
     bool m_indexedAlbedo;
 
-	std::string m_S1File;
-	std::string m_S2File;
-	bool m_hasSGGXVolume;
-
 	std::string m_segmentationFile;
+
+	bool m_hasSGGXVolume;
+	int m_numSGGXLobes;
+	std::vector<std::string> m_phaseCdfFiles;
+	std::vector<std::string> m_S1Files;
+	std::vector<std::string> m_S2Files;
 
     Spectrum m_yarnColor1, m_yarnColor2;
     int m_yarnSplit;
@@ -745,12 +826,15 @@ protected:
     Vector2i m_reso;
     std::vector<int> m_blockID;
 
-	// 0: density, 1: orientation, 2: albedo
-	// 3: s1, 4: s2, 5: segmentation
-    ref<MemoryMappedFile> m_mmap[6];
-	uint8_t *m_data[6];
-	EVolumeType m_volumeType[6];
-    int m_channels[6];
+	// 0: density, 1: orientation, 2: albedo, 3: segmentation
+    // 4: s1, 5: s2, 6: cdf; 7: s1, 8: s2, 9: cdf...
+	const int phaseIdx;
+	const int lobeComponents;
+	int m_numVolumes;
+	std::vector<ref<MemoryMappedFile> > m_mmap;
+	std::vector<uint8_t*> m_data;
+	std::vector<EVolumeType> m_volumeType;
+	std::vector<int> m_channels;
 
 	Vector3i m_dataReso;
 	Transform m_volumeToWorld, m_worldToVolume;

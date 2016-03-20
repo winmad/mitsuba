@@ -67,8 +67,9 @@ public:
 	int clusterIndex;
 	Spectrum albedoScale;
 
-	Spectrum s1;
-	Spectrum s2;
+	std::vector<Spectrum> s1;
+	std::vector<Spectrum> s2;
+	std::vector<Float> pdfLobe;
 
 	bool hasExtraInfo;
 	Point extra;
