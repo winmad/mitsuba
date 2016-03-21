@@ -3,6 +3,7 @@
 	Nov 8, 2015
 */
 
+#include <mitsuba/render/scene.h>
 #include <mitsuba/core/frame.h>
 #include <mitsuba/render/phase.h>
 #include <mitsuba/render/medium.h>
@@ -76,13 +77,24 @@ public:
 		stream->writeFloat(m_mixedWeight);
 	}
 
-	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
+	Float evalSingleLobe(const PhaseFunctionSamplingRecord &pRec, int lobeIdx) const {
 		Vector wi = pRec.wi;
 		Vector wo = pRec.wo;
 
-		Float Sxx = pRec.Sxx, Syy = pRec.Syy, Szz = pRec.Szz;
-		Float Sxy = pRec.Sxy, Sxz = pRec.Sxz, Syz = pRec.Syz;
-	
+		Spectrum s1 = pRec.mRec.s1[lobeIdx];
+		Spectrum s2 = pRec.mRec.s2[lobeIdx];
+
+		Float Sxx = s1[0], Syy = s1[1], Szz = s1[2];
+		Float Sxy = s2[0], Sxz = s2[1], Syz = s2[2];
+		
+		Float pdfLobe;
+		if (lobeIdx == 0)
+			pdfLobe = pRec.mRec.cdfLobe[lobeIdx];
+		else
+			pdfLobe = pRec.mRec.cdfLobe[lobeIdx] - pRec.mRec.cdfLobe[lobeIdx - 1];
+
+		Float res = pdfLobe;
+
 		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
 		if (fabsf(sqrSum) < 1e-6f)
@@ -96,11 +108,11 @@ public:
 				return 0.f;
 
 			H /= length;
-			return 0.25f * ndf(H, Sxx, Syy, Szz, Sxy, Sxz, Syz) / sigma(wi, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+			res *= 0.25f * ndf(H, Sxx, Syy, Szz, Sxy, Sxz, Syz) / sigma(wi, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 		}
 		else if (m_sampleType == EDiffuse) {
 			Vector wm = sampleVNormal(wi, m_sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
-			return 1.f * INV_PI * std::max(0.f, dot(wo, wm));
+			res *= 1.f * INV_PI * std::max(0.f, dot(wo, wm));
 		}
 		else if (m_sampleType == EMixed) {
 			Vector H = wi + wo;
@@ -115,17 +127,34 @@ public:
 			Vector wm = sampleVNormal(wi, m_sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 			Float p2 = 1.f * INV_PI * std::max(0.f, dot(wo, wm));
 
-			return p1 * m_mixedWeight + p2 * (1.f - m_mixedWeight);
+			res *= p1 * m_mixedWeight + p2 * (1.f - m_mixedWeight);
 		}
 		else
-			return 0;
+			res = 0;
+
+		return res;
 	}
 
-	inline Float sample(PhaseFunctionSamplingRecord &pRec, Sampler *sampler) const {
+	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
+		if (pRec.mRec.s1.size() == 0)
+			return 0;
+
+		Float res = 0.f;
+		for (int i = 0; i < pRec.mRec.s1.size(); i++) {
+			res += evalSingleLobe(pRec, i);
+		}
+
+		return res;
+	}
+
+	inline Float sampleSingleLobe(PhaseFunctionSamplingRecord &pRec, Sampler *sampler, int lobeIdx) const {
 		Vector wi = pRec.wi;
 
-		Float Sxx = pRec.Sxx, Syy = pRec.Syy, Szz = pRec.Szz;
-		Float Sxy = pRec.Sxy, Sxz = pRec.Sxz, Syz = pRec.Syz;
+		Spectrum s1 = pRec.mRec.s1[lobeIdx];
+		Spectrum s2 = pRec.mRec.s2[lobeIdx];
+
+		Float Sxx = s1[0], Syy = s1[1], Szz = s1[2];
+		Float Sxy = s2[0], Sxz = s2[1], Syz = s2[2];
 		
 		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
@@ -209,6 +238,18 @@ public:
 			return 0.f;
 	}
 
+	inline Float sample(PhaseFunctionSamplingRecord &pRec, Sampler *sampler) const {
+		const std::vector<Float> &cdfs = pRec.mRec.cdfLobe;
+		if (cdfs.size() <= 0)
+			return 0.f;
+		
+		Float rnd = sampler->next1D();
+		int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
+		lobeIdx = math::clamp(lobeIdx, 0, (int)cdfs.size() - 1);
+
+		return sampleSingleLobe(pRec, sampler, lobeIdx);
+	}
+
 	Float sample(PhaseFunctionSamplingRecord &pRec,
 		Float &pdf, Sampler *sampler) const {
 		if (sample(pRec, sampler) == 0) {
@@ -275,6 +316,19 @@ public:
 		return sigma(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 	}
 
+	Float sigmaDir(const Vector &d, const std::vector<Spectrum> &s1,
+		const std::vector<Spectrum> &s2, std::vector<Float> &cdfLobes) const {
+		Float res = 0.f;
+		for (int i = 0; i < cdfLobes.size(); i++) {
+			Float pdf = cdfLobes[i];
+			if (i > 0)
+				pdf -= cdfLobes[i - 1];
+
+			res += pdf * sigmaDir(d, s1[i][0], s1[i][1], s1[i][2], s2[i][0], s2[i][1], s2[i][2]);
+		}
+		return res;
+	}
+
 	Matrix3x3 getD() const {
 		return D;
 	}
@@ -293,11 +347,11 @@ public:
 	Float sigmaDir(Float cosTheta) const {
 		// Scaled such that replacing an isotropic phase function with an
 		// isotropic microflake distribution does not cause changes
-		return 2 * m_fiberDistr.sigmaT(cosTheta);
+		//return 2 * m_fiberDistr.sigmaT(cosTheta);
 	}
 
 	Float sigmaDirMax() const {
-		return sigmaDir(0);
+		return 1.f;
 	}
 
 	std::string toString() const {

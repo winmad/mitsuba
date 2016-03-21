@@ -490,15 +490,16 @@ public:
 				Spectrum albedo;
 				Float fClusterIndex = 0.f;
 				int clusterIndex = 0;
-				Spectrum s1(0.f);
-				Spectrum s2(0.f);
+				std::vector<Spectrum> s1;
+				std::vector<Spectrum> s2;
+				std::vector<Float> cdfLobe;
 
 				if (m_volume->hasOrientation())
 					m_volume->lookupBundle(mRec.p, NULL, &mRec.orientation, &albedo, NULL,
-						NULL, NULL, &fClusterIndex);
+						&fClusterIndex, NULL, NULL, NULL);
 				else
 					m_volume->lookupBundle(mRec.p, NULL, NULL, &albedo, NULL,
-						&s1, &s2, &fClusterIndex);
+						&fClusterIndex, &s1, &s2, &cdfLobe);
 
 				if (m_useDiffAlbedoScales) {
 					clusterIndex = (int)fClusterIndex;
@@ -514,6 +515,7 @@ public:
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 				mRec.s1 = s1;
 				mRec.s2 = s2;
+				mRec.cdfLobe = cdfLobe;
 			}
 
 			Float expVal = math::fastexp(-integratedDensity);
@@ -558,15 +560,16 @@ public:
 					Spectrum albedo;
 					Float fClusterIndex = 0.f;
 					int clusterIndex = 0;
-					Spectrum s1(0.f);
-					Spectrum s2(0.f);
+					std::vector<Spectrum> s1;
+					std::vector<Spectrum> s2;
+					std::vector<Float> cdfLobe;
 					
 					if (m_volume->hasOrientation())
 						m_volume->lookupBundle(p, NULL, &mRec.orientation, &albedo, NULL,
-							NULL, NULL, &fClusterIndex);
+							&fClusterIndex, NULL, NULL, NULL);
 					else
 						m_volume->lookupBundle(p, NULL, NULL, &albedo, NULL,
-							&s1, &s2, &fClusterIndex);
+							&fClusterIndex, &s1, &s2, &cdfLobe);
 					
 					if (m_useDiffAlbedoScales) {
 						clusterIndex = (int)fClusterIndex;
@@ -582,6 +585,7 @@ public:
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
 					mRec.s1 = s1;
 					mRec.s2 = s2;
+					mRec.cdfLobe = cdfLobe;
                     // XXX - what if a single channel has a 0 intensity value?
 					mRec.transmittance = mRec.sigmaS.isZero() 
 						? Spectrum(0.0f) : albedo/mRec.sigmaS;
@@ -604,11 +608,12 @@ public:
 			Spectrum maxtAlbedo(0.0f);
 			Float fClusterIndex = 0.f;
 			int clusterIndex = 0;
-			Spectrum s1(0.f);
-			Spectrum s2(0.f);
+			std::vector<Spectrum> s1;
+			std::vector<Spectrum> s2;
+			std::vector<Float> cdfLobe;
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
-				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &s1, &s2, &fClusterIndex) * m_scale;
+				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &fClusterIndex, &s1, &s2, &cdfLobe) * m_scale;
 				if (m_useDiffAlbedoScales) {
 					clusterIndex = (int)fClusterIndex;
 					maxtAlbedo *= m_albedoScales[clusterIndex];
@@ -625,6 +630,7 @@ public:
 			mRec.sigmaA = Spectrum(maxtDensity) - mRec.sigmaS;
 			mRec.s1 = s1;
 			mRec.s2 = s2;
+			mRec.cdfLobe = cdfLobe;
 			mRec.time = ray.time;
 			mRec.medium = this;
 
@@ -655,21 +661,25 @@ public:
 
 	MTS_DECLARE_CLASS()
 protected:
-	inline Float lookupDensity(const Point &p, const Vector &d, Spectrum *albedo = NULL, 
-		Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *clusterIndex = NULL) const {
+	inline Float lookupDensity(const Point &p, const Vector &d, 
+		Spectrum *albedo = NULL, Float *clusterIndex = NULL,
+		std::vector<Spectrum> *s1 = NULL, std::vector<Spectrum> *s2 = NULL, 
+		std::vector<Float> *cdfLobe = NULL) const {
         Float density;
         Vector orientation;
-		Spectrum S1;
-		Spectrum S2;
+		std::vector<Spectrum> _s1;
+		std::vector<Spectrum> _s2;
+		std::vector<Float> _cdfLobe;
 
-		if (s1) *s1 = Spectrum(0.f);
-		if (s2) *s2 = Spectrum(0.f);
+		if (s1) s1->clear();
+		if (s2) s2->clear();
+		if (cdfLobe) cdfLobe->clear();
 
 		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
 			if (!m_volume->hasSGGXVolume()) {
 				Matrix3x3 D = getPhaseFunction()->getD();
 				m_volume->lookupBundle(p, &density, &orientation, albedo, NULL,
-					NULL, NULL, clusterIndex);
+					clusterIndex, NULL, NULL, NULL);
 
 				if (density == 0 || orientation.isZero())
 					return 0.f;
@@ -693,27 +703,30 @@ protected:
 			}
 			else {
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
-					&S1, &S2, clusterIndex);
-				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
-				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
+					clusterIndex, &_s1, &_s2, &_cdfLobe);
 
-				if (s1 && s2) {
-					(*s1)[0] = Sxx; (*s1)[1] = Syy; (*s1)[2] = Szz;
-					(*s2)[0] = Sxy; (*s2)[1] = Sxz; (*s2)[2] = Syz;
-				}
+				density *= m_phaseFunction->sigmaDir(d, _s1, _s2, _cdfLobe);
 
-				Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
-				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
-				if (fabsf(sqrSum) > 1e-6f)
-					density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
-				else
-					return 0;
+// 				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
+// 				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
+// 
+// 				if (s1 && s2) {
+// 					(*s1)[0] = Sxx; (*s1)[1] = Syy; (*s1)[2] = Szz;
+// 					(*s2)[0] = Sxy; (*s2)[1] = Sxz; (*s2)[2] = Syz;
+// 				}
+// 
+// 				Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
+// 				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+// 				if (fabsf(sqrSum) > 1e-6f)
+// 					density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
+// 				else
+// 					return 0;
 				return density;
 			}
 		}
 		else {
 			m_volume->lookupBundle(p, &density, &orientation, albedo, NULL,
-				NULL, NULL, clusterIndex);
+				clusterIndex, NULL, NULL, NULL);
 			if (density != 0 && !orientation.isZero())
 				return density*m_phaseFunction->sigmaDir(dot(d, orientation));
 			else

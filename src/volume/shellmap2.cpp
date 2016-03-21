@@ -162,16 +162,17 @@ public:
 		return ret;
 	}
 
-    void lookupBundle(const Point &_p,
-        Float *density, Vector *direction, Spectrum *albedo, Float *gloss,
-		Spectrum *s1, Spectrum *s2, Float *segmentation) const {
+	void lookupBundle(const Point &_p, Float *density, Vector *direction,
+		Spectrum *albedo, Float *gloss, Float *segmentation,
+		std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe) const {
         if ( density ) *density = 0.0f;
         if ( direction ) *direction = Vector(0.0f);
         if ( albedo ) *albedo = Spectrum(0.0f);
         if ( gloss ) *gloss = 0.0f;
 		
-		if (s1) *s1 = Spectrum(0.f);
-		if (s2) *s2 = Spectrum(0.f);
+		if (s1) s1->clear();
+		if (s2) s2->clear();
+		if (cdfLobe) cdfLobe->clear();
 		if (segmentation) *segmentation = 0.f;
 
 		Point q = m_worldToVolume.transformAffine(_p);
@@ -183,7 +184,7 @@ public:
             if ( m_shell.lookupPoint(q, p, norm, tang) ) {
                 clampPoint(p);
                 m_block->lookupBundle(m_textureToData.transformAffine(p), density, direction, albedo, gloss,
-					s1, s2, segmentation);
+					segmentation, s1, s2, cdfLobe);
                 *direction = m_volumeToWorld(direction->x*tang.dpdu + direction->y*tang.dpdv + direction->z*norm);
 		        if ( !direction->isZero() ) *direction = normalize(*direction);
             }
@@ -194,37 +195,39 @@ public:
 			if (m_shell.lookupPoint(q, p, norm, tang)) {
 				clampPoint(p);
 				m_block->lookupBundle(m_textureToData.transformAffine(p), density, direction, albedo, gloss,
-					s1, s2, segmentation);
+					segmentation, s1, s2, cdfLobe);
 
-				// handle orientation transform
-				Matrix3x3 Q;
-				Float eig[3];
+				for (int i = 0; i < s1->size(); i++) {
+					// handle orientation transform
+					Matrix3x3 Q;
+					Float eig[3];
 
-				Matrix3x3 S((*s1)[0], (*s2)[0], (*s2)[1], 
-					(*s2)[0], (*s1)[1], (*s2)[2], 
-					(*s2)[1], (*s2)[2], (*s1)[2]);
-				S.symEig(Q, eig);
-				// eig[0] < eig[1] == eig[2]
-				Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+					Matrix3x3 S((*s1)[i][0], (*s2)[i][0], (*s2)[i][1], 
+						(*s2)[i][0], (*s1)[i][1], (*s2)[i][2], 
+						(*s2)[i][1], (*s2)[i][2], (*s1)[i][2]);
+					S.symEig(Q, eig);
+					// eig[0] < eig[1] == eig[2]
+					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
 				
-				w3 = m_volumeToWorld(w3.x * tang.dpdu + w3.y * tang.dpdv + w3.z * norm);
+					w3 = m_volumeToWorld(w3.x * tang.dpdu + w3.y * tang.dpdv + w3.z * norm);
 
-				if (!w3.isZero()) {
-					w3 = normalize(w3);
-					Frame frame(w3);
+					if (!w3.isZero()) {
+						w3 = normalize(w3);
+						Frame frame(w3);
 
-					Matrix3x3 basis(frame.s, frame.t, w3);
-					Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-					Matrix3x3 basisT;
-					basis.transpose(basisT);
-					S = basis * D * basisT;
+						Matrix3x3 basis(frame.s, frame.t, w3);
+						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+						Matrix3x3 basisT;
+						basis.transpose(basisT);
+						S = basis * D * basisT;
 
-					(*s1)[0] = S.m[0][0]; (*s1)[1] = S.m[1][1]; (*s1)[2] = S.m[2][2];
-					(*s2)[0] = S.m[0][1]; (*s2)[1] = S.m[0][2]; (*s2)[2] = S.m[1][2];
-				}
-				else {
-					*s1 = Spectrum(0.f);
-					*s2 = Spectrum(0.f);
+						(*s1)[i][0] = S.m[0][0]; (*s1)[i][1] = S.m[1][1]; (*s1)[i][2] = S.m[2][2];
+						(*s2)[i][0] = S.m[0][1]; (*s2)[i][1] = S.m[0][2]; (*s2)[i][2] = S.m[1][2];
+					}
+					else {
+						(*s1)[i] = Spectrum(0.f);
+						(*s2)[i] = Spectrum(0.f);
+					}
 				}
 			}
 		}
@@ -232,7 +235,7 @@ public:
             if ( m_shell.lookupPoint(q, p) ) {
                 clampPoint(p);
                 m_block->lookupBundle(m_textureToData.transformAffine(p), density, NULL, albedo, gloss,
-					s1, s2, segmentation);
+					segmentation, s1, s2, cdfLobe);
             }
         }
     }

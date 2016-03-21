@@ -353,7 +353,7 @@ public:
 							m_channels[id]);
 				break;
 			default:
-				Log(EError, "Encountered a volume data file of unknown type (type=%i, channels=%i)!", type, m_channels);
+				Log(EError, "Encountered a volume data file of unknown type (type=%i, channels=%i)!", type, m_channels[id]);
 		}
         m_volumeType[id] = static_cast<EVolumeType>(type);
 
@@ -635,6 +635,10 @@ public:
 			Assert(m_hasSGGXVolume);
 			Assert(s2 != NULL);
 			Assert(cdfLobe != NULL);
+
+			s1->clear();
+			s2->clear();
+			cdfLobe->clear();
 
 			/*
 			std::vector<Float> cdfs;

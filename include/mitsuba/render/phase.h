@@ -56,7 +56,6 @@ struct MTS_EXPORT_RENDER PhaseFunctionSamplingRecord {
 	ETransportMode mode;
 
 	bool useSGGX;
-	Float Sxx, Syy, Szz, Sxy, Sxz, Syz;
 
 	/**
 	 * \brief Given a medium interaction and an incident direction,
@@ -214,6 +213,9 @@ public:
 
 	virtual Float sigmaDir(const Vector &d, Float Sxx, Float Syy, Float Szz,
 		Float Sxy, Float Sxz, Float Syz) const;
+
+	virtual Float sigmaDir(const Vector &d, const std::vector<Spectrum> &s1,
+		const std::vector<Spectrum> &s2, std::vector<Float> &cdfLobes) const;
 
 	/**
 	 * \brief Returns the maximum value take on on by \ref sigmaDirMax().

@@ -69,7 +69,7 @@ public:
 
 	std::vector<Spectrum> s1;
 	std::vector<Spectrum> s2;
-	std::vector<Float> pdfLobe;
+	std::vector<Float> cdfLobe;
 
 	bool hasExtraInfo;
 	Point extra;
