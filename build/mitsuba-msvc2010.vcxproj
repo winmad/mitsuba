@@ -963,6 +963,7 @@
     <ClCompile Include="..\src\utils\cmp.cpp" />
     <ClCompile Include="..\src\utils\createGridVolume.cpp" />
     <ClCompile Include="..\src\utils\downSampleAlbedo.cpp" />
+    <ClCompile Include="..\src\utils\downSampleSGGX.cpp" />
     <ClCompile Include="..\src\utils\downSampleVolume.cpp" />
     <ClCompile Include="..\src\utils\fillEmptyVoxels.cpp" />
     <ClCompile Include="..\src\utils\microflake2SGGX.cpp" />

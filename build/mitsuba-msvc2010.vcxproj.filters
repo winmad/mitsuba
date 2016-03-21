@@ -1115,6 +1115,9 @@
     <ClCompile Include="..\src\medium\heterogeneous3.cpp">
       <Filter>Source Files\medium</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\utils\downSampleSGGX.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
