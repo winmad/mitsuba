@@ -38,12 +38,24 @@ public:
 
 		AABB bbox = originVol->getAABB();
 		Vector3i res = originVol->getResolution();
-		int channels = 3;
+		int channels = 1;
 
 		Log(EInfo, "%s", originVol->getClass()->getName().c_str());
 		Log(EInfo, "res = (%d, %d, %d)", originVol->getResolution().x, originVol->getResolution().y, originVol->getResolution().z);
 		Log(EInfo, "bbox = (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", bbox.min.x, bbox.min.y, bbox.min.z,
 			bbox.max.x, bbox.max.y, bbox.max.z);
+
+		GridData s;
+		initS(s, res);
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					s[i][j][k] = Vector(1.f);
+				}
+			}
+		}
+
 		/*
 		Properties props2("gridvolume");
 		props2.setString("filename", argv[2]);
@@ -55,7 +67,7 @@ public:
 		*/
 		 
 		// creating albedo
-
+		/*
 		Vector left(0.98, 0.1, 0.1);
 		Vector middle(0.95, 0.1, 0.1);
 		Vector right(0.8, 0.1, 0.1);
@@ -74,16 +86,6 @@ public:
 					else
 						s[i][j][k] = right;
 
-					/*
-					if (x < 0.5f) {
-						Float u = x * 2;
-						s[i][j][k] = left * (1.f - u * u) + middle * u * u;
-					}
-					else {
-						Float u = (x - 0.5f) * 2 - 1.f;
-						s[i][j][k] = middle * u * u + right * (1.f - u * u);
-					}
-					*/
 // 					x = 1.f - x;
 // 					if (x < 0.2f)
 // 						s[i][j][k] = Vector(0.99f, 0.3f, 0.3f);
@@ -98,7 +100,7 @@ public:
 				}
 			}
 		}
-		
+		*/
 
 		/*
 		// density filtering

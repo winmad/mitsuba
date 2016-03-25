@@ -9,6 +9,7 @@
 #include <mitsuba/render/util.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/properties.h>
+#include "../phase/microflake_fiber.h"
 
 MTS_NAMESPACE_BEGIN
 
@@ -16,107 +17,95 @@ class DownSampleSGGX : public Utility {
 public:
 	typedef std::vector<std::vector<std::vector<Vector> > > GridData;
 
+	typedef TPoint3<double> Pt;
+	typedef TVector3<double> Vec;
+
 	int run(int argc, char **argv) {
-		if(argc != 7 && argc != 9) {
-			cout << "Down-sample grid volume data by a scale" << endl;
-			cout << "Syntax: mtsutil downSampleVolume 0 <grid_volume> <scale x> <scale y> <scale z> <target_volume>" << endl;
-			cout << "Syntax: mtsutil downSampleVolume 1 <hgrid_volume_dict> <scale x> <scale y> <scale z> <prefix> <origin_suffix> <target_suffix>" << endl;
+		if(argc != 8) {
+			cout << "Down-sample SGGX volume data by a scale" << endl;
+			cout << "Syntax: mtsutil downSampleVolume <orientation_volume> <scale> <stddev> <num_SGGX_lobes> <s1_prefix> <s2_prefix> <cdf_prefix>" << endl;
 			return -1;
 		}
 
-		if (strcmp(argv[1], "0") == 0) {
-			char *end_ptr = NULL;
-			scale.x = strtol(argv[3], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.y = strtol(argv[4], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.z = strtol(argv[5], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
+		char *end_ptr = NULL;
+		int scaleValue = strtol(argv[2], &end_ptr, 10);
+		if (*end_ptr != '\0')
+			SLog(EError, "Could not parse integer value");
+		scale = Vector3i(scaleValue);
 
-			Properties props("gridvolume");
-			props.setString("filename", argv[2]);
-			props.setBoolean("sendData", false);
+		Float stddev = strtod(argv[3], &end_ptr);
+		if (*end_ptr != '\0')
+			SLog(EError, "Could not parse floating point value");
+		d = GaussianFiberDistribution(stddev);
 
-			VolumeDataSource *originVol = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
-				createObject(MTS_CLASS(VolumeDataSource), props));
-			originVol->configure();
+		numSGGXlobes = strtol(argv[4], &end_ptr, 10);
+		if (*end_ptr != '\0')
+			SLog(EError, "Could not parse integer value");
 
-			Log(EInfo, "%s", originVol->getClass()->getName().c_str());
-			Log(EInfo, "res = (%d, %d, %d)", originVol->getResolution().x, originVol->getResolution().y, originVol->getResolution().z);
-			Log(EInfo, "channels = %d", originVol->getChannels());
-			Log(EInfo, "min = (%.6f, %.6f, %.6f)", originVol->getAABB().min.x, originVol->getAABB().min.y, originVol->getAABB().min.z);
-			Log(EInfo, "max = (%.6f, %.6f, %.6f)", originVol->getAABB().max.x, originVol->getAABB().max.y, originVol->getAABB().max.z);
+		Properties props("gridvolume");
+		props.setString("filename", argv[1]);
+		props.setBoolean("sendData", false);
 
-			AABB bbox = originVol->getAABB();
+		VolumeDataSource *originVol = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(VolumeDataSource), props));
+		originVol->configure();
 
-			GridData s;
-			downSample(originVol, s);
+		Log(EInfo, "%s", originVol->getClass()->getName().c_str());
+		Log(EInfo, "res = (%d, %d, %d)", originVol->getResolution().x, originVol->getResolution().y, originVol->getResolution().z);
+		Log(EInfo, "channels = %d", originVol->getChannels());
+		Log(EInfo, "min = (%.6f, %.6f, %.6f)", originVol->getAABB().min.x, originVol->getAABB().min.y, originVol->getAABB().min.z);
+		Log(EInfo, "max = (%.6f, %.6f, %.6f)", originVol->getAABB().max.x, originVol->getAABB().max.y, originVol->getAABB().max.z);
 
-			Log(EInfo, "finish down-sampling, save volume data to file");
-			ref<FileStream> outFile = new FileStream(argv[6], FileStream::ETruncReadWrite);
-			writeVolume(s, bbox, originVol->getChannels(), outFile);
+		bbox = originVol->getAABB();
+
+		init(originVol);
+		cluster(originVol);
+		downSample(originVol);
+
+		Log(EInfo, "finish down-sampling, save volume data to file");
+		
+		for (int i = 0; i < numSGGXlobes; i++) {
+			std::string s1Filename(argv[5]);
+			std::string s2Filename(argv[6]);
+			std::string cdfFilename(argv[7]);
+
+			s1Filename += formatString("_%i.vol", i);
+			s2Filename += formatString("_%i.vol", i);
+			cdfFilename += formatString("_%i.vol", i);
+
+			ref<FileStream> outFile = new FileStream(s1Filename.c_str(), FileStream::ETruncReadWrite);
+			writeVolume(s1[i], bbox, 3, outFile);
+
+			outFile = new FileStream(s2Filename.c_str(), FileStream::ETruncReadWrite);
+			writeVolume(s2[i], bbox, 3, outFile);
+
+			outFile = new FileStream(cdfFilename.c_str(), FileStream::ETruncReadWrite);
+			writeVolume(cdf[i], bbox, 1, outFile);
 		}
-		else if (strcmp(argv[1], "1") == 0) {
-			char *end_ptr = NULL;
-			scale.x = strtol(argv[3], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.y = strtol(argv[4], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-			scale.z = strtol(argv[5], &end_ptr, 10);
-			if (*end_ptr != '\0')
-				SLog(EError, "Could not parse integer value");
-
-			fs::path resolved = Thread::getThread()->getFileResolver()->resolve(argv[2]);
-			Log(EInfo, "Loading hierarchical grid dictrionary \"%s\"", argv[2]);
-			ref<FileStream> stream = new FileStream(resolved, FileStream::EReadOnly);
-			stream->setByteOrder(Stream::ELittleEndian);
-
-			Float xmin = stream->readSingle(), ymin = stream->readSingle(), zmin = stream->readSingle();
-			Float xmax = stream->readSingle(), ymax = stream->readSingle(), zmax = stream->readSingle();
-			AABB aabb = AABB(Point(xmin, ymin, zmin), Point(xmax, ymax, zmax));
-
-			Vector3i res = Vector3i(stream);
-			int nCells = res.x * res.y * res.z;
-
-			int numBlocks = 0;
-			while (!stream->isEOF()) {
-				Vector3i block = Vector3i(stream);
-				Assert(block.x >= 0 && block.y >= 0 && block.z >= 0
-					&& block.x < res.x && block.y < res.y && block.z < res.z);
-
-				Properties props("gridvolume");
-				props.setString("filename", formatString("%s%03i_%03i_%03i%s",
-					argv[6], block.x, block.y, block.z, argv[7]));
-				props.setBoolean("sendData", false);
-
-				VolumeDataSource *ori = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
-					createObject(MTS_CLASS(VolumeDataSource), props));
-				ori->configure();
-
-				//Log(EInfo, "Loading grid %03i_%03i_%03i", block.x, block.y, block.z);
-
-				AABB bbox = ori->getAABB();
-
-				GridData s;
-				downSample(ori, s);
-
-				std::string filename(formatString("%s%03i_%03i_%03i%s", argv[6], block.x, block.y, block.z, argv[8]));
-				ref<FileStream> outFile = new FileStream(filename.c_str(), FileStream::ETruncReadWrite);
-
-				writeVolume(s, bbox, ori->getChannels(), outFile);
-
-				++numBlocks;
-			}
-			Log(EInfo, "%i blocks total, %s, resolution=%s", numBlocks,
-				aabb.toString().c_str(), res.toString().c_str());
-		}
-
+		
 		return 0;
+	}
+
+	void init(VolumeDataSource *ori) {
+		s1.resize(numSGGXlobes);
+		s2.resize(numSGGXlobes);
+		cdf.resize(numSGGXlobes);
+
+		originRes = ori->getResolution();
+
+		res.x = originRes.x / scale.x;
+		res.y = originRes.y / scale.y;
+		res.z = originRes.z / scale.z;
+
+		originRes.x -= originRes.x % scale.x;
+		originRes.y -= originRes.y % scale.y;
+		originRes.z -= originRes.z % scale.z;
+
+		for (int i = 0; i < numSGGXlobes; i++) {
+			initS(s1[i], res);
+			initS(s2[i], res);
+			initS(cdf[i], res);
+		}
 	}
 
 	void initS(GridData &s, const Vector3i &res) {
@@ -129,45 +118,212 @@ public:
 		}
 	}
 
-	void downSample(VolumeDataSource *ori, GridData &s) {
-		int channels = ori->getChannels();
-		Vector3i originRes = ori->getResolution();
+	Vector6 getSValue(const Vector &w) {
+		if (w.isZero()) {
+			return Vector6(0.f);
+		}
 
-		Vector3i res;
-		res.x = originRes.x / scale.x;
-		res.y = originRes.y / scale.y;
-		res.z = originRes.z / scale.z;
+		Float gauss_sigma3 = d.sigmaT(1.f) * 2.f;
+		Float gauss_sigma1 = d.sigmaT(0.f) * 2.f;
 
-		initS(s, res);
+		Frame dFrame(w);
+		Vector w1 = dFrame.s;
+		Vector w2 = dFrame.t;
 
-		originRes.x -= originRes.x % scale.x;
-		originRes.y -= originRes.y % scale.y;
-		originRes.z -= originRes.z % scale.z;
+		Float sigma1 = gauss_sigma1;
+		Float sigma2 = gauss_sigma1;
+		Float sigma3 = gauss_sigma3;
+
+		Matrix3x3 basis(w1, w2, w);
+		Matrix3x3 D(Vector(sigma1 * sigma1, 0, 0), Vector(0, sigma2 * sigma2, 0), Vector(0, 0, sigma3 * sigma3));
+		Matrix3x3 basisT;
+		basis.transpose(basisT);
+		Matrix3x3 S = basis * D * basisT;
+
+		Vector6 res;
+		res[0] = S.m[0][0]; res[1] = S.m[1][1]; res[2] = S.m[2][2];
+		res[3] = S.m[0][1]; res[4] = S.m[0][2]; res[5] = S.m[1][2];
+		return res;
+	}
+
+	void cluster(VolumeDataSource *ori) {
+		N = scale.x * scale.y * scale.z;
+		data.resize(N);
+		idx.resize(N);
+		segs.resize(N);
+
+		clusterRes.resize(originRes.x);
+		for (int i = 0; i < originRes.x; i++) {
+			clusterRes[i].resize(originRes.y);
+			for (int j = 0; j < originRes.y; j++) {
+				clusterRes[i][j].resize(originRes.z);
+				for (int k = 0; k < originRes.z; k++) {
+					clusterRes[i][j][k] = -1;
+				}
+			}
+		}
+
+		Log(EInfo, "Start Clustering...");
 
 		for (int i = 0; i < originRes.x; i += scale.x) {
 			for (int j = 0; j < originRes.y; j += scale.y) {
 				for (int k = 0; k < originRes.z; k += scale.z) {
-					Vector sumValue(0.f);
-					Float cnt = 0.f;
+					numColors = 0;
+					hasht.clear();
+					diffIndices.clear();
+					numClusters = numSGGXlobes;
+
+					int count = 0;
+
 					for (int dx = 0; dx < scale.x; dx++) {
 						for (int dy = 0; dy < scale.y; dy++) {
 							for (int dz = 0; dz < scale.z; dz++) {
-								if (channels == 1) {
-									float v = ori->lookupFloat(i + dx, j + dy, k + dz, 0);
-									sumValue += Vector(v);
-									cnt += 1.f;
+								Pt p;
+								for (int c = 0; c < 3; c++) {
+									p[c] = ori->lookupFloat(i + dx, j + dy, k + dz, c);
 								}
-								else {
-									Vector v(ori->lookupFloat(i + dx, j + dy, k + dz, 0),
-										ori->lookupFloat(i + dx, j + dy, k + dz, 1),
-										ori->lookupFloat(i + dx, j + dy, k + dz, 2));
-									sumValue += v;
-									cnt += 1.f;
+
+								if (p.x * p.x + p.y * p.y + p.z * p.z < 1e-6)
+									continue;
+
+								int maxComponent = 0;
+								double maxValue = abs(p[0]);
+								for (int c = 1; c < 3; c++) {
+									if (maxValue < abs(p[c])) {
+										maxValue = abs(p[c]);
+										maxComponent = c;
+									}
 								}
+
+								if (p[maxComponent] < 0)
+									p = -p;
+
+								data[count] = p;
+								idx[count] = Vector3i(i + dx, j + dy, k + dz);
+								segs[count] = -1;
+
+								int hashValue = hashFunc(p);
+								if (numColors < 200 && hasht.find(hashValue) == hasht.end()) {
+									hasht[hashValue] = numColors;
+									diffIndices.push_back(count);
+									numColors++;
+								}
+
+								count++;
 							}
 						}
 					}
-					s[i / scale.x][j / scale.y][k / scale.z] = sumValue / cnt;
+
+					N = count;
+					numClusters = std::min(numClusters, numColors);
+
+					//Log(EInfo, "Data prepared, total data = %d, maximum cluster = %d...", N, numClusters);
+
+					initCluster();
+					kMeans();
+
+					//Log(EInfo, "Finish one clustering...");
+
+					for (int c = 0; c < N; c++) {
+						Vector3i nowIdx = idx[c];
+						clusterRes[nowIdx.x][nowIdx.y][nowIdx.z] = segs[c];
+					}
+				}
+			}
+		}
+
+		Log(EInfo, "Finish Clustering...\nStart Downsampling SGGX...");
+		/*
+		GridData tmp;
+		initS(tmp, originRes);
+		for (int i = 0; i < originRes.x; i++) {
+			for (int j = 0; j < originRes.y; j++) {
+				for (int k = 0; k < originRes.z; k++) {
+					if (clusterRes[i][j][k] < 0)
+						tmp[i][j][k] = Vector(0.f);
+					else if (clusterRes[i][j][k] == 0)
+						tmp[i][j][k] = Vector(1.f, 0.f, 0.f);
+					else
+						tmp[i][j][k] = Vector(0.f, 1.f, 0.f);
+				}
+			}
+		}
+		ref<FileStream> outFile = new FileStream("orientation_cluster.vol", FileStream::ETruncReadWrite);
+		writeVolume(tmp, bbox, 3, outFile);
+		*/
+	}
+
+	void downSample(VolumeDataSource *ori) {
+		std::vector<Vector6> sumS;
+		std::vector<Float> count;
+		std::vector<Float> pdf;
+		sumS.resize(numSGGXlobes);
+		count.resize(numSGGXlobes);
+		pdf.resize(numSGGXlobes);
+		
+		Float norm = 1.f / (scale.x * scale.y * scale.z);
+
+		for (int i = 0; i < originRes.x; i += scale.x) {
+			for (int j = 0; j < originRes.y; j += scale.y) {
+				for (int k = 0; k < originRes.z; k += scale.z) {
+					for (int c = 0; c < numSGGXlobes; c++) {
+						sumS[c] = Vector6(0.f);
+						count[c] = 0.f;
+						pdf[c] = 0.f;
+					}
+					Float nonzero = 0.f;
+					Float zeros = 0.f;
+
+					for (int dx = 0; dx < scale.x; dx++) {
+						for (int dy = 0; dy < scale.y; dy++) {
+							for (int dz = 0; dz < scale.z; dz++) {
+								int clusterIdx = clusterRes[i + dx][j + dy][k + dz];
+								if (clusterIdx < 0)
+									continue;
+
+								Vector w;
+								for (int c = 0; c < 3; c++) {
+									w[c] = ori->lookupFloat(i + dx, j + dy, k + dz, c);
+								}
+
+								Vector6 s;
+								s = getSValue(w);
+
+								sumS[clusterIdx] += s;
+								count[clusterIdx] += 1.f;
+								nonzero += 1.f;
+							}
+						}
+					}
+					
+					if (nonzero > 0.f)
+						norm = 1.f / nonzero;
+					else
+						norm = 0.f;
+
+					zeros = (scale.x * scale.y * scale.z) - nonzero;
+
+					Float nonzeroLobes = 0.f;
+					for (int c = 0; c < numSGGXlobes; c++) {
+						if (count[c] > 0.f)
+							nonzeroLobes += 1.f;
+					}
+
+					for (int c = 0; c < numSGGXlobes; c++) {
+						if (count[c] > 0.f) {
+							sumS[c] /= (count[c] + zeros / nonzeroLobes);
+						}
+						pdf[c] = count[c] * norm;
+
+						s1[c][i / scale.x][j / scale.y][k / scale.z] = Vector(sumS[c][0], sumS[c][1], sumS[c][2]);
+						s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(sumS[c][3], sumS[c][4], sumS[c][5]);
+
+						if (c == 0)
+							cdf[c][i / scale.x][j / scale.y][k / scale.z] = Vector(pdf[c]);
+						else
+							cdf[c][i / scale.x][j / scale.y][k / scale.z] = cdf[c - 1][i / scale.x][j / scale.y][k / scale.z] + 
+								Vector(pdf[c]);
+					}
 				}
 			}
 		}
@@ -209,7 +365,139 @@ public:
 		delete[] data;
 	}
 
+	inline int hashFunc(const Pt &u) {
+		return (int)(u.x * 1e2) * 10000 + (int)(u.y * 1e2) * 100 + (int)(u.z * 1e2);
+	}
+
+	inline double dist2(const Pt &u, const Pt &v) {
+		return (u - v).lengthSquared();
+	}
+
+	void assignCluster(int now) {
+#pragma omp parallel for
+		for (int i = 0; i < N; i++) {
+			double minDist2 = 1e10;
+			int k = -1;
+			for (int j = 0; j < numClusters; j++) {
+				double d = dist2(data[i], centers[now][j]);
+				if (d < minDist2) {
+					minDist2 = d;
+					k = j;
+				}
+			}
+			segs[i] = k;
+		}
+	}
+
+	void updateCenters(int now) {
+		for (int i = 0; i < numClusters; i++) {
+			cnt[i] = 0;
+			centers[1 - now][i] = Pt(0.0);
+		}
+
+		for (int i = 0; i < N; i++) {
+			int k = segs[i];
+			centers[1 - now][k] += data[i];
+			cnt[k] += 1;
+		}
+
+		for (int i = 0; i < numClusters; i++) {
+			if (cnt[i] > 0)
+				centers[1 - now][i] /= (double)cnt[i];
+			else
+				centers[1 - now][i] = Pt(1e8);
+		}
+
+		/*
+		for (int i = 0; i < numClusters; i++) {
+			Log(EInfo, "cluster %d: %d", i, cnt[i]);
+		}
+		Log(EInfo, "total: %d", N);
+		*/
+	}
+
+	void initCluster() {
+		centers[0].resize(numClusters);
+		centers[1].resize(numClusters);
+		cnt.resize(numClusters);
+		for (int i = 0; i < numClusters; i++) {
+			int k;
+			while (1) {
+				int u = rand() % numColors;
+				k = diffIndices[u];
+
+				bool flag = true;
+				for (int j = 0; j < i; j++) {
+					if (dist2(centers[0][j], data[k]) < 1e-6) {
+						flag = false;
+						break;
+					}
+				}
+				if (flag)
+					break;
+			}
+			centers[0][i] = data[k];
+		}
+		/*
+		for (int i = 0; i < numClusters; i++) {
+			Log(EInfo, "init center %d, (%.6f, %.6f, %.6f)", i, centers[0][i].x, centers[0][i].y, centers[0][i].z);
+		}
+		*/
+	}
+
+	void kMeans() {
+		int now = 0;
+		int iter = 0;
+		while (1) {
+			assignCluster(now);
+			updateCenters(now);
+
+			// converged?
+			bool flag = true;
+			for (int i = 0; i < numClusters; i++) {
+				if (dist2(centers[1 - now][i], centers[now][i]) > 1e-8) {
+					flag = false;
+					break;
+				}
+			}
+
+			iter++;
+			now = 1 - now;
+			//Log(EInfo, "====== Iter %d ======", iter);
+			for (int i = 0; i < numClusters; i++) {
+				//Log(EInfo, "old center %d, (%.8f, %.8f, %.8f)", i, centers[1 - now][i].x, centers[1 - now][i].y, centers[1 - now][i].z);
+				//Log(EInfo, "center %d, (%.8f, %.8f, %.8f)", i, centers[now][i].x, centers[now][i].y, centers[now][i].z);
+			}
+
+			if (iter > 100 || flag)
+				break;
+		}
+	}
+
 	Vector3i scale;
+	GaussianFiberDistribution d;
+	int numSGGXlobes;
+
+	Vector3i originRes;
+	Vector3i res;
+	AABB bbox;
+
+	std::vector<GridData> s1;
+	std::vector<GridData> s2;
+	std::vector<GridData> cdf;
+
+	std::vector<std::vector<std::vector<int> > > clusterRes;
+
+	int N, numClusters;
+	std::vector<int> segs;
+	std::vector<Vector3i> idx;
+	std::vector<int> cnt;
+	std::vector<Pt> centers[2];
+	std::vector<Pt> data;
+
+	int numColors;
+	std::map<int, int> hasht;
+	std::vector<int> diffIndices;
 
 	MTS_DECLARE_UTILITY()
 };

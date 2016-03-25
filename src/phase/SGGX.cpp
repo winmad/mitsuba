@@ -93,7 +93,7 @@ public:
 		else
 			pdfLobe = pRec.mRec.cdfLobe[lobeIdx] - pRec.mRec.cdfLobe[lobeIdx - 1];
 
-		Float res = pdfLobe;
+		Float res = pdfLobe / pRec.mRec.cdfLobe.back();
 
 		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
@@ -245,7 +245,10 @@ public:
 		
 		Float rnd = sampler->next1D();
 		int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
-		lobeIdx = math::clamp(lobeIdx, 0, (int)cdfs.size() - 1);
+		if (lobeIdx >= cdfs.size())
+			return 0.f;
+
+		//lobeIdx = math::clamp(lobeIdx, 0, (int)cdfs.size() - 1);
 
 		return sampleSingleLobe(pRec, sampler, lobeIdx);
 	}
@@ -255,7 +258,7 @@ public:
 		if (sample(pRec, sampler) == 0) {
 			pdf = 0; return 0.0f;
 		}
-		pdf = eval(pRec);
+		pdf = eval(pRec) * pRec.mRec.cdfLobe.back();
 		return 1.0f;
 	}
 
@@ -347,11 +350,11 @@ public:
 	Float sigmaDir(Float cosTheta) const {
 		// Scaled such that replacing an isotropic phase function with an
 		// isotropic microflake distribution does not cause changes
-		//return 2 * m_fiberDistr.sigmaT(cosTheta);
+		return 2 * m_fiberDistr.sigmaT(cosTheta);
 	}
 
 	Float sigmaDirMax() const {
-		return 1.f;
+		return sigmaDir(0.f);
 	}
 
 	std::string toString() const {

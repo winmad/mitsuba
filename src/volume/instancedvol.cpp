@@ -36,8 +36,7 @@ public:
 		m_S2Files.resize(m_numSGGXLobes);
 		for (int i = 0; i < m_numSGGXLobes; i++) {
 			std::string s1name, s2name, cdfname;
-			if (i == 0)
-			{
+			if (i == 0) {
 				s1name = "S1File";
 				s2name = "S2File";
 				cdfname = "cdfFile";
