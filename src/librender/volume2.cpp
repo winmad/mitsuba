@@ -54,7 +54,7 @@ bool VolumeDataSourceEx::supportsBundleLookups() const {
 
 void VolumeDataSourceEx::lookupBundle(const Point &p,
     Float *density, Vector *direction, Spectrum *albedo, Float *gloss, Float *segmentation,
-	std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe) const {
+	std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe, bool lazy) const {
 	Log(EError, "'%s': does not implement lookup()!", getClass()->getName().c_str());
 }
 

@@ -548,8 +548,9 @@ protected:
 				return density;
 			}
 			else {
+				bool lazy = true;
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL, 
-					clusterIndex, s1, s2, cdfLobe);
+					clusterIndex, s1, s2, cdfLobe, lazy);
 
 				for (int i = 0; i < s1->size(); i++) {
 					S1 = (*s1)[i];
@@ -557,16 +558,24 @@ protected:
 					Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
 					Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
 
-					// handle orientation transform
 					Matrix3x3 Q;
 					Float eig[3];
+					Matrix3x3 S;
+					Vector w3;
 
-					Matrix3x3 S(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
-					S.symEig(Q, eig);
-					// eig[0] < eig[1] == eig[2]
-					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+					if (!lazy) {
+						// handle orientation transform
+						S = Matrix3x3(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
+						S.symEig(Q, eig);
+						// eig[0] < eig[1] == eig[2]
+						w3 = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+					}
+					else {
+						w3 = Vector(S1[0], S1[1], S1[2]);
+						eig[1] = S2[0]; eig[2] = S2[1]; eig[0] = S2[2];
+					}
+
 					w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
-
 					// seems missing in original implementation
 					w3 = m_volumeToWorld(w3);
 

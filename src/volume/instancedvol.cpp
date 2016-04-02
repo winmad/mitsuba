@@ -516,7 +516,7 @@ public:
 
     void lookupBundle(const Point &p, Float *density, Vector *direction,
 		Spectrum *albedo, Float *gloss, Float *segmentation,
-		std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe) const
+		std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe, bool lazy) const
     {
         Assert( gloss == NULL );
 
@@ -681,33 +681,48 @@ public:
 				cdfLobe->push_back(cdf);
 
 				if (!s1value.isZero()) {
-					Matrix3x3 Q;
-					Float eig[3];
+					if (!lazy) {
+						Matrix3x3 Q;
+						Float eig[3];
 
-					Matrix3x3 S(s1value[0], s2value[0], s2value[1],
-						s2value[0], s1value[1], s2value[2],
-						s2value[1], s2value[2], s1value[2]);
-					S.symEig(Q, eig);
-					// eig[0] < eig[1] == eig[2]
-					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-					w3 = m_volumeToWorld(w3);
+						Matrix3x3 S(s1value[0], s2value[0], s2value[1],
+							s2value[0], s1value[1], s2value[2],
+							s2value[1], s2value[2], s1value[2]);
+						S.symEig(Q, eig);
+						// eig[0] < eig[1] == eig[2]
+						Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+						w3 = m_volumeToWorld(w3);
 
-					if (!w3.isZero()) {
-						w3 = normalize(w3);
-						Frame frame(w3);
+						if (!w3.isZero()) {
+							w3 = normalize(w3);
+							Frame frame(w3);
 
-						Matrix3x3 basis(frame.s, frame.t, w3);
-						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-						Matrix3x3 basisT;
-						basis.transpose(basisT);
-						S = basis * D * basisT;
+							Matrix3x3 basis(frame.s, frame.t, w3);
+							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+							Matrix3x3 basisT;
+							basis.transpose(basisT);
+							S = basis * D * basisT;
 
-						s1value[0] = S.m[0][0]; s1value[1] = S.m[1][1]; s1value[2] = S.m[2][2];
-						s2value[0] = S.m[0][1]; s2value[1] = S.m[0][2]; s2value[2] = S.m[1][2];
+							s1value[0] = S.m[0][0]; s1value[1] = S.m[1][1]; s1value[2] = S.m[2][2];
+							s2value[0] = S.m[0][1]; s2value[1] = S.m[0][2]; s2value[2] = S.m[1][2];
+						}
+						else {
+							s1value = Spectrum(0.f);
+							s2value = Spectrum(0.f);
+						}
 					}
 					else {
-						s1value = Spectrum(0.f);
-						s2value = Spectrum(0.f);
+						Vector w3(s1value[0], s1value[1], s1value[2]);
+						w3 = m_volumeToWorld(w3);
+
+						if (!w3.isZero()) {
+							w3 = normalize(w3);
+							s1value[0] = w3.x; s1value[1] = w3.y; s1value[2] = w3.z;
+						}
+						else {
+							s1value = Spectrum(0.f);
+							s2value = Spectrum(0.f);
+						}
 					}
 				}
 				else {
@@ -838,6 +853,9 @@ protected:
 	std::vector<uint8_t*> m_data;
 	std::vector<EVolumeType> m_volumeType;
 	std::vector<int> m_channels;
+	// s1 = (Sxx, Syy, Szz), s2 = (Sxy, Sxz, Syz)
+	// or
+	// s1 = (w3.x, w3.y, w3.z), s2 = (sigma1, sigma2, sigma3), sigma1 = sigma2 > sigma3
 
 	Vector3i m_dataReso;
 	Transform m_volumeToWorld, m_worldToVolume;

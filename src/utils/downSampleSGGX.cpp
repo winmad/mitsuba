@@ -21,24 +21,24 @@ public:
 	typedef TVector3<double> Vec;
 
 	int run(int argc, char **argv) {
-		if(argc != 8) {
+		if(argc != 9) {
 			cout << "Down-sample SGGX volume data by a scale" << endl;
-			cout << "Syntax: mtsutil downSampleVolume <orientation_volume> <scale> <stddev> <num_SGGX_lobes> <s1_prefix> <s2_prefix> <cdf_prefix>" << endl;
+			cout << "Syntax: mtsutil downSampleVolume <orientation_volume> <density_volume> <scale> <stddev> <num_SGGX_lobes> <s1_prefix> <s2_prefix> <cdf_prefix>" << endl;
 			return -1;
 		}
 
 		char *end_ptr = NULL;
-		int scaleValue = strtol(argv[2], &end_ptr, 10);
+		int scaleValue = strtol(argv[3], &end_ptr, 10);
 		if (*end_ptr != '\0')
 			SLog(EError, "Could not parse integer value");
 		scale = Vector3i(scaleValue);
 
-		Float stddev = strtod(argv[3], &end_ptr);
+		Float stddev = strtod(argv[4], &end_ptr);
 		if (*end_ptr != '\0')
 			SLog(EError, "Could not parse floating point value");
 		d = GaussianFiberDistribution(stddev);
 
-		numSGGXlobes = strtol(argv[4], &end_ptr, 10);
+		numSGGXlobes = strtol(argv[5], &end_ptr, 10);
 		if (*end_ptr != '\0')
 			SLog(EError, "Could not parse integer value");
 
@@ -58,16 +58,28 @@ public:
 
 		bbox = originVol->getAABB();
 
+		/*
+		Properties props2("gridvolume");
+		props2.setString("filename", argv[2]);
+		props2.setBoolean("sendData", false);
+
+		VolumeDataSource *densityVol = static_cast<VolumeDataSource *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(VolumeDataSource), props2));
+		densityVol->configure();
+		*/
+
 		init(originVol);
 		cluster(originVol);
-		downSample(originVol);
+
+		bool lazy = true;
+		downSample(originVol, lazy);
 
 		Log(EInfo, "finish down-sampling, save volume data to file");
 		
 		for (int i = 0; i < numSGGXlobes; i++) {
-			std::string s1Filename(argv[5]);
-			std::string s2Filename(argv[6]);
-			std::string cdfFilename(argv[7]);
+			std::string s1Filename(argv[6]);
+			std::string s2Filename(argv[7]);
+			std::string cdfFilename(argv[8]);
 
 			s1Filename += formatString("_%i.vol", i);
 			s2Filename += formatString("_%i.vol", i);
@@ -253,7 +265,7 @@ public:
 		*/
 	}
 
-	void downSample(VolumeDataSource *ori) {
+	void downSample(VolumeDataSource *ori, bool lazy = false) {
 		std::vector<Vector6> sumS;
 		std::vector<Float> count;
 		std::vector<Float> pdf;
@@ -285,6 +297,7 @@ public:
 								for (int c = 0; c < 3; c++) {
 									w[c] = ori->lookupFloat(i + dx, j + dy, k + dz, c);
 								}
+								//Float density = densityVol->lookupFloat(i + dx, j + dy, k + dz, 0);
 
 								Vector6 s;
 								s = getSValue(w);
@@ -300,7 +313,7 @@ public:
 						norm = 1.f / nonzero;
 					else
 						norm = 0.f;
-
+					/*
 					zeros = (scale.x * scale.y * scale.z) - nonzero;
 
 					Float nonzeroLobes = 0.f;
@@ -308,15 +321,36 @@ public:
 						if (count[c] > 0.f)
 							nonzeroLobes += 1.f;
 					}
-
+					*/
 					for (int c = 0; c < numSGGXlobes; c++) {
 						if (count[c] > 0.f) {
-							sumS[c] /= (count[c] + zeros / nonzeroLobes);
+							//sumS[c] /= (count[c] + zeros / nonzeroLobes);
+							sumS[c] /= count[c];
 						}
 						pdf[c] = count[c] * norm;
 
-						s1[c][i / scale.x][j / scale.y][k / scale.z] = Vector(sumS[c][0], sumS[c][1], sumS[c][2]);
-						s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(sumS[c][3], sumS[c][4], sumS[c][5]);
+						if (!lazy) {
+							s1[c][i / scale.x][j / scale.y][k / scale.z] = Vector(sumS[c][0], sumS[c][1], sumS[c][2]);
+							s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(sumS[c][3], sumS[c][4], sumS[c][5]);
+						}
+						else {
+							Matrix3x3 Q;
+							Float eig[3];
+
+							Matrix3x3 S(sumS[c][0], sumS[c][3], sumS[c][4], 
+								sumS[c][3], sumS[c][1], sumS[c][5], 
+								sumS[c][4], sumS[c][5], sumS[c][2]);
+							S.symEig(Q, eig);
+							// eig[0] < eig[1] == eig[2]
+							Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+							if (!w3.isZero()) {
+								s1[c][i / scale.x][j / scale.y][k / scale.z] = normalize(w3);
+								s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(eig[1], eig[2], eig[0]);
+							}
+							else {
+								Log(EInfo, "No! zero orientation vector!");
+							}
+						}
 
 						if (c == 0)
 							cdf[c][i / scale.x][j / scale.y][k / scale.z] = Vector(pdf[c]);

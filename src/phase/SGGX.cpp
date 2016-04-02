@@ -93,7 +93,7 @@ public:
 		else
 			pdfLobe = pRec.mRec.cdfLobe[lobeIdx] - pRec.mRec.cdfLobe[lobeIdx - 1];
 
-		Float res = pdfLobe / pRec.mRec.cdfLobe.back();
+		Float res = pdfLobe;
 
 		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
@@ -136,15 +136,34 @@ public:
 	}
 
 	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
-		if (pRec.mRec.s1.size() == 0)
-			return 0;
+		const std::vector<Float> &cdfs = pRec.mRec.cdfLobe;
+		if (cdfs.size() <= 0 || cdfs.back() < 1e-6f)
+			return 0.f;
 
+		Float rnd = m_sampler->next1D();
+		int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
+		if (lobeIdx >= cdfs.size()) {
+			return 1.f / (1.f - cdfs.back() + 1e-4f);
+		}
+
+		Float pdf = cdfs[lobeIdx];
+		if (lobeIdx > 0)
+			pdf -= cdfs[lobeIdx - 1];
+
+		return evalSingleLobe(pRec, lobeIdx) / pdf;
+
+		/*
 		Float res = 0.f;
 		for (int i = 0; i < pRec.mRec.s1.size(); i++) {
 			res += evalSingleLobe(pRec, i);
 		}
 
+// 		Vector h = pRec.wi + pRec.wo;
+// 		if (h.lengthSquared() < 1e-6f)
+// 			res += 1.f - pRec.mRec.cdfLobe.back();
+
 		return res;
+		*/
 	}
 
 	inline Float sampleSingleLobe(PhaseFunctionSamplingRecord &pRec, Sampler *sampler, int lobeIdx) const {
@@ -240,14 +259,16 @@ public:
 
 	inline Float sample(PhaseFunctionSamplingRecord &pRec, Sampler *sampler) const {
 		const std::vector<Float> &cdfs = pRec.mRec.cdfLobe;
-		if (cdfs.size() <= 0)
+		if (cdfs.size() <= 0 || cdfs.back() < 1e-6f)
 			return 0.f;
 		
 		Float rnd = sampler->next1D();
 		int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
-		if (lobeIdx >= cdfs.size())
-			return 0.f;
-
+		if (lobeIdx >= cdfs.size()) {
+			pRec.wo = -pRec.wi;
+			return 1.f;
+		}
+			
 		//lobeIdx = math::clamp(lobeIdx, 0, (int)cdfs.size() - 1);
 
 		return sampleSingleLobe(pRec, sampler, lobeIdx);
@@ -258,7 +279,7 @@ public:
 		if (sample(pRec, sampler) == 0) {
 			pdf = 0; return 0.0f;
 		}
-		pdf = eval(pRec) * pRec.mRec.cdfLobe.back();
+		pdf = eval(pRec);
 		return 1.0f;
 	}
 
@@ -321,6 +342,23 @@ public:
 
 	Float sigmaDir(const Vector &d, const std::vector<Spectrum> &s1,
 		const std::vector<Spectrum> &s2, std::vector<Float> &cdfLobes) const {
+		if (cdfLobes.size() <= 0 || cdfLobes.back() < 1e-6f)
+			return 0.f;
+
+		Float rnd = m_sampler->next1D();
+		int lobeIdx = (std::lower_bound(cdfLobes.begin(), cdfLobes.end(), rnd) - cdfLobes.begin());
+		if (lobeIdx >= cdfLobes.size()) {
+			return 0.f;
+		}
+
+		Float pdf = cdfLobes[lobeIdx];
+		if (lobeIdx > 0)
+			pdf -= cdfLobes[lobeIdx - 1];
+
+		return sigmaDir(d, s1[lobeIdx][0], s1[lobeIdx][1], s1[lobeIdx][2],
+			s2[lobeIdx][0], s2[lobeIdx][1], s2[lobeIdx][2]) / pdf;
+
+		/*
 		Float res = 0.f;
 		for (int i = 0; i < cdfLobes.size(); i++) {
 			Float pdf = cdfLobes[i];
@@ -330,6 +368,7 @@ public:
 			res += pdf * sigmaDir(d, s1[i][0], s1[i][1], s1[i][2], s2[i][0], s2[i][1], s2[i][2]);
 		}
 		return res;
+		*/
 	}
 
 	Matrix3x3 getD() const {
