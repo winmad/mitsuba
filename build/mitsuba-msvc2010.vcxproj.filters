@@ -1118,6 +1118,12 @@
     <ClCompile Include="..\src\utils\downSampleSGGX.cpp">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\volume\tiledvol2.cpp">
+      <Filter>Source Files\volume</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\volume\gridvol2_simple.cpp">
+      <Filter>Source Files\volume</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

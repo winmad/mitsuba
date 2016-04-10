@@ -123,8 +123,7 @@ public:
 
 	InstancedVolume(Stream *stream, InstanceManager *manager) 
 		: VolumeDataSourceEx(stream, manager), m_ready(false),
-		phaseIdx(4), lobeComponents(3)
-    {
+		phaseIdx(4), lobeComponents(3) {
 		m_volumeToWorld = Transform(stream);
 
         m_densityFile = stream->readString();

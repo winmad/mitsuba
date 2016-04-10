@@ -497,9 +497,11 @@ public:
 				if (m_volume->hasOrientation())
 					m_volume->lookupBundle(mRec.p, NULL, &mRec.orientation, &albedo, NULL,
 						&fClusterIndex, NULL, NULL, NULL);
-				else
+				else {
 					m_volume->lookupBundle(mRec.p, NULL, NULL, &albedo, NULL,
 						&fClusterIndex, &s1, &s2, &cdfLobe);
+					Log(EInfo, "lazy s1, s2...");
+				}
 
 				if (m_useDiffAlbedoScales) {
 					clusterIndex = (int)fClusterIndex;
@@ -544,32 +546,36 @@ public:
 			maxt = std::min(maxt, ray.maxt);
 
 			Float t = mint, densityAtT = 0;
+			std::vector<Spectrum> s1;
+			std::vector<Spectrum> s2;
+			std::vector<Float> cdfLobe;
+
 			while (true) {
 				t -= math::fastlog(1-sampler->next1D()) * m_invMaxDensity;
 				if (t >= maxt)
 					break;
 
 				Point p = ray(t);
-				densityAtT = lookupDensity(p, ray.d) * m_scale;
+				Spectrum albedo;
+				Float fClusterIndex = 0.f;
+				int clusterIndex = 0;
+
+				densityAtT = lookupDensity(p, ray.d, &albedo, &fClusterIndex, &s1, &s2, &cdfLobe) * m_scale;
+				
 				#if defined(HETVOL_STATISTICS)
 					++avgRayMarchingStepsSampling;
 				#endif
 				if (densityAtT * m_invMaxDensity > sampler->next1D()) {
 					mRec.t = t;
 					mRec.p = p;
-					Spectrum albedo;
-					Float fClusterIndex = 0.f;
-					int clusterIndex = 0;
-					std::vector<Spectrum> s1;
-					std::vector<Spectrum> s2;
-					std::vector<Float> cdfLobe;
+					
 					
 					if (m_volume->hasOrientation())
 						m_volume->lookupBundle(p, NULL, &mRec.orientation, &albedo, NULL,
 							&fClusterIndex, NULL, NULL, NULL);
-					else
-						m_volume->lookupBundle(p, NULL, NULL, &albedo, NULL,
-							&fClusterIndex, &s1, &s2, &cdfLobe);
+// 					else
+// 						m_volume->lookupBundle(p, NULL, NULL, &albedo, NULL,
+// 							&fClusterIndex, &s1, &s2, &cdfLobe);
 					
 					if (m_useDiffAlbedoScales) {
 						clusterIndex = (int)fClusterIndex;
@@ -602,15 +608,16 @@ public:
 
 	void eval(const Ray &ray, MediumSamplingRecord &mRec) const {
 		if (m_method == ESimpsonQuadrature) {
+			std::vector<Spectrum> s1;
+			std::vector<Spectrum> s2;
+			std::vector<Float> cdfLobe;
 			Float expVal = math::fastexp(-integrateDensity(ray));
 			Float mintDensity = lookupDensity(ray(ray.mint), ray.d) * m_scale;
 			Float maxtDensity = 0.0f;
 			Spectrum maxtAlbedo(0.0f);
 			Float fClusterIndex = 0.f;
 			int clusterIndex = 0;
-			std::vector<Spectrum> s1;
-			std::vector<Spectrum> s2;
-			std::vector<Float> cdfLobe;
+			
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
 				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &fClusterIndex, &s1, &s2, &cdfLobe) * m_scale;
@@ -667,6 +674,8 @@ protected:
 		std::vector<Float> *cdfLobe = NULL) const {
         Float density;
         Vector orientation;
+		Spectrum S1;
+		Spectrum S2;
 		std::vector<Spectrum> _s1;
 		std::vector<Spectrum> _s2;
 		std::vector<Float> _cdfLobe;
@@ -702,10 +711,53 @@ protected:
 				return density;
 			}
 			else {
+				bool lazy = true;
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
-					clusterIndex, &_s1, &_s2, &_cdfLobe);
+					clusterIndex, &_s1, &_s2, &_cdfLobe, lazy);
+				
+				if (!lazy) {
+					density *= m_phaseFunction->sigmaDir(d, _s1, _s2, _cdfLobe);
+				}
+				else {
+					for (int i = 0; i < _s1.size(); i++) {
+						S1 = _s1[i];
+						S2 = _s2[i];
+						Vector w3(S1[0], S1[1], S1[2]);
+						Float eig[3];
+						eig[1] = S2[0]; eig[2] = S2[1]; eig[0] = S2[2];
 
-				density *= m_phaseFunction->sigmaDir(d, _s1, _s2, _cdfLobe);
+						if (!w3.isZero()) {
+							Frame frame(w3);
+
+							Matrix3x3 basis(frame.s, frame.t, w3);
+							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+							Matrix3x3 basisT;
+							basis.transpose(basisT);
+							Matrix3x3 S = basis * D * basisT;
+
+							Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
+							Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
+
+							if (s1 && s2) {
+								S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
+								S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
+								_s1[i] = S1;
+								_s2[i] = S2;
+							}
+						}
+						else {
+							_s1[i] = Spectrum(0.f);
+							_s2[i] = Spectrum(0.f);
+						}
+					}
+					density *= m_phaseFunction->sigmaDir(d, _s1, _s2, _cdfLobe);
+				}
+
+				if (s1) {
+					*s1 = _s1;
+					*s2 = _s2;
+					*cdfLobe = _cdfLobe;
+				}
 
 // 				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
 // 				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
@@ -721,6 +773,7 @@ protected:
 // 					density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 // 				else
 // 					return 0;
+
 				return density;
 			}
 		}

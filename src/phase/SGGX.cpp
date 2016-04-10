@@ -355,7 +355,7 @@ public:
 		if (lobeIdx > 0)
 			pdf -= cdfLobes[lobeIdx - 1];
 
-		return sigmaDir(d, s1[lobeIdx][0], s1[lobeIdx][1], s1[lobeIdx][2],
+		return sigma(d, s1[lobeIdx][0], s1[lobeIdx][1], s1[lobeIdx][2],
 			s2[lobeIdx][0], s2[lobeIdx][1], s2[lobeIdx][2]) / pdf;
 
 		/*
