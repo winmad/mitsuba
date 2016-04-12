@@ -23,6 +23,8 @@
 #include <mitsuba/core/mmap.h>
 #include <mitsuba/core/math.h>
 #include <mitsuba/core/frame.h>
+#include <mitsuba/core/plugin.h>
+#include <mitsuba/render/sampler.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -142,6 +144,10 @@ public:
 
 	void configure() {
         if ( !m_ready ) {
+			Properties props("independent");
+			m_sampler = static_cast<Sampler*>(PluginManager::getInstance()->createObject(MTS_CLASS(Sampler), props));
+			m_sampler->configure();
+
 		    /* Precompute cosine and sine lookup tables */
 		    for (int i=0; i<255; i++) {
 			    Float angle = (float) i * ((float) M_PI / 255.0f);
@@ -282,8 +288,8 @@ public:
     }
 
 	void lookupBundle(const Point &p, Float *density, Vector *direction, Spectrum *albedo,
-		Float *gloss, Float *segmentation, std::vector<Spectrum> *s1, std::vector<Spectrum> *s2,
-		std::vector<Float> *cdfLobe, bool lazy) const {
+		Float *gloss, Float *segmentation, Spectrum *s1, Spectrum *s2,
+		Float *pdfLobe, bool lazy) const {
 		int idx = getCoord(p);
 
 		if (idx < 0)
@@ -292,9 +298,9 @@ public:
 			if (direction) *direction = Vector(0.0f);
 			if (albedo) *albedo = Spectrum(0.0f);
 
-			if (s1) s1->clear();
-			if (s2) s2->clear();
-			if (cdfLobe) cdfLobe->clear();
+			if (s1) (*s1) = Spectrum(0.f);
+			if (s2) (*s2) = Spectrum(0.f);
+			if (pdfLobe) *pdfLobe = 0.f;
 			if (segmentation) *segmentation = 0.f;
 
 			return;
@@ -395,22 +401,20 @@ public:
 			Assert(s2 != NULL);
 			Assert(cdfLobe != NULL);
 
-			s1->clear();
-			s2->clear();
-			cdfLobe->clear();
+			s1->resize(m_numSGGXLobes);
+			s2->resize(m_numSGGXLobes);
+			cdfLobe->resize(m_numSGGXLobes);
 
-			/*
 			std::vector<Float> cdfs;
-			cdfs.push_back(0.f);
 			for (int i = 0; i < m_numSGGXLobes; i++) {
-			const float *floatData = (float *)m_data[phaseIdx + lobeComponents * i + 2];
-			cdfs.push_back(floatData[idx]);
+				const float *floatData = (float *)m_data[phaseIdx + lobeComponents * i + 2];
+				cdfs.push_back(floatData[idx]);
 			}
 
-			Float rnd = sampler->next1D();
+			Float rnd = m_sampler->next1D();
 			int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
-			lobeIdx = math::clamp(lobeIdx, 0, m_numSGGXLobes - 1);
-			*/
+
+			if (lobeIdx >= m_numSGGXLobes)
 
 			for (int i = 0; i < m_numSGGXLobes; i++) {
 				int s1VolumeIdx = phaseIdx + lobeComponents * i;
@@ -437,8 +441,6 @@ public:
 					s2value = Spectrum(0.f);
 					cdf = 0.f;
 				}
-
-				cdfLobe->push_back(cdf);
 
 				if (!s1value.isZero()) {
 					if (!lazy) {
@@ -490,8 +492,9 @@ public:
 					s2value = Spectrum(0.f);
 				}
 
-				s1->push_back(s1value);
-				s2->push_back(s2value);
+				(*s1)[i] = s1value;
+				(*s2)[i] = s2value;
+				(*cdfLobe)[i] = cdf;
 			}
 		}
 	}
@@ -712,6 +715,8 @@ protected:
 	std::vector<std::string> m_phaseCdfFiles;
 	std::vector<std::string> m_S1Files;
 	std::vector<std::string> m_S2Files;
+
+	Sampler *m_sampler;
 
 	// 0: density, 1: orientation, 2: albedo, 3: segmentation
 	// 4: s1, 5: s2, 6: cdf; 7: s1, 8: s2, 9: cdf...

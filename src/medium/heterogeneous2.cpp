@@ -711,7 +711,20 @@ protected:
 				bool lazy = true;
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
 					clusterIndex, &_s1, &_s2, &_cdfLobe, lazy);
+
+				if (s1) {
+					_s1[0] = Spectrum(1.f);
+					_s2[0] = Spectrum(0.f);
+					*s1 = _s1;
+					*s2 = _s2;
+					*cdfLobe = _cdfLobe;
+				}
+				return density;
 				
+				Matrix3x3 basisT;
+				Matrix3x3 S;
+				Float eig[3];
+
 				if (!lazy) {
 					density *= m_phaseFunction->sigmaDir(d, _s1, _s2, _cdfLobe);
 				}
@@ -719,8 +732,8 @@ protected:
 					for (int i = 0; i < _s1.size(); i++) {
 						S1 = _s1[i];
 						S2 = _s2[i];
+						
 						Vector w3(S1[0], S1[1], S1[2]);
-						Float eig[3];
 						eig[1] = S2[0]; eig[2] = S2[1]; eig[0] = S2[2];
 
 						if (!w3.isZero()) {
@@ -728,16 +741,13 @@ protected:
 
 							Matrix3x3 basis(frame.s, frame.t, w3);
 							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-							Matrix3x3 basisT;
+							
 							basis.transpose(basisT);
-							Matrix3x3 S = basis * D * basisT;
-
-							Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
-							Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
+							S = basis * D * basisT;
 
 							if (s1 && s2) {
-								S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
-								S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
+								S1[0] = S.m[0][0]; S1[1] = S.m[1][1]; S1[2] = S.m[2][2];
+								S2[0] = S.m[0][1]; S2[1] = S.m[0][2]; S2[2] = S.m[1][2];
 								_s1[i] = S1;
 								_s2[i] = S2;
 							}

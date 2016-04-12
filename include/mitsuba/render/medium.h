@@ -32,6 +32,7 @@ MTS_NAMESPACE_BEGIN
  * \sa Medium::sampleDistance()
  * \ingroup librender
  */
+
 struct MTS_EXPORT_RENDER MediumSamplingRecord {
 public:
 
@@ -67,9 +68,9 @@ public:
 	int clusterIndex;
 	Spectrum albedoScale;
 
-	std::vector<Spectrum> s1;
-	std::vector<Spectrum> s2;
-	std::vector<Float> cdfLobe;
+	Spectrum s1;
+	Spectrum s2;
+	Float pdfLobe;
 
 	bool hasExtraInfo;
 	Point extra;

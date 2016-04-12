@@ -32,7 +32,7 @@ public:
     virtual bool supportsBundleLookups() const;
     virtual void lookupBundle(const Point &p,
         Float *density, Vector *direction, Spectrum *albedo, Float *gloss, Float *segmentation, 
-		std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe, bool lazy = false) const;
+		Spectrum *s1, Spectrum *s2, Float *pdfLobe, bool lazy = false) const;
 
     virtual Float getMaximumFloatValueEx(uint32_t id) const = 0;
 

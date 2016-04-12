@@ -77,23 +77,17 @@ public:
 		stream->writeFloat(m_mixedWeight);
 	}
 
-	Float evalSingleLobe(const PhaseFunctionSamplingRecord &pRec, int lobeIdx) const {
+	Float evalSingleLobe(const PhaseFunctionSamplingRecord &pRec) const {
 		Vector wi = pRec.wi;
 		Vector wo = pRec.wo;
 
-		Spectrum s1 = pRec.mRec.s1[lobeIdx];
-		Spectrum s2 = pRec.mRec.s2[lobeIdx];
+		Spectrum s1 = pRec.mRec.s1;
+		Spectrum s2 = pRec.mRec.s2;
 
 		Float Sxx = s1[0], Syy = s1[1], Szz = s1[2];
 		Float Sxy = s2[0], Sxz = s2[1], Syz = s2[2];
-		
-		Float pdfLobe;
-		if (lobeIdx == 0)
-			pdfLobe = pRec.mRec.cdfLobe[lobeIdx];
-		else
-			pdfLobe = pRec.mRec.cdfLobe[lobeIdx] - pRec.mRec.cdfLobe[lobeIdx - 1];
 
-		Float res = pdfLobe;
+		Float res = pRec.mRec.pdfLobe;
 
 		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
@@ -341,7 +335,7 @@ public:
 	}
 
 	Float sigmaDir(const Vector &d, const std::vector<Spectrum> &s1,
-		const std::vector<Spectrum> &s2, std::vector<Float> &cdfLobes) const {
+		const std::vector<Spectrum> &s2, const std::vector<Float> &cdfLobes) const {
 		if (cdfLobes.size() <= 0 || cdfLobes.back() < 1e-6f)
 			return 0.f;
 
