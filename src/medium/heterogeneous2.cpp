@@ -667,6 +667,7 @@ public:
 	}
 
 	MTS_DECLARE_CLASS()
+
 protected:
 	inline Float lookupDensity(const Point &p, const Vector &d, 
 		Spectrum *albedo = NULL, Float *clusterIndex = NULL,
@@ -679,10 +680,6 @@ protected:
 		std::vector<Spectrum> _s1;
 		std::vector<Spectrum> _s2;
 		std::vector<Float> _cdfLobe;
-
-		if (s1) s1->clear();
-		if (s2) s2->clear();
-		if (cdfLobe) cdfLobe->clear();
 
 		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
 			if (!m_volume->hasSGGXVolume()) {
