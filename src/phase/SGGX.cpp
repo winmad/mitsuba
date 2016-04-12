@@ -93,7 +93,7 @@ public:
 		else
 			pdfLobe = pRec.mRec.cdfLobe[lobeIdx] - pRec.mRec.cdfLobe[lobeIdx - 1];
 
-		Float res = pdfLobe;
+		Float res = 1.f;
 
 		Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 		//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
@@ -146,11 +146,13 @@ public:
 			return 1.f / (1.f - cdfs.back() + 1e-4f);
 		}
 
+		/*
 		Float pdf = cdfs[lobeIdx];
 		if (lobeIdx > 0)
 			pdf -= cdfs[lobeIdx - 1];
+		*/
 
-		return evalSingleLobe(pRec, lobeIdx) / pdf;
+		return evalSingleLobe(pRec, lobeIdx);
 
 		/*
 		Float res = 0.f;
@@ -351,12 +353,14 @@ public:
 			return 0.f;
 		}
 
+		/*
 		Float pdf = cdfLobes[lobeIdx];
 		if (lobeIdx > 0)
 			pdf -= cdfLobes[lobeIdx - 1];
-
+		*/
+		
 		return sigma(d, s1[lobeIdx][0], s1[lobeIdx][1], s1[lobeIdx][2],
-			s2[lobeIdx][0], s2[lobeIdx][1], s2[lobeIdx][2]) / pdf;
+			s2[lobeIdx][0], s2[lobeIdx][1], s2[lobeIdx][2]);
 
 		/*
 		Float res = 0.f;
