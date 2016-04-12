@@ -8,6 +8,7 @@ dependencies_macos/
 backup/
 build/*.py
 *.txt
+build/
 
 # Documentation
 doc/apidocs/*
