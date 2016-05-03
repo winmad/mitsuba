@@ -399,11 +399,7 @@ public:
 		if (s1) {
 			Assert(m_hasSGGXVolume);
 			Assert(s2 != NULL);
-			Assert(cdfLobe != NULL);
-
-			s1->resize(m_numSGGXLobes);
-			s2->resize(m_numSGGXLobes);
-			cdfLobe->resize(m_numSGGXLobes);
+			Assert(pdfLobe != NULL);
 
 			std::vector<Float> cdfs;
 			for (int i = 0; i < m_numSGGXLobes; i++) {
@@ -414,15 +410,17 @@ public:
 			Float rnd = m_sampler->next1D();
 			int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
 
-			if (lobeIdx >= m_numSGGXLobes)
-
-			for (int i = 0; i < m_numSGGXLobes; i++) {
-				int s1VolumeIdx = phaseIdx + lobeComponents * i;
-				int s2VolumeIdx = phaseIdx + lobeComponents * i + 1;
-				int cdfVolumeIdx = phaseIdx + lobeComponents * i + 2;
+			if (lobeIdx < m_numSGGXLobes) {
+				int s1VolumeIdx = phaseIdx + lobeComponents * lobeIdx;
+				int s2VolumeIdx = phaseIdx + lobeComponents * lobeIdx + 1;
+				int cdfVolumeIdx = phaseIdx + lobeComponents * lobeIdx + 2;
 
 				Spectrum s1value, s2value;
-				Float cdf;
+				
+				if (lobeIdx == 0)
+					*pdfLobe = cdfs[0];
+				else
+					*pdfLobe = cdfs[lobeIdx] - cdfs[lobeIdx - 1];
 
 				switch (m_volumeType[s1VolumeIdx])
 				{
@@ -430,16 +428,13 @@ public:
 				{
 					const float3 *s1Data = (float3 *)m_data[s1VolumeIdx];
 					const float3 *s2Data = (float3 *)m_data[s2VolumeIdx];
-					const float *floatData = (float *)m_data[cdfVolumeIdx];
 					s1value = s1Data[idx].toSpectrum();
 					s2value = s2Data[idx].toSpectrum();
-					cdf = floatData[idx];
 				}
 				break;
 				default:
 					s1value = Spectrum(0.f);
 					s2value = Spectrum(0.f);
-					cdf = 0.f;
 				}
 
 				if (!s1value.isZero()) {
@@ -492,9 +487,8 @@ public:
 					s2value = Spectrum(0.f);
 				}
 
-				(*s1)[i] = s1value;
-				(*s2)[i] = s2value;
-				(*cdfLobe)[i] = cdf;
+				*s1 = s1value;
+				*s2 = s2value;
 			}
 		}
 	}

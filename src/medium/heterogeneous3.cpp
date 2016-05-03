@@ -265,15 +265,15 @@ public:
                             m_shell.m_vtxTangent[tmp[3]].dpdv*bb.w;
 
                         Vector orientation;
-						std::vector<Spectrum> s1;
-						std::vector<Spectrum> s2;
-						std::vector<Float> cdfLobe;
+						Spectrum s1;
+						Spectrum s2;
+						Float pdfLobe;
                         if ( m_anisotropicMedium ) {
 							Frame tangFrame;
 							tangFrame.s = dpdu; tangFrame.t = dpdv; tangFrame.n = norm;
 
 							density = lookupDensity(q, ray.d, tangFrame, NULL, NULL, NULL, 
-								&s1, &s2, &cdfLobe) * m_scale;
+								&s1, &s2, &pdfLobe) * m_scale;
 							/*
                             m_volume->lookupBundle(q, &density, &orientation, NULL, NULL,
 								NULL, NULL, NULL);
@@ -367,9 +367,9 @@ public:
             Spectrum albedo;
 			Float fClusterIndex = 0.f;
 			int clusterIndex = 0;
-			std::vector<Spectrum> s1;
-			std::vector<Spectrum> s2;
-			std::vector<Float> cdfLobe;
+			Spectrum s1;
+			Spectrum s2;
+			Float pdfLobe;
 
             if ( m_shell.m_tetra[id].inside(m_shell.m_vtxPosition, p, bb) ) {
                 const uint32_t *tmp = m_shell.m_tetra[id].idx;
@@ -399,7 +399,7 @@ public:
 					if (m_volume->hasOrientation()) {
 						density = lookupDensity(q, ray.d, tangFrame,
 							&orientation, &albedo, &fClusterIndex,
-							&s1, &s2, &cdfLobe) * m_scale;
+							&s1, &s2, &pdfLobe) * m_scale;
 
 						/*
 						m_volume->lookupBundle(q, &density, &orientation, &albedo, NULL,
@@ -415,7 +415,7 @@ public:
 					else {
 						density = lookupDensity(q, ray.d, tangFrame,
 							NULL, &albedo, &fClusterIndex,
-							&s1, &s2, &cdfLobe) * m_scale;
+							&s1, &s2, &pdfLobe) * m_scale;
 					}
                 }
                 else {
@@ -452,7 +452,7 @@ public:
                 mRec.extra = tex;
 				mRec.s1 = s1;
 				mRec.s2 = s2;
-				mRec.cdfLobe = cdfLobe;
+				mRec.pdfLobe = pdfLobe;
                 success = true;
                 break;
             }
@@ -494,17 +494,15 @@ public:
 protected:
 	inline Float lookupDensity(const Point &p, const Vector &d, const Frame &tangFrame,
 		Vector *_orientation = NULL, Spectrum *albedo = NULL, Float *clusterIndex = NULL,
-        std::vector<Spectrum> *s1 = NULL, std::vector<Spectrum> *s2 = NULL, 
-		std::vector<Float> *cdfLobe = NULL) const {
+        Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *pdfLobe = NULL) const {
 		Float density;
 		Vector orientation;
-		Spectrum S1;
-		Spectrum S2;
+		Spectrum S1(0.f);
+		Spectrum S2(0.f);
+		Float _pdfLobe(0.f);
 
 		if (_orientation) *_orientation = Vector(0.f);
-		if (s1) s1->clear();
-		if (s2) s2->clear();
-        if (cdfLobe) cdfLobe->clear();
+		if (pdfLobe) *pdfLobe = 0.f;
 
 		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
 			if (!m_volume->hasSGGXVolume()) {
@@ -529,12 +527,13 @@ protected:
 				Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
 				Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
 
-				if (s1 && s2 && cdfLobe) {
-					S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
-					S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
-                    s1->push_back(S1);
-                    s2->push_back(S2);
-					cdfLobe->push_back(1.f);
+				S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
+				S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
+
+				if (s1 && s2 && pdfLobe) {
+                    *s1 = S1;
+                    *s2 = S2;
+					*pdfLobe = 1.f;
 				}
 
 				//Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
@@ -544,68 +543,66 @@ protected:
 				//else
 				//	return 0.f;
 
-				density *= m_phaseFunction->sigmaDir(d, *s1, *s2, *cdfLobe);
+				density *= m_phaseFunction->sigmaDir(d, S1, S2);
 				return density;
 			}
 			else {
 				bool lazy = true;
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL, 
-					clusterIndex, s1, s2, cdfLobe, lazy);
+					clusterIndex, &S1, &S2, &_pdfLobe, lazy);
 
-				for (int i = 0; i < s1->size(); i++) {
-					S1 = (*s1)[i];
-					S2 = (*s2)[i];
-					Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
-					Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
+				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
+				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
 
-					Matrix3x3 Q;
-					Float eig[3];
-					Matrix3x3 S;
-					Vector w3;
+				Matrix3x3 Q;
+				Float eig[3];
+				Matrix3x3 S;
+				Vector w3;
 
-					if (!lazy) {
-						// handle orientation transform
-						S = Matrix3x3(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
-						S.symEig(Q, eig);
-						// eig[0] < eig[1] == eig[2]
-						w3 = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-					}
-					else {
-						w3 = Vector(S1[0], S1[1], S1[2]);
-						eig[1] = S2[0]; eig[2] = S2[1]; eig[0] = S2[2];
-					}
+				if (!lazy) {
+					// handle orientation transform
+					S = Matrix3x3(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
+					S.symEig(Q, eig);
+					// eig[0] < eig[1] == eig[2]
+					w3 = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+				}
+				else {
+					w3 = Vector(S1[0], S1[1], S1[2]);
+					eig[1] = S2[0]; eig[2] = S2[1]; eig[0] = S2[2];
+				}
 
-					w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
-					// seems missing in original implementation
-					w3 = m_volumeToWorld(w3);
+				w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
+				// seems missing in original implementation
+				w3 = m_volumeToWorld(w3);
 
-					if (!w3.isZero()) {
-						w3 = normalize(w3);
-						Frame frame(w3);
+				if (!w3.isZero()) {
+					w3 = normalize(w3);
+					Frame frame(w3);
 
-						Matrix3x3 basis(frame.s, frame.t, w3);
-						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-						Matrix3x3 basisT;
-						basis.transpose(basisT);
-						S = basis * D * basisT;
+					Matrix3x3 basis(frame.s, frame.t, w3);
+					Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+					Matrix3x3 basisT;
+					basis.transpose(basisT);
+					S = basis * D * basisT;
 
-						Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
-						Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
+					Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
+					Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
 
-						if (s1 && s2) {
-							S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
-							S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
-							(*s1)[i] = S1;
-							(*s2)[i] = S2;
-						}
-					}
-					else {
-						(*s1)[i] = Spectrum(0.f);
-						(*s2)[i] = Spectrum(0.f);
-					}
+					S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
+					S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
+				}
+				else {
+					S1 = Spectrum(0.f);
+					S2 = Spectrum(0.f);
+				}
+
+				if (s1 && s2 && pdfLobe) {
+					*s1 = S1;
+					*s2 = S2;
+					*pdfLobe = _pdfLobe;
 				}
 				
-				density *= m_phaseFunction->sigmaDir(d, *s1, *s2, *cdfLobe);
+				density *= m_phaseFunction->sigmaDir(d, S1, S2);
 				return density;
 			}
 		}

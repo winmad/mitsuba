@@ -6,7 +6,8 @@
 #include <mitsuba/core/mmap.h>
 #include <mitsuba/core/math.h>
 #include <mitsuba/core/frame.h>
-
+#include <mitsuba/core/plugin.h>
+#include <mitsuba/render/sampler.h>
 MTS_NAMESPACE_BEGIN
 
 
@@ -221,6 +222,10 @@ public:
     {
         if ( !m_ready )
         {
+			Properties props("independent");
+			m_sampler = static_cast<Sampler*>(PluginManager::getInstance()->createObject(MTS_CLASS(Sampler), props));
+			m_sampler->configure();
+
             m_hasOrientation = (m_orientationFile != "");
 			m_hasSGGXVolume = (m_numSGGXLobes > 0);
 
@@ -515,7 +520,7 @@ public:
 
     void lookupBundle(const Point &p, Float *density, Vector *direction,
 		Spectrum *albedo, Float *gloss, Float *segmentation,
-		std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe, bool lazy) const
+		Spectrum *s1, Spectrum *s2, Float *pdfLobe, bool lazy) const
     {
         Assert( gloss == NULL );
 
@@ -526,9 +531,9 @@ public:
             if ( direction ) *direction = Vector(0.0f);
             if ( albedo ) *albedo = Spectrum(0.0f);
 			
-			if (s1) s1->clear();
-			if (s2) s2->clear();
-			if (cdfLobe) cdfLobe->clear();
+			if (s1) (*s1) = Spectrum(0.f);
+			if (s2) (*s2) = Spectrum(0.f);
+			if (pdfLobe) *pdfLobe = 0.f;
 			if (segmentation) *segmentation = 0.f;
 
             return;
@@ -632,32 +637,28 @@ public:
 		if (s1) {
 			Assert(m_hasSGGXVolume);
 			Assert(s2 != NULL);
-			Assert(cdfLobe != NULL);
+			Assert(pdfLobe != NULL);
 
-			s1->clear();
-			s2->clear();
-			cdfLobe->clear();
-
-			/*
 			std::vector<Float> cdfs;
-			cdfs.push_back(0.f);
 			for (int i = 0; i < m_numSGGXLobes; i++) {
 				const float *floatData = (float *)m_data[phaseIdx + lobeComponents * i + 2];
 				cdfs.push_back(floatData[idx]);
 			}
 
-			Float rnd = sampler->next1D();
+			Float rnd = m_sampler->next1D();
 			int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
-			lobeIdx = math::clamp(lobeIdx, 0, m_numSGGXLobes - 1);
-			*/
 
-			for (int i = 0; i < m_numSGGXLobes; i++) {
-				int s1VolumeIdx = phaseIdx + lobeComponents * i;
-				int s2VolumeIdx = phaseIdx + lobeComponents * i + 1;
-				int cdfVolumeIdx = phaseIdx + lobeComponents * i + 2;
+			if (lobeIdx < m_numSGGXLobes) {
+				int s1VolumeIdx = phaseIdx + lobeComponents * lobeIdx;
+				int s2VolumeIdx = phaseIdx + lobeComponents * lobeIdx + 1;
+				int cdfVolumeIdx = phaseIdx + lobeComponents * lobeIdx + 2;
 
 				Spectrum s1value, s2value;
-				Float cdf;
+				
+				if (lobeIdx == 0)
+					*pdfLobe = cdfs[0];
+				else
+					*pdfLobe = cdfs[lobeIdx] - cdfs[lobeIdx - 1];
 
 				switch (m_volumeType[s1VolumeIdx])
 				{
@@ -665,19 +666,14 @@ public:
 				{
 					const float3 *s1Data = (float3 *)m_data[s1VolumeIdx];
 					const float3 *s2Data = (float3 *)m_data[s2VolumeIdx];
-					const float *floatData = (float *)m_data[cdfVolumeIdx];
 					s1value = s1Data[idx].toSpectrum();
 					s2value = s2Data[idx].toSpectrum();
-					cdf = floatData[idx];
 				}
 				break;
 				default:
 					s1value = Spectrum(0.f);
 					s2value = Spectrum(0.f);
-					cdf = 0.f;
 				}
-
-				cdfLobe->push_back(cdf);
 
 				if (!s1value.isZero()) {
 					if (!lazy) {
@@ -729,8 +725,8 @@ public:
 					s2value = Spectrum(0.f);
 				}
 				
-				s1->push_back(s1value);
-				s2->push_back(s2value);
+				*s1 = s1value;
+				*s2 = s2value;
 			}
 		}
     }
@@ -831,6 +827,8 @@ protected:
 	std::vector<std::string> m_phaseCdfFiles;
 	std::vector<std::string> m_S1Files;
 	std::vector<std::string> m_S2Files;
+
+	Sampler *m_sampler;
 
     Spectrum m_yarnColor1, m_yarnColor2;
     int m_yarnSplit;

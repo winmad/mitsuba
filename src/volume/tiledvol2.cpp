@@ -146,21 +146,21 @@ public:
 
     void lookupBundle(const Point &_p,
         Float *density, Vector *direction, Spectrum *albedo, Float *gloss, Float *segmentation,
-		std::vector<Spectrum> *s1, std::vector<Spectrum> *s2, std::vector<Float> *cdfLobe, bool lazy) const {
+		Spectrum *s1, Spectrum *s2, Float *pdfLobe, bool lazy) const {
         if ( density ) *density = 0.0f;
         if ( direction ) *direction = Vector(0.0f);
         if ( albedo ) *albedo = Spectrum(0.0f);
         if ( gloss ) *gloss = 0.0f;
 
-		if (s1) s1->clear();
-		if (s2) s2->clear();
-		if (cdfLobe) cdfLobe->clear();
+		if (s1) *s1 = Spectrum(0.f);
+		if (s2) *s2 = Spectrum(0.f);
+		if (pdfLobe) *pdfLobe = 0.f;
 		if (segmentation) *segmentation = 0.f;
 
 		Point q = m_worldToBlock.transformAffine(_p);
         if ( updateLocation(q) )
             m_block->lookupBundle(q, density, direction, albedo, gloss, segmentation,
-				s1, s2, cdfLobe, lazy);
+				s1, s2, pdfLobe, lazy);
     }
 	
     bool supportsBundleLookups() const { return m_block->supportsBundleLookups(); }

@@ -574,7 +574,8 @@ template <typename T> struct TVector3 {
 
 	/// Return whether or not this vector is identically zero
 	bool isZero() const {
-		return x == 0 && y == 0 && z == 0;
+		//return x == 0 && y == 0 && z == 0;
+		return lengthSquared() < 1e-10f;
 	}
 
 	/// Equality test

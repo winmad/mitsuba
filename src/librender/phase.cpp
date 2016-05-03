@@ -209,8 +209,7 @@ Float PhaseFunction::sigmaDir(const Vector &d, Float Sxx, Float Syy, Float Szz,
 	return 0.0f;
 }
 
-Float PhaseFunction::sigmaDir(const Vector &d, const std::vector<Spectrum> &s1,
-	const std::vector<Spectrum> &s2, std::vector<Float> &cdfLobes) const {
+Float PhaseFunction::sigmaDir(const Vector &d, const Spectrum &s1, const Spectrum &s2) const {
 	Log(EError, "%s::sigmaDir(Vector) is not implemented (this is not "
 		"an anisotropic medium!)", getClass()->getName().c_str());
 	return 0.0f;
