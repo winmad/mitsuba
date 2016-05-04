@@ -217,6 +217,8 @@ public:
 	virtual Float sigmaDir(const Vector &d, const Spectrum &s1,
 		const Spectrum &s2) const;
 
+	virtual Float sigmaDir(const Vector &d, Spectrum *s1, Spectrum *s2,
+		Float *pdfLobe, int numLobes) const;
 	/**
 	 * \brief Returns the maximum value take on on by \ref sigmaDirMax().
 	 * This is useful when implementing Woodcock tracking.

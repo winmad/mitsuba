@@ -639,6 +639,7 @@ public:
 			Assert(s2 != NULL);
 			Assert(pdfLobe != NULL);
 
+#ifdef USE_STOC_EVAL
 			std::vector<Float> cdfs;
 			for (int i = 0; i < m_numSGGXLobes; i++) {
 				const float *floatData = (float *)m_data[phaseIdx + lobeComponents * i + 2];
@@ -728,6 +729,92 @@ public:
 				*s1 = s1value;
 				*s2 = s2value;
 			}
+#else
+			for (int i = 0; i < m_numSGGXLobes; i++) {
+				int s1VolumeIdx = phaseIdx + lobeComponents * i;
+				int s2VolumeIdx = phaseIdx + lobeComponents * i + 1;
+				int cdfVolumeIdx = phaseIdx + lobeComponents * i + 2;
+
+				Spectrum s1value, s2value;
+				Float cdf;
+
+				switch (m_volumeType[s1VolumeIdx])
+				{
+				case EFloat32:
+				{
+					const float3 *s1Data = (float3 *)m_data[s1VolumeIdx];
+					const float3 *s2Data = (float3 *)m_data[s2VolumeIdx];
+					const float *floatData = (float *)m_data[cdfVolumeIdx];
+					s1value = s1Data[idx].toSpectrum();
+					s2value = s2Data[idx].toSpectrum();
+					cdf = floatData[idx];
+				}
+				break;
+				default:
+					s1value = Spectrum(0.f);
+					s2value = Spectrum(0.f);
+					cdf = 0.f;
+				}
+
+				pdfLobe[i] = cdf;
+
+				if (!s1value.isZero()) {
+					if (!lazy) {
+						Matrix3x3 Q;
+						Float eig[3];
+
+						Matrix3x3 S(s1value[0], s2value[0], s2value[1],
+							s2value[0], s1value[1], s2value[2],
+							s2value[1], s2value[2], s1value[2]);
+						S.symEig(Q, eig);
+						// eig[0] < eig[1] == eig[2]
+						Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+						w3 = m_volumeToWorld(w3);
+
+						if (!w3.isZero()) {
+							w3 = normalize(w3);
+							Frame frame(w3);
+
+							Matrix3x3 basis(frame.s, frame.t, w3);
+							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+							Matrix3x3 basisT;
+							basis.transpose(basisT);
+							S = basis * D * basisT;
+
+							s1value[0] = S.m[0][0]; s1value[1] = S.m[1][1]; s1value[2] = S.m[2][2];
+							s2value[0] = S.m[0][1]; s2value[1] = S.m[0][2]; s2value[2] = S.m[1][2];
+						}
+						else {
+							s1value = Spectrum(0.f);
+							s2value = Spectrum(0.f);
+						}
+					}
+					else {
+						Vector w3(s1value[0], s1value[1], s1value[2]);
+						w3 = m_volumeToWorld(w3);
+
+						if (!w3.isZero()) {
+							w3 = normalize(w3);
+							s1value[0] = w3.x; s1value[1] = w3.y; s1value[2] = w3.z;
+						}
+						else {
+							s1value = Spectrum(0.f);
+							s2value = Spectrum(0.f);
+						}
+					}
+				}
+				else {
+					s1value = Spectrum(0.f);
+					s2value = Spectrum(0.f);
+				}
+
+				s1[i] = s1value;
+				s2[i] = s2value;
+			}
+
+			for (int i = m_numSGGXLobes - 1; i >= 1; i--)
+				pdfLobe[i] -= pdfLobe[i - 1];
+#endif
 		}
     }
 
@@ -763,6 +850,10 @@ public:
 
 	bool hasSGGXVolume() const {
 		return m_hasSGGXVolume;
+	}
+
+	int getNumLobes() const {
+		return m_numSGGXLobes;
 	}
 
 	std::string toString() const {

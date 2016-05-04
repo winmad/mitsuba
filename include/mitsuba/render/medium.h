@@ -24,6 +24,8 @@
 #include <mitsuba/core/aabb.h>
 #include <mitsuba/render/volume2.h>
 
+#define MAX_SGGX_LOBES 5
+
 MTS_NAMESPACE_BEGIN
 /**
  * \brief Data record for sampling a point on the in-scattering
@@ -68,9 +70,17 @@ public:
 	int clusterIndex;
 	Spectrum albedoScale;
 
+	int numLobes;
+
+#ifdef USE_STOC_EVAL
 	Spectrum s1;
 	Spectrum s2;
 	Float pdfLobe;
+#else
+	Spectrum s1[MAX_SGGX_LOBES];
+	Spectrum s2[MAX_SGGX_LOBES];
+	Float pdfLobe[MAX_SGGX_LOBES];
+#endif
 
 	bool hasExtraInfo;
 	Point extra;

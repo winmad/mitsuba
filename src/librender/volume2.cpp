@@ -66,5 +66,9 @@ bool VolumeDataSourceEx::hasSGGXVolume() const {
 	return false;
 }
 
+int VolumeDataSourceEx::getNumLobes() const {
+	return 1;
+}
+
 MTS_IMPLEMENT_CLASS(VolumeDataSourceEx, true, VolumeDataSource)
 MTS_NAMESPACE_END

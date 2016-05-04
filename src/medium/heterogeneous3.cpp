@@ -57,6 +57,11 @@ public:
 			std::string name = formatString("albedoScale%02i", i);
 			m_albedoScales[i] = props.getSpectrum(name, Spectrum(1.f));
 		}
+
+		/* multi-lobe SGGX */
+		m_numLobes = props.getInteger("SGGXlobes", 1);
+
+		Log(EInfo, "Number of SGGX lobes = %d", m_numLobes);
     }
 
     
@@ -81,6 +86,9 @@ public:
 			m_albedoScales[i] = Spectrum(stream);
 		}
 
+		/* multi-lobe SGGX */
+		m_numLobes = stream->readInt();
+
         configure();
     }
 
@@ -102,6 +110,9 @@ public:
 		for (int i = 0; i < m_numClusters; i++) {
 			m_albedoScales[i].serialize(stream);
 		}
+
+		/* multi-lobe SGGX */
+		stream->writeInt(m_numLobes);
     }
 
 
@@ -215,6 +226,16 @@ public:
             int nSamples = 2; /// XXX make configurable
             Float result = 0;
 
+#ifdef USE_STOC_EVAL
+			Spectrum s1;
+			Spectrum s2;
+			Float pdfLobe;
+#else 
+			Spectrum s1[MAX_SGGX_LOBES];
+			Spectrum s2[MAX_SGGX_LOBES];
+			Float pdfLobe[MAX_SGGX_LOBES];
+#endif
+
             for (int i=0; i<nSamples; ++i) {
                 Float t = mint;
                 int id = static_cast<int>(id0);
@@ -265,15 +286,18 @@ public:
                             m_shell.m_vtxTangent[tmp[3]].dpdv*bb.w;
 
                         Vector orientation;
-						Spectrum s1;
-						Spectrum s2;
-						Float pdfLobe;
+						
                         if ( m_anisotropicMedium ) {
 							Frame tangFrame;
 							tangFrame.s = dpdu; tangFrame.t = dpdv; tangFrame.n = norm;
 
+#ifdef USE_STOC_EVAL
 							density = lookupDensity(q, ray.d, tangFrame, NULL, NULL, NULL, 
 								&s1, &s2, &pdfLobe) * m_scale;
+#else
+							density = lookupDensity(q, ray.d, tangFrame, NULL, NULL, NULL,
+								s1, s2, pdfLobe) * m_scale;
+#endif
 							/*
                             m_volume->lookupBundle(q, &density, &orientation, NULL, NULL,
 								NULL, NULL, NULL);
@@ -304,6 +328,7 @@ public:
     bool sampleDistance(const Ray &ray, MediumSamplingRecord &mRec,	Sampler *sampler) const
     {
         bool success = false;
+		mRec.numLobes = m_numLobes;
 
         /* The following information is invalid when
             using Woodcock-tracking */
@@ -343,6 +368,17 @@ public:
 
         Float t = mint;
         int id = static_cast<int>(id0);
+
+#ifdef USE_STOC_EVAL
+		Spectrum s1;
+		Spectrum s2;
+		Float pdfLobe;
+#else 
+		Spectrum s1[MAX_SGGX_LOBES];
+		Spectrum s2[MAX_SGGX_LOBES];
+		Float pdfLobe[MAX_SGGX_LOBES];
+#endif
+
         while (true) {
             t -= math::fastlog(1 - sampler->next1D())*m_invMaxDensity;
             if ( t >= maxt )
@@ -367,9 +403,6 @@ public:
             Spectrum albedo;
 			Float fClusterIndex = 0.f;
 			int clusterIndex = 0;
-			Spectrum s1;
-			Spectrum s2;
-			Float pdfLobe;
 
             if ( m_shell.m_tetra[id].inside(m_shell.m_vtxPosition, p, bb) ) {
                 const uint32_t *tmp = m_shell.m_tetra[id].idx;
@@ -397,9 +430,15 @@ public:
 					tangFrame.s = dpdu; tangFrame.t = dpdv; tangFrame.n = norm;
 					
 					if (m_volume->hasOrientation()) {
+#ifdef USE_STOC_EVAL
 						density = lookupDensity(q, ray.d, tangFrame,
 							&orientation, &albedo, &fClusterIndex,
 							&s1, &s2, &pdfLobe) * m_scale;
+#else
+						density = lookupDensity(q, ray.d, tangFrame,
+							&orientation, &albedo, &fClusterIndex,
+							s1, s2, pdfLobe) * m_scale;
+#endif
 
 						/*
 						m_volume->lookupBundle(q, &density, &orientation, &albedo, NULL,
@@ -413,9 +452,15 @@ public:
 						*/
 					}
 					else {
+#ifdef USE_STOC_EVAL
 						density = lookupDensity(q, ray.d, tangFrame,
 							NULL, &albedo, &fClusterIndex,
 							&s1, &s2, &pdfLobe) * m_scale;
+#else
+						density = lookupDensity(q, ray.d, tangFrame,
+							NULL, &albedo, &fClusterIndex,
+							s1, s2, pdfLobe) * m_scale;
+#endif
 					}
                 }
                 else {
@@ -450,9 +495,17 @@ public:
                 mRec.medium = this;
                 mRec.hasExtraInfo = true;
                 mRec.extra = tex;
+#ifdef USE_STOC_EVAL
 				mRec.s1 = s1;
 				mRec.s2 = s2;
 				mRec.pdfLobe = pdfLobe;
+#else
+				for (int i = 0; i < m_numLobes; i++) {
+					mRec.s1[i] = s1[i];
+					mRec.s2[i] = s2[i];
+					mRec.pdfLobe[i] = pdfLobe[i];
+				}
+#endif
                 success = true;
                 break;
             }
@@ -497,9 +550,15 @@ protected:
         Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *pdfLobe = NULL) const {
 		Float density;
 		Vector orientation;
+#ifdef USE_STOC_EVAL
 		Spectrum S1(0.f);
 		Spectrum S2(0.f);
 		Float _pdfLobe(0.f);
+#else
+		Spectrum S1[MAX_SGGX_LOBES];
+		Spectrum S2[MAX_SGGX_LOBES];
+		Float _pdfLobe[MAX_SGGX_LOBES];
+#endif
 
 		if (_orientation) *_orientation = Vector(0.f);
 		if (pdfLobe) *pdfLobe = 0.f;
@@ -527,6 +586,7 @@ protected:
 				Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
 				Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
 
+#ifdef USE_STOC_EVAL
 				S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
 				S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
 
@@ -535,6 +595,16 @@ protected:
                     *s2 = S2;
 					*pdfLobe = 1.f;
 				}
+#else
+				S1[0][0] = Sxx; S1[0][1] = Syy; S1[0][2] = Szz;
+				S2[0][0] = Sxy; S2[0][1] = Sxz; S2[0][2] = Syz;
+
+				if (s1 && s2 && pdfLobe) {
+					s1[0] = S1[0];
+					s2[0] = S2[0];
+					pdfLobe[0] = 1.f;
+				}
+#endif
 
 				//Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
@@ -543,11 +613,16 @@ protected:
 				//else
 				//	return 0.f;
 
+#ifdef USE_STOC_EVAL
 				density *= m_phaseFunction->sigmaDir(d, S1, S2);
+#else
+				density *= m_phaseFunction->sigmaDir(d, S1, S2, pdfLobe, 1);
+#endif
 				return density;
 			}
 			else {
 				bool lazy = true;
+#ifdef USE_STOC_EVAL
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL, 
 					clusterIndex, &S1, &S2, &_pdfLobe, lazy);
 
@@ -603,6 +678,79 @@ protected:
 				}
 				
 				density *= m_phaseFunction->sigmaDir(d, S1, S2);
+#else
+				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
+					clusterIndex, S1, S2, _pdfLobe, lazy);
+
+// 				if (_pdfLobe[0] + _pdfLobe[1] > 0.99) {
+// 					Log(EInfo, "(%.3f,%.3f,%.3f), (%.3f,%.3f,%.3f), %.3f\n(%.3f,%.3f,%.3f), (%.3f,%.3f,%.3f), %.3f",
+// 						S1[0][0], S1[0][1], S1[0][2], S2[0][0], S2[0][1], S2[0][2], _pdfLobe[0],
+// 						S1[1][0], S1[1][1], S1[1][2], S2[1][0], S2[1][1], S2[1][2], _pdfLobe[1]);
+// 				}
+
+				for (int i = 0; i < m_numLobes; i++) {
+					if (_pdfLobe[i] < 1e-6f) {
+						S1[i] = Spectrum(0.f);
+						S2[i] = Spectrum(0.f);
+						continue;
+					}
+
+					Float Sxx = S1[i][0], Syy = S1[i][1], Szz = S1[i][2];
+					Float Sxy = S2[i][0], Sxz = S2[i][1], Syz = S2[i][2];
+
+					Matrix3x3 Q;
+					Float eig[3];
+					Matrix3x3 S;
+					Vector w3;
+
+					if (!lazy) {
+						// handle orientation transform
+						S = Matrix3x3(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
+						S.symEig(Q, eig);
+						// eig[0] < eig[1] == eig[2]
+						w3 = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+					}
+					else {
+						w3 = Vector(S1[i][0], S1[i][1], S1[i][2]);
+						eig[1] = S2[i][0]; eig[2] = S2[i][1]; eig[0] = S2[i][2];
+					}
+
+					w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
+					// seems missing in original implementation
+					w3 = m_volumeToWorld(w3);
+
+					if (!w3.isZero()) {
+						w3 = normalize(w3);
+						Frame frame(w3);
+
+						Matrix3x3 basis(frame.s, frame.t, w3);
+						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+						Matrix3x3 basisT;
+						basis.transpose(basisT);
+						S = basis * D * basisT;
+
+						Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
+						Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
+
+						S1[i][0] = Sxx; S1[i][1] = Syy; S1[i][2] = Szz;
+						S2[i][0] = Sxy; S2[i][1] = Sxz; S2[i][2] = Syz;
+					}
+					else {
+						S1[i] = Spectrum(0.f);
+						S2[i] = Spectrum(0.f);
+					}
+				}
+
+				if (s1 && s2 && pdfLobe) {
+					for (int i = 0; i < m_numLobes; i++) {
+						s1[i] = S1[i];
+						s2[i] = S2[i];
+						pdfLobe[i] = _pdfLobe[i];
+					}
+				}
+
+				density *= m_phaseFunction->sigmaDir(d, S1, S2, _pdfLobe, m_numLobes);
+#endif
 				return density;
 			}
 		}
@@ -641,6 +789,9 @@ protected:
 	bool m_useDiffAlbedoScales;
 	int m_numClusters;
 	std::vector<Spectrum> m_albedoScales;
+
+	int m_numLobes;
+	std::vector<Spectrum> m_lobeScales;
 };
 
 

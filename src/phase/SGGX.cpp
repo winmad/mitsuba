@@ -77,12 +77,17 @@ public:
 		stream->writeFloat(m_mixedWeight);
 	}
 
-	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
+	Float evalSingleLobe(const PhaseFunctionSamplingRecord &pRec, int lobeIdx) const {
 		Vector wi = pRec.wi;
 		Vector wo = pRec.wo;
 
+#ifdef USE_STOC_EVAL
 		Spectrum s1 = pRec.mRec.s1;
 		Spectrum s2 = pRec.mRec.s2;
+#else
+		Spectrum s1 = pRec.mRec.s1[lobeIdx];
+		Spectrum s2 = pRec.mRec.s2[lobeIdx];
+#endif
 
 		Float Sxx = s1[0], Syy = s1[1], Szz = s1[2];
 		Float Sxy = s2[0], Sxz = s2[1], Syz = s2[2];
@@ -129,11 +134,31 @@ public:
 		return res;
 	}
 
-	inline Float sample(PhaseFunctionSamplingRecord &pRec, Sampler *sampler) const {
+	Float eval(const PhaseFunctionSamplingRecord &pRec) const {
+#ifdef USE_STOC_EVAL
+		return evalSingleLobe(pRec, 0);
+#else
+		Float res = 0.f;
+		int numLobes = pRec.mRec.numLobes;
+
+		for (int i = 0; i < numLobes; i++) {
+			if (pRec.mRec.pdfLobe[i] > 0.f)
+				res += pRec.mRec.pdfLobe[i] * evalSingleLobe(pRec, i);
+		}
+		return res;
+#endif
+	}
+
+	inline Float sampleSingleLobe(PhaseFunctionSamplingRecord &pRec, Sampler *sampler, int lobeIdx) const {
 		Vector wi = pRec.wi;
 
+#ifdef USE_STOC_EVAL
 		Spectrum s1 = pRec.mRec.s1;
 		Spectrum s2 = pRec.mRec.s2;
+#else
+		Spectrum s1 = pRec.mRec.s1[lobeIdx];
+		Spectrum s2 = pRec.mRec.s2[lobeIdx];
+#endif
 
 		Float Sxx = s1[0], Syy = s1[1], Szz = s1[2];
 		Float Sxy = s2[0], Sxz = s2[1], Syz = s2[2];
@@ -220,12 +245,41 @@ public:
 			return 0.f;
 	}
 
+	inline Float sample(PhaseFunctionSamplingRecord &pRec, Sampler *sampler) const {
+#ifdef USE_STOC_EVAL
+		return sampleSingleLobe(pRec, sampler, 0);
+#else
+		Float cdfs[MAX_SGGX_LOBES];
+		int numLobes = pRec.mRec.numLobes;
+
+		for (int i = 0; i < numLobes; i++) {
+			if (i == 0)
+				cdfs[i] = pRec.mRec.pdfLobe[i];
+			else
+				cdfs[i] = cdfs[i - 1] + pRec.mRec.pdfLobe[i];
+		}
+
+		if (cdfs[numLobes - 1] < 1e-6f)
+			return 0.f;
+
+		Float rnd = m_sampler->next1D();
+		int lobeIdx = std::lower_bound(cdfs, cdfs + numLobes, rnd) - cdfs;
+
+		Assert(lobeIdx < numLobes);
+
+		return sampleSingleLobe(pRec, sampler, lobeIdx);
+#endif
+	}
+
 	Float sample(PhaseFunctionSamplingRecord &pRec,
 		Float &pdf, Sampler *sampler) const {
 		if (sample(pRec, sampler) == 0) {
 			pdf = 0; return 0.0f;
 		}
+		
 		pdf = eval(pRec);
+		// need to be normalized, if using lobe scales
+		
 		return 1.0f;
 	}
 
@@ -289,6 +343,16 @@ public:
 	Float sigmaDir(const Vector &d, const Spectrum &s1,
 		const Spectrum &s2) const {
 		return sigma(d, s1[0], s1[1], s1[2], s2[0], s2[1], s2[2]);
+	}
+
+	Float sigmaDir(const Vector &d, Spectrum *s1, Spectrum *s2, 
+		Float *pdfLobe, int numLobes) const {
+		Float res = 0.f;
+		for (int i = 0; i < numLobes; i++) {
+			if (pdfLobe[i] > 0)
+				res += pdfLobe[i] * sigma(d, s1[i][0], s1[i][1], s1[i][2], s2[i][0], s2[i][1], s2[i][2]);
+		}
+		return res;
 	}
 
 	Matrix3x3 getD() const {

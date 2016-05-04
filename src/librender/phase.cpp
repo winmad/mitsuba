@@ -215,6 +215,13 @@ Float PhaseFunction::sigmaDir(const Vector &d, const Spectrum &s1, const Spectru
 	return 0.0f;
 }
 
+Float PhaseFunction::sigmaDir(const Vector &d, Spectrum *s1, Spectrum *s2,
+	Float *pdfLobe, int numLobes) const {
+	Log(EError, "%s::sigmaDir(Vector) is not implemented (this is not "
+		"an anisotropic medium!)", getClass()->getName().c_str());
+	return 0.0f;
+}
+
 Float PhaseFunction::sigmaDirMax() const {
 	Log(EError, "%s::sigmaDirMax() is not implemented (this is not "
 		"an anisotropic medium!)", getClass()->getName().c_str());

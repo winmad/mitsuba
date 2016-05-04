@@ -152,9 +152,18 @@ public:
         if ( albedo ) *albedo = Spectrum(0.0f);
         if ( gloss ) *gloss = 0.0f;
 
-		if (s1) *s1 = Spectrum(0.f);
-		if (s2) *s2 = Spectrum(0.f);
+#ifdef USE_STOC_EVAL
+		if (s1) (*s1) = Spectrum(0.f);
+		if (s2) (*s2) = Spectrum(0.f);
 		if (pdfLobe) *pdfLobe = 0.f;
+#else
+		for (int i = 0; i < m_block->getNumLobes(); i++) {
+			if (s1) s1[i] = Spectrum(0.f);
+			if (s2) s2[i] = Spectrum(0.f);
+			if (pdfLobe) pdfLobe[i] = 0.f;
+		}
+#endif
+
 		if (segmentation) *segmentation = 0.f;
 
 		Point q = m_worldToBlock.transformAffine(_p);
@@ -177,6 +186,10 @@ public:
 
 	bool hasSGGXVolume() const {
 		return m_block->hasSGGXVolume();
+	}
+
+	int getNumLobes() const {
+		return m_block->getNumLobes();
 	}
 
 	MTS_DECLARE_CLASS()

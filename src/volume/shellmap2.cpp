@@ -170,9 +170,17 @@ public:
         if ( albedo ) *albedo = Spectrum(0.0f);
         if ( gloss ) *gloss = 0.0f;
 		
+#ifdef USE_STOC_EVAL
 		if (s1) (*s1) = Spectrum(0.f);
 		if (s2) (*s2) = Spectrum(0.f);
 		if (pdfLobe) *pdfLobe = 0.f;
+#else
+		for (int i = 0; i < m_block->getNumLobes(); i++) {
+			if (s1) s1[i] = Spectrum(0.f);
+			if (s2) s2[i] = Spectrum(0.f);
+			if (pdfLobe) pdfLobe[i] = 0.f;
+		}
+#endif
 		if (segmentation) *segmentation = 0.f;
 
 		Point q = m_worldToVolume.transformAffine(_p);
@@ -201,6 +209,7 @@ public:
 				Matrix3x3 Q;
 				Float eig[3];
 
+#ifdef USE_STOC_EVAL
 				Matrix3x3 S((*s1)[0], (*s2)[0], (*s2)[1], 
 					(*s2)[0], (*s1)[1], (*s2)[2], 
 					(*s2)[1], (*s2)[2], (*s1)[2]);
@@ -227,6 +236,40 @@ public:
 					(*s1) = Spectrum(0.f);
 					(*s2) = Spectrum(0.f);
 				}
+#else
+				for (int i = 0; i < m_block->getNumLobes(); i++) {
+					// handle orientation transform
+					Matrix3x3 Q;
+					Float eig[3];
+
+					Matrix3x3 S(s1[i][0], s2[i][0], s2[i][1],
+						s2[i][0], s1[i][1], s2[i][2],
+						s2[i][1], s2[i][2], s1[i][2]);
+					S.symEig(Q, eig);
+					// eig[0] < eig[1] == eig[2]
+					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+
+					w3 = m_volumeToWorld(w3.x * tang.dpdu + w3.y * tang.dpdv + w3.z * norm);
+
+					if (!w3.isZero()) {
+						w3 = normalize(w3);
+						Frame frame(w3);
+
+						Matrix3x3 basis(frame.s, frame.t, w3);
+						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+						Matrix3x3 basisT;
+						basis.transpose(basisT);
+						S = basis * D * basisT;
+
+						s1[i][0] = S.m[0][0]; s1[i][1] = S.m[1][1]; s1[i][2] = S.m[2][2];
+						s2[i][0] = S.m[0][1]; s2[i][1] = S.m[0][2]; s2[i][2] = S.m[1][2];
+					}
+					else {
+						s1[i] = Spectrum(0.f);
+						s2[i] = Spectrum(0.f);
+					}
+				}
+#endif
 			}
 		}
 		else {
@@ -252,6 +295,10 @@ public:
 
 	bool hasSGGXVolume() const {
 		return m_block->hasSGGXVolume();
+	}
+
+	int getNumLobes() const {
+		return m_block->getNumLobes();
 	}
 
 	MTS_DECLARE_CLASS()

@@ -21,6 +21,8 @@
 
 #include <mitsuba/render/volume.h>
 
+//#define USE_STOC_EVAL // using stochastic evaluation of SGGX
+
 MTS_NAMESPACE_BEGIN
 
 class MTS_EXPORT_RENDER VolumeDataSourceEx : public VolumeDataSource {
@@ -38,6 +40,8 @@ public:
 
 	virtual bool hasOrientation() const;
 	virtual bool hasSGGXVolume() const;
+
+	virtual int getNumLobes() const;
 
 	MTS_DECLARE_CLASS()
 protected:
