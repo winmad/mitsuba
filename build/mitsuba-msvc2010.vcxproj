@@ -640,6 +640,7 @@
     <ClCompile Include="..\src\integrators\misc\multichannel.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_diff.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_multi_lobe_diff.cpp" />
+    <ClCompile Include="..\src\integrators\path\volpath_simple_multi_lobe_hetero_diff.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_scale_diff.cpp" />
     <ClCompile Include="..\src\librender\lightcutter.cpp" />
     <ClCompile Include="..\src\librender\trimesh.cpp">
