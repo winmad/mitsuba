@@ -93,6 +93,12 @@ public:
 
 		/* multi-lobe SGGX */
 		m_numLobes = props.getInteger("SGGXlobes", 1);
+		m_lobeScales.resize(m_numLobes);
+		for (int i = 0; i < m_numLobes; i++) {
+			std::string name = formatString("lobeScale%02i", i);
+			m_lobeScales[i] = props.getFloat(name, 1.f);
+		}
+		Log(EInfo, "Number of SGGX lobes = %d", m_numLobes);
 	}
 
 	/* Unserialize from a binary data stream */
@@ -112,6 +118,10 @@ public:
 
 		/* multi-lobe SGGX */
 		m_numLobes = stream->readInt();
+		m_lobeScales.resize(m_numLobes);
+		for (int i = 0; i < m_numLobes; i++) {
+			m_lobeScales[i] = stream->readFloat();
+		}
 		configure();
 	}
 
@@ -134,6 +144,9 @@ public:
 
 		/* multi-lobe SGGX */
 		stream->writeInt(m_numLobes);
+		for (int i = 0; i < m_numLobes; i++) {
+			stream->writeFloat(m_lobeScales[i]);
+		}
 	}
 
 	void configure() {
@@ -545,6 +558,7 @@ public:
 					mRec.s1[i] = s1[i];
 					mRec.s2[i] = s2[i];
 					mRec.pdfLobe[i] = pdfLobe[i];
+					mRec.lobeScales[i] = m_lobeScales[i];
 				}
 #endif
 			}
@@ -637,6 +651,7 @@ public:
 						mRec.s1[i] = s1[i];
 						mRec.s2[i] = s2[i];
 						mRec.pdfLobe[i] = pdfLobe[i];
+						mRec.lobeScales[i] = m_lobeScales[i];
 					}
 #endif
                     // XXX - what if a single channel has a 0 intensity value?
@@ -703,6 +718,7 @@ public:
 				mRec.s1[i] = s1[i];
 				mRec.s2[i] = s2[i];
 				mRec.pdfLobe[i] = pdfLobe[i];
+				mRec.lobeScales[i] = m_lobeScales[i];
 			}
 #endif
 			mRec.time = ray.time;
@@ -749,6 +765,7 @@ protected:
 		Spectrum S1[MAX_SGGX_LOBES];
 		Spectrum S2[MAX_SGGX_LOBES];
 		Float _pdfLobe[MAX_SGGX_LOBES];
+		Float weightedPdfLobe[MAX_SGGX_LOBES];
 #endif
 
 		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
@@ -823,12 +840,16 @@ protected:
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
 					clusterIndex, S1, S2, _pdfLobe, lazy);
 
+				for (int i = 0; i < m_numLobes; i++) {
+					weightedPdfLobe[i] = _pdfLobe[i] * m_lobeScales[i];
+				}
+
 				Matrix3x3 basisT;
 				Matrix3x3 S;
 				Float eig[3];
 
 				if (!lazy) {
-					density *= m_phaseFunction->sigmaDir(d, S1, S2, _pdfLobe, m_numLobes);
+					density *= m_phaseFunction->sigmaDir(d, S1, S2, weightedPdfLobe, m_numLobes);
 				}
 				else {
 					for (int i = 0; i < m_numLobes; i++) {
@@ -853,7 +874,7 @@ protected:
 						}
 						
 					}
-					density *= m_phaseFunction->sigmaDir(d, S1, S2, _pdfLobe, m_numLobes);
+					density *= m_phaseFunction->sigmaDir(d, S1, S2, weightedPdfLobe, m_numLobes);
 				}
 
 				if (s1 && s2 && pdfLobe) {
@@ -892,7 +913,7 @@ protected:
 	std::vector<Spectrum> m_albedoScales;
 
 	int m_numLobes;
-	std::vector<Spectrum> m_lobeScales;
+	std::vector<Float> m_lobeScales;
 };
 
 MTS_IMPLEMENT_CLASS_S(HeterogeneousMediumEx, false, Medium)

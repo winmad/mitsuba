@@ -143,7 +143,27 @@ public:
 
 		for (int i = 0; i < numLobes; i++) {
 			if (pRec.mRec.pdfLobe[i] > 0.f)
-				res += pRec.mRec.pdfLobe[i] * evalSingleLobe(pRec, i);
+				res += pRec.mRec.lobeScales[i] * pRec.mRec.pdfLobe[i] * evalSingleLobe(pRec, i);
+		}
+		return res;
+#endif
+	}
+
+	Float eval(const PhaseFunctionSamplingRecord &pRec, Float *weightedF) const {
+#ifdef USE_STOC_EVAL
+		return evalSingleLobe(pRec, 0);
+#else
+		Float res = 0.f;
+		int numLobes = pRec.mRec.numLobes;
+
+		for (int i = 0; i < numLobes; i++) {
+			if (pRec.mRec.pdfLobe[i] > 0.f) {
+				weightedF[i] = pRec.mRec.pdfLobe[i] * evalSingleLobe(pRec, i);
+				res += pRec.mRec.lobeScales[i] * weightedF[i];
+			}
+			else {
+				weightedF[i] = 0.f;
+			}
 		}
 		return res;
 #endif
@@ -254,20 +274,25 @@ public:
 
 		for (int i = 0; i < numLobes; i++) {
 			if (i == 0)
-				cdfs[i] = pRec.mRec.pdfLobe[i];
+				cdfs[i] = pRec.mRec.pdfLobe[i] * pRec.mRec.lobeScales[i];
 			else
-				cdfs[i] = cdfs[i - 1] + pRec.mRec.pdfLobe[i];
+				cdfs[i] = cdfs[i - 1] + pRec.mRec.pdfLobe[i] * pRec.mRec.lobeScales[i];
 		}
 
 		if (cdfs[numLobes - 1] < 1e-6f)
 			return 0.f;
+
+		Float normFactor = cdfs[numLobes - 1];
+		for (int i = 0; i < numLobes; i++) {
+			cdfs[i] /= normFactor;
+		}
 
 		Float rnd = m_sampler->next1D();
 		int lobeIdx = std::lower_bound(cdfs, cdfs + numLobes, rnd) - cdfs;
 
 		Assert(lobeIdx < numLobes);
 
-		return sampleSingleLobe(pRec, sampler, lobeIdx);
+		return sampleSingleLobe(pRec, sampler, lobeIdx) * normFactor;
 #endif
 	}
 
@@ -277,10 +302,26 @@ public:
 			pdf = 0; return 0.0f;
 		}
 		
-		pdf = eval(pRec);
 		// need to be normalized, if using lobe scales
+		pdf = eval(pRec);
+		Float normFactor = 0.f;
+		for (int i = 0; i < pRec.mRec.numLobes; i++) {
+			normFactor += pRec.mRec.pdfLobe[i] * pRec.mRec.lobeScales[i];
+		}
+		pdf /= normFactor;
 		
-		return 1.0f;
+		
+		return 1.0f * normFactor;
+	}
+
+	Float pdf(const PhaseFunctionSamplingRecord &pRec) const {
+		Float res = eval(pRec);
+		Float normFactor = 0.f;
+		for (int i = 0; i < pRec.mRec.numLobes; i++) {
+			normFactor += pRec.mRec.pdfLobe[i] * pRec.mRec.lobeScales[i];
+		}
+		res /= normFactor;
+		return res;
 	}
 
 	Vector sampleVNormal(const Vector &wi, Sampler *sampler, Float Sxx, Float Syy, Float Szz,

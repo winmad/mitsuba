@@ -147,6 +147,8 @@ public:
 	 */
 	virtual Float eval(const PhaseFunctionSamplingRecord &pRec) const = 0;
 
+	virtual Float eval(const PhaseFunctionSamplingRecord &pRec, Float *weightedF) const;
+
 	/**
 	 * \brief Sample the phase function and return the importance weight (i.e. the
 	 * value of the phase function divided by the probability density of the sample).

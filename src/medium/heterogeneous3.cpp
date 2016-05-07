@@ -60,7 +60,11 @@ public:
 
 		/* multi-lobe SGGX */
 		m_numLobes = props.getInteger("SGGXlobes", 1);
-
+		m_lobeScales.resize(m_numLobes);
+		for (int i = 0; i < m_numLobes; i++) {
+			std::string name = formatString("lobeScale%02i", i);
+			m_lobeScales[i] = props.getFloat(name, 1.f);
+		}
 		Log(EInfo, "Number of SGGX lobes = %d", m_numLobes);
     }
 
@@ -88,7 +92,10 @@ public:
 
 		/* multi-lobe SGGX */
 		m_numLobes = stream->readInt();
-
+		m_lobeScales.resize(m_numLobes);
+		for (int i = 0; i < m_numLobes; i++) {
+			m_lobeScales[i] = stream->readFloat();
+		}
         configure();
     }
 
@@ -113,6 +120,9 @@ public:
 
 		/* multi-lobe SGGX */
 		stream->writeInt(m_numLobes);
+		for (int i = 0; i < m_numLobes; i++) {
+			stream->writeFloat(m_lobeScales[i]);
+		}
     }
 
 
@@ -504,6 +514,7 @@ public:
 					mRec.s1[i] = s1[i];
 					mRec.s2[i] = s2[i];
 					mRec.pdfLobe[i] = pdfLobe[i];
+					mRec.lobeScales[i] = m_lobeScales[i];
 				}
 #endif
                 success = true;
@@ -558,6 +569,7 @@ protected:
 		Spectrum S1[MAX_SGGX_LOBES];
 		Spectrum S2[MAX_SGGX_LOBES];
 		Float _pdfLobe[MAX_SGGX_LOBES];
+		Float weightedPdfLobe[MAX_SGGX_LOBES];
 #endif
 
 		if (_orientation) *_orientation = Vector(0.f);
@@ -749,7 +761,11 @@ protected:
 					}
 				}
 
-				density *= m_phaseFunction->sigmaDir(d, S1, S2, _pdfLobe, m_numLobes);
+				for (int i = 0; i < m_numLobes; i++) {
+					weightedPdfLobe[i] = _pdfLobe[i] * m_lobeScales[i];
+				}
+				
+				density *= m_phaseFunction->sigmaDir(d, S1, S2, weightedPdfLobe, m_numLobes);
 #endif
 				return density;
 			}
@@ -791,7 +807,7 @@ protected:
 	std::vector<Spectrum> m_albedoScales;
 
 	int m_numLobes;
-	std::vector<Spectrum> m_lobeScales;
+	std::vector<Float> m_lobeScales;
 };
 
 

@@ -305,9 +305,6 @@
     <ClCompile Include="..\src\librender\renderqueue.cpp">
       <Filter>Source Files\librender</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\librender\renderproc.cpp">
-      <Filter>Source Files\librender</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\librender\vpl.cpp">
       <Filter>Source Files\librender</Filter>
     </ClCompile>
@@ -1126,6 +1123,12 @@
     </ClCompile>
     <ClCompile Include="..\src\utils\alignLobes.cpp">
       <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\librender\renderproc.cpp">
+      <Filter>Source Files\mitsuba</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\integrators\path\volpath_simple_multi_lobe_diff.cpp">
+      <Filter>Source Files\integrators\path</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">

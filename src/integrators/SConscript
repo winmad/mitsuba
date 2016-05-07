@@ -3,6 +3,9 @@ Import('env', 'sys', 'plugins')
 plugins += env.SharedLibrary('volpath_simple_scale_diff', ['path/volpath_simple_scale_diff.cpp'])
 plugins += env.SharedLibrary('volpath_simple_diff', ['path/volpath_simple_diff.cpp'])
 
+plugins += env.SharedLibrary('volpath_simple_multi_lobe_diff', ['path/volpath_simple_multi_lobe_diff.cpp'])
+plugins += env.SharedLibrary('volpath_simple_multi_lobe_hetero_diff', ['path/volpath_simple_multi_lobe_hetero_diff.cpp'])
+
 plugins += env.SharedLibrary('aaf', ['aaf/aaf.cpp'])
 plugins += env.SharedLibrary('info', ['info/info.cpp'])
 

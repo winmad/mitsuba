@@ -14,6 +14,9 @@ endmacro()
 add_integrator(volpath_simple_scale_diff  path/volpath_simple_scale_diff.cpp)
 add_integrator(volpath_simple_diff  path/volpath_simple_diff.cpp)
 
+add_integrator(volpath_simple_multi_lobe_diff  path/volpath_simple_multi_lobe_diff.cpp)
+add_integrator(volpath_simple_multi_lobe_hetero_diff  path/volpath_simple_multi_lobe_hetero_diff.cpp)
+
 add_integrator(aaf      aaf/aaf.cpp)
 add_integrator(info    info/info.cpp)
 add_integrator(lightcuts    lightcuts/lightcuts.cpp)
