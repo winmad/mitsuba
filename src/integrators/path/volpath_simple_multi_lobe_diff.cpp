@@ -279,7 +279,7 @@ public:
 		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
 
 		for (int k = 0; k < m_numLobes; k++) {
-			outfile = prefix + formatString("LdW_s%02i_%03i_%03i.pfm", k, block->getOffset().x, block->getOffset().y);
+			outfile = prefix + formatString("LdW_l%02i_%03i_%03i.pfm", k, block->getOffset().x, block->getOffset().y);
 			for (int i = 0; i < points.size(); i++) {
 				Point2i p = Point2i(points[i]);
 				int localIndex = p.x + p.y * block->getWidth();

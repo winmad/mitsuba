@@ -218,9 +218,21 @@ public:
 
 				std::vector<Spectrum> oneTdA(numClusters, Spectrum(0.f));
 				std::vector<Spectrum> oneLdA(numClusters, Spectrum(0.f));
+				std::vector<std::vector<Spectrum> > oneTdW;
+				std::vector<std::vector<Spectrum> > oneLdW;
+				oneTdW.resize(numClusters);
+				oneLdW.resize(numClusters);
+				for (int k = 0; k < numClusters; k++) {
+					oneTdW[k].resize(m_numLobes);
+					oneLdW[k].resize(m_numLobes);
+					for (int l = 0; l < m_numLobes; l++) {
+						oneTdW[k][l] = Spectrum(0.f);
+						oneLdW[k][l] = Spectrum(0.f);
+					}
+				}
 				int albedoSegs = 0;
 
-				spec *= Li(sensorRay, rRec, oneTdA, oneLdA, albedoSegs);
+				spec *= Li(sensorRay, rRec, oneTdA, oneLdA, oneTdW, oneLdW, albedoSegs);
 
 				block->put(samplePos, spec, rRec.alpha);
 
@@ -240,6 +252,24 @@ public:
 					}
 				}
 
+				for (int k = 0; k < numClusters; k++) {
+					for (int l = 0; l < m_numLobes; l++) {
+						bool goodSample = true;
+
+						for (int c = 0; c < 3; c++) {
+							if (!std::isfinite(oneLdW[k][l][c]) || oneLdW[k][l][c] < 0) {
+								goodSample = false;
+								break;
+							}
+						}
+
+						if (goodSample) {
+							LdW[k][l][index] += oneLdW[k][l];
+							cntLdW[k][l] += 1.f;
+						}
+					}
+				}
+
 				imageSeg[index] |= albedoSegs;
 
 				sampler->advance();
@@ -252,13 +282,23 @@ public:
 				else {
 					LdA[k][index] = Spectrum(0.f);
 				}
+
+				for (int l = 0; l < m_numLobes; l++) {
+					if (cntLdW[k][l] > 0.f) {
+						LdW[k][l][index] /= cntLdW[k][l];
+					}
+					else {
+						LdW[k][l][index] = Spectrum(0.f);
+					}
+				}
 			}
 		}
 
 		Float *data = new Float[(int)points.size() * 3];
 
 		for (int k = 0; k < numClusters; k++) {
-			std::string outfile = prefix + formatString("LdA_s%02i_%03i_%03i.pfm", k, block->getOffset().x, block->getOffset().y);
+			std::string outfile = prefix + formatString("LdA_s%02i_%03i_%03i.pfm", k, 
+				block->getOffset().x, block->getOffset().y);
 			for (int i = 0; i < points.size(); i++) {
 				Point2i p = Point2i(points[i]);
 				int localIndex = p.x + p.y * block->getWidth();
@@ -270,6 +310,24 @@ public:
 				}
 			}
 			savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
+		}
+
+		for (int k = 0; k < numClusters; k++) {
+			for (int l = 0; l < m_numLobes; l++) {
+				std::string outfile = prefix + formatString("LdW_s%02i_l%02i_%03i_%03i.pfm", k, l, block->getOffset().x,
+					block->getOffset().y);
+				for (int i = 0; i < points.size(); i++) {
+					Point2i p = Point2i(points[i]);
+					int localIndex = p.x + p.y * block->getWidth();
+					Point2i offset = p + Vector2i(block->getOffset());
+					int globalIndex = offset.x + offset.y * width;
+					Spectrum color(LdW[k][l][globalIndex]);
+					for (int c = 0; c < 3; c++) {
+						data[3 * localIndex + c] = color[c];
+					}
+				}
+				savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
+			}
 		}
 
 		std::string outfile = prefix + formatString("image_seg_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
@@ -308,7 +366,9 @@ public:
 	}
 
 	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec,
-		std::vector<Spectrum> &TdA, std::vector<Spectrum> &LdA, int &albedoSegs) const {
+		std::vector<Spectrum> &TdA, std::vector<Spectrum> &LdA, 
+		std::vector<std::vector<Spectrum> > &TdW,
+		std::vector<std::vector<Spectrum> > &LdW, int &albedoSegs) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
@@ -360,6 +420,10 @@ public:
 					else {
 						TdA[k] *= val;
 					}
+
+					for (int l = 0; l < m_numLobes; l++) {
+						TdW[k][l] *= val;
+					}
 				}
 
 				numScattering++;
@@ -382,13 +446,25 @@ public:
 						if (phase->getClass()->getName() == "SGGXPhaseFunction")
 							useSGGX = true;
 
+						Float weightedF[MAX_SGGX_LOBES];
 						Spectrum val = value * phase->eval(
-							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX));
+							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX), weightedF);
 						Li += throughput * val;
 
 						albedoSegs |= thrAlbedoSegs;
 						for (int k = 0; k < numClusters; k++) {
 							LdA[k] += TdA[k] * val;
+
+							if (k == mRec.clusterIndex) {
+								for (int l = 0; l < m_numLobes; l++) {
+									LdW[k][l] += TdW[k][l] * val + throughput * value * weightedF[l];
+								}
+							}
+							else {
+								for (int l = 0; l < m_numLobes; l++) {
+									LdW[k][l] += TdW[k][l] * val;
+								}
+							}
 						}
 					}
 				}
@@ -415,6 +491,17 @@ public:
 
 				for (int k = 0; k < numClusters; k++) {
 					TdA[k] *= phaseVal;
+
+					if (k == mRec.clusterIndex) {
+						for (int l = 0; l < m_numLobes; l++) {
+							TdW[k][l] = throughput * mRec.pdfLobe[l] + TdW[k][l] * phaseVal;
+						}
+					}
+					else {
+						for (int l = 0; l < m_numLobes; l++) {
+							TdW[k][l] *= phaseVal;
+						}
+					}
 				}
 
 				/* Trace a ray in this direction */
@@ -436,6 +523,10 @@ public:
 
 					for (int k = 0; k < numClusters; k++) {
 						TdA[k] *= val;
+						
+						for (int l = 0; l < m_numLobes; l++) {
+							TdW[k][l] *= val;
+						}
 					}
 				}
 
@@ -457,6 +548,10 @@ public:
 						albedoSegs |= thrAlbedoSegs;
 						for (int k = 0; k < numClusters; k++) {
 							LdA[k] += TdA[k] * val;
+
+							for (int l = 0; l < m_numLobes; l++) {
+								LdW[k][l] += TdW[k][l] * val;
+							}
 						}
 					}
 					break;
@@ -471,6 +566,10 @@ public:
 					albedoSegs |= thrAlbedoSegs;
 					for (int k = 0; k < numClusters; k++) {
 						LdA[k] += TdA[k] * val;
+
+						for (int l = 0; l < m_numLobes; l++) {
+							LdW[k][l] += TdW[k][l] * val;
+						}
 					}
 				}
 
@@ -482,6 +581,10 @@ public:
 					albedoSegs |= thrAlbedoSegs;
 					for (int k = 0; k < numClusters; k++) {
 						LdA[k] += TdA[k] * val;
+
+						for (int l = 0; l < m_numLobes; l++) {
+							LdW[k][l] += TdW[k][l] * val;
+						}
 					}
 				}
 
@@ -522,6 +625,10 @@ public:
 							albedoSegs |= thrAlbedoSegs;
 							for (int k = 0; k < numClusters; k++) {
 								LdA[k] += TdA[k] * val;
+
+								for (int l = 0; l < m_numLobes; l++) {
+									LdW[k][l] += TdW[k][l] * val;
+								}
 							}
 						}
 					}
@@ -574,6 +681,10 @@ public:
 
 				for (int k = 0; k < numClusters; k++) {
 					TdA[k] *= bsdfVal;
+
+					for (int l = 0; l < m_numLobes; l++) {
+						TdW[k][l] *= bsdfVal;
+					}
 				}
 
 				eta *= bRec.eta;
@@ -599,6 +710,10 @@ public:
 
 				for (int k = 0; k < numClusters; k++) {
 					TdA[k] /= q;
+
+					for (int l = 0; l < m_numLobes; l++) {
+						TdW[k][l] /= q;
+					}
 				}
 			}
 		}

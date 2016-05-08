@@ -93,10 +93,13 @@ public:
 
 		/* multi-lobe SGGX */
 		m_numLobes = props.getInteger("SGGXlobes", 1);
-		m_lobeScales.resize(m_numLobes);
-		for (int i = 0; i < m_numLobes; i++) {
-			std::string name = formatString("lobeScale%02i", i);
-			m_lobeScales[i] = props.getFloat(name, 1.f);
+		m_lobeScales.resize(m_numClusters);
+		for (int i = 0; i < m_numClusters; i++) {
+			m_lobeScales[i].resize(m_numLobes);
+			for (int j = 0; j < m_numLobes; j++) {
+				std::string name = formatString("lobeScale_s%02i_l%02i", i, j);
+				m_lobeScales[i][j] = props.getFloat(name, 1.f);
+			}
 		}
 		Log(EInfo, "Number of SGGX lobes = %d", m_numLobes);
 	}
@@ -118,9 +121,12 @@ public:
 
 		/* multi-lobe SGGX */
 		m_numLobes = stream->readInt();
-		m_lobeScales.resize(m_numLobes);
-		for (int i = 0; i < m_numLobes; i++) {
-			m_lobeScales[i] = stream->readFloat();
+		m_lobeScales.resize(m_numClusters);
+		for (int i = 0; i < m_numClusters; i++) {
+			m_lobeScales[i].resize(m_numLobes);
+			for (int j = 0; j < m_numLobes; j++) {
+				m_lobeScales[i][j] = stream->readFloat();
+			}
 		}
 		configure();
 	}
@@ -144,8 +150,10 @@ public:
 
 		/* multi-lobe SGGX */
 		stream->writeInt(m_numLobes);
-		for (int i = 0; i < m_numLobes; i++) {
-			stream->writeFloat(m_lobeScales[i]);
+		for (int i = 0; i < m_numClusters; i++) {
+			for (int j = 0; j < m_numLobes; j++) {
+				stream->writeFloat(m_lobeScales[i][j]);
+			}
 		}
 	}
 
@@ -542,6 +550,7 @@ public:
 					albedo *= m_albedoScales[clusterIndex];
 				}
 				else {
+					clusterIndex = 0;
 					albedo *= m_albedoScales[0];
 				}
 
@@ -558,7 +567,7 @@ public:
 					mRec.s1[i] = s1[i];
 					mRec.s2[i] = s2[i];
 					mRec.pdfLobe[i] = pdfLobe[i];
-					mRec.lobeScales[i] = m_lobeScales[i];
+					mRec.lobeScales[i] = m_lobeScales[clusterIndex][i];
 				}
 #endif
 			}
@@ -635,6 +644,7 @@ public:
 						albedo *= m_albedoScales[clusterIndex];
 					}
 					else {
+						clusterIndex = 0;
 						albedo *= m_albedoScales[0];
 					}
 					
@@ -651,7 +661,7 @@ public:
 						mRec.s1[i] = s1[i];
 						mRec.s2[i] = s2[i];
 						mRec.pdfLobe[i] = pdfLobe[i];
-						mRec.lobeScales[i] = m_lobeScales[i];
+						mRec.lobeScales[i] = m_lobeScales[clusterIndex][i];
 					}
 #endif
                     // XXX - what if a single channel has a 0 intensity value?
@@ -700,6 +710,7 @@ public:
 					maxtAlbedo *= m_albedoScales[clusterIndex];
 				}
 				else {
+					clusterIndex = 0;
 					maxtAlbedo *= m_albedoScales[0];
 				}
 			}
@@ -718,7 +729,7 @@ public:
 				mRec.s1[i] = s1[i];
 				mRec.s2[i] = s2[i];
 				mRec.pdfLobe[i] = pdfLobe[i];
-				mRec.lobeScales[i] = m_lobeScales[i];
+				mRec.lobeScales[i] = m_lobeScales[clusterIndex][i];
 			}
 #endif
 			mRec.time = ray.time;
@@ -757,6 +768,7 @@ protected:
 		Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *pdfLobe = NULL) const {
         Float density;
         Vector orientation;
+		Float _clusterIndex;
 #ifdef USE_STOC_EVAL
 		Spectrum S1(0.f);
 		Spectrum S2(0.f);
@@ -767,6 +779,8 @@ protected:
 		Float _pdfLobe[MAX_SGGX_LOBES];
 		Float weightedPdfLobe[MAX_SGGX_LOBES];
 #endif
+
+		if (clusterIndex) *clusterIndex = 0.f;
 
 		if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction")  {
 			if (!m_volume->hasSGGXVolume()) {
@@ -837,11 +851,24 @@ protected:
 				}
 
 #else
-				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
-					clusterIndex, S1, S2, _pdfLobe, lazy);
+				int clusterIdx;
+
+				if (m_useDiffAlbedoScales) {
+					m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
+						&_clusterIndex, S1, S2, _pdfLobe, lazy);
+					clusterIdx = (int)_clusterIndex;
+				}
+				else {
+					m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
+						clusterIndex, S1, S2, _pdfLobe, lazy);
+					clusterIdx = 0;
+				}
+
+				if (clusterIndex && m_useDiffAlbedoScales) 
+					*clusterIndex = _clusterIndex;
 
 				for (int i = 0; i < m_numLobes; i++) {
-					weightedPdfLobe[i] = _pdfLobe[i] * m_lobeScales[i];
+					weightedPdfLobe[i] = _pdfLobe[i] * m_lobeScales[clusterIdx][i];
 				}
 
 				Matrix3x3 basisT;
@@ -913,7 +940,7 @@ protected:
 	std::vector<Spectrum> m_albedoScales;
 
 	int m_numLobes;
-	std::vector<Float> m_lobeScales;
+	std::vector<std::vector<Float> > m_lobeScales;
 };
 
 MTS_IMPLEMENT_CLASS_S(HeterogeneousMediumEx, false, Medium)
