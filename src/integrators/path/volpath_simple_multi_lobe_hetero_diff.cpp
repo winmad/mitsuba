@@ -483,7 +483,9 @@ public:
 					useSGGX = true;
 				PhaseFunctionSamplingRecord pRec(mRec, -ray.d, useSGGX);
 
-				Float phaseVal = phase->sample(pRec, rRec.sampler);
+				Float phasePdf;
+				Float weightedF[MAX_SGGX_LOBES];
+				Float phaseVal = phase->sample(pRec, phasePdf, rRec.sampler, weightedF);
 				if (phaseVal == 0)
 					break;
 
@@ -494,7 +496,9 @@ public:
 
 					if (k == mRec.clusterIndex) {
 						for (int l = 0; l < m_numLobes; l++) {
-							TdW[k][l] = throughput * mRec.pdfLobe[l] + TdW[k][l] * phaseVal;
+							//TdW[k][l] = throughput * mRec.pdfLobe[l] + TdW[k][l] * phaseVal;
+							Float dfdW = weightedF[l] / phasePdf;
+							TdW[k][l] = throughput * dfdW + TdW[k][l] * phaseVal;
 						}
 					}
 					else {

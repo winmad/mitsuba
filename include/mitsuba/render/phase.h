@@ -181,6 +181,9 @@ public:
 	virtual Float sample(PhaseFunctionSamplingRecord &pRec,
 		Float &pdf, Sampler *sampler) const = 0;
 
+	virtual Float sample(PhaseFunctionSamplingRecord &pRec,
+		Float &pdf, Sampler *sampler, Float *weightedF) const;
+
 	/**
 	 * \brief Calculate the probability of sampling wo (given wi).
 	 *

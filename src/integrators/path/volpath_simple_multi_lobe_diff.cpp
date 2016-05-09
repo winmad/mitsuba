@@ -429,7 +429,9 @@ public:
 					useSGGX = true;
 				PhaseFunctionSamplingRecord pRec(mRec, -ray.d, useSGGX);
 
-				Float phaseVal = phase->sample(pRec, rRec.sampler);
+				Float phasePdf;
+				Float weightedF[MAX_SGGX_LOBES];
+				Float phaseVal = phase->sample(pRec, phasePdf, rRec.sampler, weightedF);
 				if (phaseVal == 0)
 					break;
 				
@@ -437,7 +439,9 @@ public:
 				TdA *= phaseVal;
 
 				for (int k = 0; k < m_numLobes; k++) {
-					TdW[k] = throughput * mRec.pdfLobe[k] + TdW[k] * phaseVal;
+					//TdW[k] = throughput * mRec.pdfLobe[k] + TdW[k] * phaseVal;
+					Float dfdW = weightedF[k] / phasePdf;
+					TdW[k] = throughput * dfdW + TdW[k] * phaseVal;
 				}
 
 				/* Trace a ray in this direction */

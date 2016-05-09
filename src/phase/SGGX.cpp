@@ -314,6 +314,24 @@ public:
 		return 1.0f * normFactor;
 	}
 
+	Float sample(PhaseFunctionSamplingRecord &pRec,
+		Float &pdf, Sampler *sampler, Float *weightedF) const {
+		if (sample(pRec, sampler) == 0) {
+			pdf = 0; return 0.0f;
+		}
+
+		// need to be normalized, if using lobe scales
+		pdf = eval(pRec, weightedF);
+		Float normFactor = 0.f;
+		for (int i = 0; i < pRec.mRec.numLobes; i++) {
+			normFactor += pRec.mRec.pdfLobe[i] * pRec.mRec.lobeScales[i];
+		}
+		pdf /= normFactor;
+
+
+		return 1.0f * normFactor;
+	}
+
 	Float pdf(const PhaseFunctionSamplingRecord &pRec) const {
 		Float res = eval(pRec);
 		Float normFactor = 0.f;

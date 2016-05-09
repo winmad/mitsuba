@@ -188,6 +188,12 @@ Float PhaseFunction::eval(const PhaseFunctionSamplingRecord &pRec, Float *weight
 	return 0.0f;
 }
 
+Float PhaseFunction::sample(PhaseFunctionSamplingRecord &pRec, Float &pdf, Sampler *sampler, Float *weightedF) const {
+	Log(EError, "%s::sample(pRec, Sampler*, Float*) is not implemented (this is not "
+		"weighted SGGX!)", getClass()->getName().c_str());
+	return 0.0f;
+}
+
 Float PhaseFunction::pdf(const PhaseFunctionSamplingRecord &pRec) const {
 	return eval(pRec);
 }
