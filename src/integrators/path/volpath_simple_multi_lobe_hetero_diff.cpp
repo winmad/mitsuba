@@ -184,9 +184,6 @@ public:
 		cntLdW.resize(numClusters);
 		for (int k = 0; k < numClusters; k++) {
 			cntLdW[k].resize(m_numLobes);
-			for (int l = 0; l < m_numLobes; l++) {
-				cntLdW[k][l] = 0.f;
-			}
 		}
 
 		for (size_t i = 0; i < points.size(); ++i) {
@@ -200,6 +197,12 @@ public:
 
 			for (int k = 0; k < numClusters; k++) {
 				cntLdA[k] = 0.f;
+			}
+			
+			for (int k = 0; k < numClusters; k++) {
+				for (int l = 0; l < m_numLobes; l++) {
+					cntLdW[k][l] = 0.f;
+				}
 			}
 
 			for (size_t j = 0; j < sampler->getSampleCount(); j++) {
@@ -449,6 +452,8 @@ public:
 						Float weightedF[MAX_SGGX_LOBES];
 						Spectrum val = value * phase->eval(
 							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX), weightedF);
+						//Spectrum val = value * phase->eval(
+						//	PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX));
 						Li += throughput * val;
 
 						albedoSegs |= thrAlbedoSegs;
@@ -486,6 +491,7 @@ public:
 				Float phasePdf;
 				Float weightedF[MAX_SGGX_LOBES];
 				Float phaseVal = phase->sample(pRec, phasePdf, rRec.sampler, weightedF);
+				//Float phaseVal = phase->sample(pRec, rRec.sampler);
 				if (phaseVal == 0)
 					break;
 
