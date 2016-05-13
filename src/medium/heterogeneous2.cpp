@@ -864,6 +864,9 @@ protected:
 					clusterIdx = 0;
 				}
 
+				if (density == 0)
+					return 0;
+
 				if (clusterIndex && m_useDiffAlbedoScales) 
 					*clusterIndex = _clusterIndex;
 
@@ -911,6 +914,7 @@ protected:
 						pdfLobe[i] = _pdfLobe[i];
 					}
 				}
+
 #endif
 				return density;
 			}

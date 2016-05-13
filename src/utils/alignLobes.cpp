@@ -175,15 +175,21 @@ public:
 			initS(newCdf[l], res);
 		}
 
+		std::vector<bool> flag(numSGGXlobes, false);
+
 		for (int i = 0; i < res.x; i++) {
 			for (int j = 0; j < res.y; j++) {
 				for (int k = 0; k < res.z; k++) {
+					for (int l = 0; l < numSGGXlobes; l++)
+						flag[l] = false;
 					for (int l = 0; l < numSGGXlobes; l++) {
 						int choose = -1;
 						float maxv = 0.f;
 						if (pdf[l][i][j][k].x > 0) {
 							for (int c = 0; c < stdVecs.size(); c++) {
-								float v = dot(s1[l][i][j][k], stdVecs[c]);
+								if (flag[c])
+									continue;
+								float v = abs(dot(s1[l][i][j][k], stdVecs[c]));
 								if (v > maxv) {
 									maxv = v;
 									choose = c;
@@ -194,6 +200,7 @@ public:
 								newCdf[choose][i][j][k] = Vector(pdf[l][i][j][k]);
 								newS1[choose][i][j][k] = s1[l][i][j][k];
 								newS2[choose][i][j][k] = s2[l][i][j][k];
+								flag[choose] = true;
 							}
 						}
 					}
