@@ -596,7 +596,7 @@ protected:
 				orientation = orientation.x * tangFrame.s + orientation.y * tangFrame.t + orientation.z * tangFrame.n;
 				
 				// seems missing in original implementation
-				orientation = m_volumeToWorld(orientation);
+				//orientation = m_volumeToWorld(orientation);
 
 				if (density == 0 || orientation.isZero())
 					return 0.f;
@@ -673,7 +673,7 @@ protected:
 
 				w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
 				// seems missing in original implementation
-				w3 = m_volumeToWorld(w3);
+				//w3 = m_volumeToWorld(w3);
 
 				if (!w3.isZero()) {
 					w3 = normalize(w3);
@@ -742,7 +742,7 @@ protected:
 
 					w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
 					// seems missing in original implementation
-					w3 = m_volumeToWorld(w3);
+					//w3 = m_volumeToWorld(w3);
 
 					if (!w3.isZero()) {
 						w3 = normalize(w3);
@@ -792,7 +792,7 @@ protected:
 			orientation = orientation.x * tangFrame.s + orientation.y * tangFrame.t + orientation.z * tangFrame.n;
 
 			// seems missing in original implementation
-			orientation = m_volumeToWorld(orientation);
+			//orientation = m_volumeToWorld(orientation);
 
 			if (density != 0 && !orientation.isZero()) {
 				orientation = normalize(orientation);
