@@ -162,9 +162,10 @@ public:
 		return ret;
 	}
 
+	// doesn't implement lazy SGGX evaluation
 	void lookupBundle(const Point &_p, Float *density, Vector *direction,
 		Spectrum *albedo, Float *gloss, Float *segmentation,
-		Spectrum *s1, Spectrum *s2, Float *pdfLobe) const {
+		Spectrum *s1, Spectrum *s2, Float *pdfLobe, bool lazy) const {
         if ( density ) *density = 0.0f;
         if ( direction ) *direction = Vector(0.0f);
         if ( albedo ) *albedo = Spectrum(0.0f);

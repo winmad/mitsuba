@@ -72,7 +72,12 @@ public:
 		cluster(originVol);
 
 		bool lazy = true;
-		downSample(originVol, lazy);
+		if (scale.x > 1 && numSGGXlobes > 1)
+			downSample(originVol, lazy);
+		else if (scale.x == 1)
+			downSampleScale1(originVol, lazy);
+		else if (numSGGXlobes == 1)
+			downSampleLobe1(originVol, lazy);
 
 		Log(EInfo, "finish down-sampling, save volume data to file");
 		
@@ -186,59 +191,70 @@ public:
 					numClusters = numSGGXlobes;
 
 					int count = 0;
-
-					for (int dx = 0; dx < scale.x; dx++) {
-						for (int dy = 0; dy < scale.y; dy++) {
-							for (int dz = 0; dz < scale.z; dz++) {
-								Pt p;
-								for (int c = 0; c < 3; c++) {
-									p[c] = ori->lookupFloat(i + dx, j + dy, k + dz, c);
-								}
-
-								if (p.x * p.x + p.y * p.y + p.z * p.z < 1e-6)
-									continue;
-
-								int maxComponent = 0;
-								double maxValue = abs(p[0]);
-								for (int c = 1; c < 3; c++) {
-									if (maxValue < abs(p[c])) {
-										maxValue = abs(p[c]);
-										maxComponent = c;
+					
+					if (numSGGXlobes > 1) {
+						for (int dx = 0; dx < scale.x; dx++) {
+							for (int dy = 0; dy < scale.y; dy++) {
+								for (int dz = 0; dz < scale.z; dz++) {
+									Pt p;
+									for (int c = 0; c < 3; c++) {
+										p[c] = ori->lookupFloat(i + dx, j + dy, k + dz, c);
 									}
+
+									if (p.x * p.x + p.y * p.y + p.z * p.z < 1e-6)
+										continue;
+
+									int maxComponent = 0;
+									double maxValue = abs(p[0]);
+									for (int c = 1; c < 3; c++) {
+										if (maxValue < abs(p[c])) {
+											maxValue = abs(p[c]);
+											maxComponent = c;
+										}
+									}
+
+									if (p[maxComponent] < 0)
+										p = -p;
+
+									data[count] = p;
+									idx[count] = Vector3i(i + dx, j + dy, k + dz);
+									segs[count] = -1;
+
+									int hashValue = hashFunc(p);
+									if (numColors < 200 && hasht.find(hashValue) == hasht.end()) {
+										hasht[hashValue] = numColors;
+										diffIndices.push_back(count);
+										numColors++;
+									}
+
+									count++;
 								}
-
-								if (p[maxComponent] < 0)
-									p = -p;
-
-								data[count] = p;
-								idx[count] = Vector3i(i + dx, j + dy, k + dz);
-								segs[count] = -1;
-
-								int hashValue = hashFunc(p);
-								if (numColors < 200 && hasht.find(hashValue) == hasht.end()) {
-									hasht[hashValue] = numColors;
-									diffIndices.push_back(count);
-									numColors++;
-								}
-
-								count++;
 							}
 						}
+
+						N = count;
+						numClusters = std::min(numClusters, numColors);
+
+						//Log(EInfo, "Data prepared, total data = %d, maximum cluster = %d...", N, numClusters);
+
+						initCluster();
+						kMeans();
+
+						//Log(EInfo, "Finish one clustering...");
+
+						for (int c = 0; c < N; c++) {
+							Vector3i nowIdx = idx[c];
+							clusterRes[nowIdx.x][nowIdx.y][nowIdx.z] = segs[c];
+						}
 					}
-
-					N = count;
-					numClusters = std::min(numClusters, numColors);
-
-					//Log(EInfo, "Data prepared, total data = %d, maximum cluster = %d...", N, numClusters);
-
-					initCluster();
-					kMeans();
-
-					//Log(EInfo, "Finish one clustering...");
-
-					for (int c = 0; c < N; c++) {
-						Vector3i nowIdx = idx[c];
-						clusterRes[nowIdx.x][nowIdx.y][nowIdx.z] = segs[c];
+					else {
+						for (int dx = 0; dx < scale.x; dx++) {
+							for (int dy = 0; dy < scale.y; dy++) {
+								for (int dz = 0; dz < scale.z; dz++) {
+									clusterRes[i + dx][j + dy][k + dz] = 0;
+								}
+							}
+						}
 					}
 				}
 			}
@@ -266,18 +282,19 @@ public:
 	}
 
 	void downSample(VolumeDataSource *ori, bool lazy = false) {
-		std::vector<Vector6> sumS;
-		std::vector<Float> count;
-		std::vector<Float> pdf;
-		sumS.resize(numSGGXlobes);
-		count.resize(numSGGXlobes);
-		pdf.resize(numSGGXlobes);
-		
-		Float norm = 1.f / (scale.x * scale.y * scale.z);
-
+#pragma omp parallel for
 		for (int i = 0; i < originRes.x; i += scale.x) {
 			for (int j = 0; j < originRes.y; j += scale.y) {
 				for (int k = 0; k < originRes.z; k += scale.z) {
+					std::vector<Vector6> sumS;
+					std::vector<Float> count;
+					std::vector<Float> pdf;
+					sumS.resize(numSGGXlobes);
+					count.resize(numSGGXlobes);
+					pdf.resize(numSGGXlobes);
+
+					Float norm = 1.f / (scale.x * scale.y * scale.z);
+
 					for (int c = 0; c < numSGGXlobes; c++) {
 						sumS[c] = Vector6(0.f);
 						count[c] = 0.f;
@@ -357,6 +374,129 @@ public:
 						else
 							cdf[c][i / scale.x][j / scale.y][k / scale.z] = cdf[c - 1][i / scale.x][j / scale.y][k / scale.z] + 
 								Vector(pdf[c]);
+					}
+				}
+			}
+		}
+	}
+
+	void downSampleScale1(VolumeDataSource *ori, bool lazy = false) {
+#pragma omp parallel for
+		for (int i = 0; i < originRes.x; i += scale.x) {
+			for (int j = 0; j < originRes.y; j += scale.y) {
+				for (int k = 0; k < originRes.z; k += scale.z) {
+					Vector w;
+					for (int c = 0; c < 3; c++) {
+						w[c] = ori->lookupFloat(i, j, k, c);
+					}
+
+					if (!lazy) {
+
+					}
+					else {
+						if (w.length() < 1e-6f) {
+							s1[0][i][j][k] = Vector(0.f, 0.f, 0.f);
+							s2[0][i][j][k] = Vector(0.f, 0.f, 0.f);
+							cdf[0][i][j][k] = Vector(0.f);
+						}
+						else {
+							s1[0][i][j][k] = normalize(w);
+							Float gauss_sigma3 = d.sigmaT(1.f) * 2.f;
+							Float gauss_sigma1 = d.sigmaT(0.f) * 2.f;
+							Float sigma1 = gauss_sigma1;
+							Float sigma2 = gauss_sigma1;
+							Float sigma3 = gauss_sigma3;
+							s2[0][i][j][k] = Vector(sigma1, sigma2, sigma3);
+							cdf[0][i][j][k] = Vector(1.f);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	void downSampleLobe1(VolumeDataSource *ori, bool lazy = false) {
+#pragma omp parallel for
+		for (int i = 0; i < originRes.x; i += scale.x) {
+			for (int j = 0; j < originRes.y; j += scale.y) {
+				for (int k = 0; k < originRes.z; k += scale.z) {
+					std::vector<Vector6> sumS;
+					std::vector<Float> count;
+					std::vector<Float> pdf;
+					sumS.resize(numSGGXlobes);
+					count.resize(numSGGXlobes);
+					pdf.resize(numSGGXlobes);
+					
+					Float norm = 1.f / (scale.x * scale.y * scale.z);
+
+					for (int c = 0; c < numSGGXlobes; c++) {
+						sumS[c] = Vector6(0.f);
+						count[c] = 0.f;
+						pdf[c] = 0.f;
+					}
+					Float nonzero = 0.f;
+					Float zeros = 0.f;
+
+					for (int dx = 0; dx < scale.x; dx++) {
+						for (int dy = 0; dy < scale.y; dy++) {
+							for (int dz = 0; dz < scale.z; dz++) {
+								int clusterIdx = clusterRes[i + dx][j + dy][k + dz];
+								if (clusterIdx < 0)
+									continue;
+
+								Vector w;
+								for (int c = 0; c < 3; c++) {
+									w[c] = ori->lookupFloat(i + dx, j + dy, k + dz, c);
+								}
+								//Float density = densityVol->lookupFloat(i + dx, j + dy, k + dz, 0);
+
+								Vector6 s;
+								s = getSValue(w);
+
+								sumS[clusterIdx] += s;
+								count[clusterIdx] += 1.f;
+								nonzero += 1.f;
+							}
+						}
+					}
+
+					if (nonzero > 0.f)
+						norm = 1.f / nonzero;
+					else
+						norm = 0.f;
+
+					int c = 0;
+
+					if (!lazy) {
+					
+					}
+					else {
+						if (sumS[0].length() < 1e-6f) {
+							s1[c][i / scale.x][j / scale.y][k / scale.z] = Vector(0.f);
+							s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(0.f);
+							cdf[c][i / scale.x][j / scale.y][k / scale.z] = Vector(0.f);
+						}
+						else {
+							sumS[0] /= count[0];
+
+							Matrix3x3 Q;
+							Float eig[3];
+
+							Matrix3x3 S(sumS[c][0], sumS[c][3], sumS[c][4],
+								sumS[c][3], sumS[c][1], sumS[c][5],
+								sumS[c][4], sumS[c][5], sumS[c][2]);
+							S.symEig(Q, eig);
+							// eig[0] < eig[1] == eig[2]
+							Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+							if (!w3.isZero()) {
+								s1[c][i / scale.x][j / scale.y][k / scale.z] = normalize(w3);
+								s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(eig[1], eig[2], eig[0]);
+							}
+							else {
+								Log(EInfo, "No! zero orientation vector!");
+							}
+							cdf[c][i / scale.x][j / scale.y][k / scale.z] = Vector(1.f);
+						}
 					}
 				}
 			}

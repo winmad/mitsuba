@@ -176,7 +176,8 @@ public:
 		/* Assumes that the density medium does not 
 		   contain values greater than one! */
 		m_maxDensity = m_scale*m_volume->getMaximumFloatValueEx(0);
-        m_maxDensity *= m_phaseFunction->sigmaDirMax();
+		if (m_volume->hasSGGXVolume())
+			m_maxDensity *= m_phaseFunction->sigmaDirMax();
 		m_invMaxDensity = 1.0f/m_maxDensity;
 
         if (m_stepSize == 0) {
@@ -810,6 +811,8 @@ protected:
 			}
 			else {
 				bool lazy = true;
+				if (m_volume->getClass()->getName() == "ShellMappedDataSourceEx")
+					lazy = false;
 #ifdef USE_STOC_EVAL
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
 					clusterIndex, &S1, &S2, &_pdfLobe, lazy);

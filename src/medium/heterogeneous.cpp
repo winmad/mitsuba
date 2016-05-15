@@ -652,6 +652,7 @@ public:
 			Sampler *sampler) const {
 		Float integratedDensity, densityAtMinT, densityAtT;
 		bool success = false;
+		mRec.numLobes = 1;
 
 		if (m_method == ESimpsonQuadrature) {
 			Float desiredDensity = -math::fastlog(1-sampler->next1D());
@@ -714,13 +715,17 @@ public:
 			maxt = std::min(maxt, ray.maxt);
 
 			Float t = mint, densityAtT = 0;
+			
+			Spectrum s1;
+			Spectrum s2;
+
 			while (true) {
 				t -= math::fastlog(1-sampler->next1D()) * m_invMaxDensity;
 				if (t >= maxt)
 					break;
 
 				Point p = ray(t);
-				densityAtT = lookupDensity(p, ray.d) * m_scale;
+				densityAtT = lookupDensity(p, ray.d, &s1, &s2) * m_scale;
 				#if defined(HETVOL_STATISTICS)
 					++avgRayMarchingStepsSampling;
 				#endif
@@ -737,6 +742,10 @@ public:
 					else {
 						albedo = m_albedo->lookupSpectrum(mRec.p) * m_albedoScales[0];
 					}
+					mRec.s1[0] = s1;
+					mRec.s2[0] = s2;
+					mRec.pdfLobe[0] = 1;
+					mRec.lobeScales[0] = 1;
 					mRec.sigmaS = albedo * densityAtT;
 					mRec.clusterIndex = clusterIndex;
 					mRec.albedoScale = m_albedoScales[clusterIndex];
@@ -770,6 +779,9 @@ public:
 	}
 
 	void eval(const Ray &ray, MediumSamplingRecord &mRec) const {
+		mRec.numLobes = 1;
+		Spectrum s1;
+		Spectrum s2;
 		if (m_method == ESimpsonQuadrature) {
 			Float expVal = math::fastexp(-integrateDensity(ray));
 			Float mintDensity = lookupDensity(ray(ray.mint), ray.d) * m_scale;
@@ -778,7 +790,7 @@ public:
 			int clusterIndex = 0;
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
-				maxtDensity = lookupDensity(p, ray.d) * m_scale;
+				maxtDensity = lookupDensity(p, ray.d, &s1, &s2) * m_scale;
 				//maxtAlbedo = m_albedo->lookupSpectrum(p);
 				if (m_useDiffAlbedoScales) {
 					maxtAlbedo = m_albedo->lookupSpectrum(p);
@@ -789,6 +801,10 @@ public:
 					maxtAlbedo = m_albedo->lookupSpectrum(p) * m_albedoScales[0];
 				}
 			}
+			mRec.s1[0] = s1;
+			mRec.s2[0] = s2;
+			mRec.pdfLobe[0] = 1;
+			mRec.lobeScales[0] = 1;
 			mRec.transmittance = Spectrum(expVal);
 			mRec.pdfFailure = expVal;
 			mRec.pdfSuccess = expVal * maxtDensity;
@@ -823,7 +839,7 @@ public:
 
 	MTS_DECLARE_CLASS()
 protected:
-	inline Float lookupDensity(const Point &p, const Vector &d) const {
+	inline Float lookupDensity(const Point &p, const Vector &d, Spectrum *s1 = NULL, Spectrum *s2 = NULL) const {
 		Float density = m_density->lookupFloat(p);
 		if (m_anisotropicMedium && density != 0) {
 			if (m_phaseFunction->getClass()->getName() == "SGGXPhaseFunction") {
@@ -893,6 +909,12 @@ protected:
 
 						Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 						//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
+
+						if (s1 && s2) {
+							(*s1)[0] = Sxx; (*s1)[1] = Syy; (*s1)[2] = Szz;
+							(*s2)[0] = Sxy; (*s2)[1] = Sxz; (*s2)[2] = Syz;
+						}
+
 						if (fabsf(sqrSum) > 1e-6f)
 							density *= m_phaseFunction->sigmaDir(d, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 						else
@@ -900,6 +922,11 @@ protected:
 						return density;
 					}
 					else {
+						if (s1 && s2) {
+							(*s1)[0] = 0; (*s1)[1] = 0; (*s1)[2] = 0;
+							(*s2)[0] = 0; (*s2)[1] = 0; (*s2)[2] = 0;
+						}
+
 						return 0;
 					}
 				}
