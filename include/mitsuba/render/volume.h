@@ -57,8 +57,11 @@ public:
 	/// Look up a vector value by position
 	virtual Vector lookupVector(const Point &p) const;
 
-	/// Look up a float value by grid postion
+	/// Look up a float value by grid position
 	virtual Float lookupFloat(int x, int y, int z, int c) const;
+
+	/// Set a float value by grid position
+	virtual void setFloat(int x, int y, int z, int c, float value);
 
 	/**
 	 * \brief Return the recommended step size for numerical

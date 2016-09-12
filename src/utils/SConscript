@@ -14,6 +14,7 @@ plugins += env.SharedLibrary('splitGridVolume', ['splitGridVolume.cpp'])
 plugins += env.SharedLibrary('createGridVolume', ['createGridVolume.cpp'])
 plugins += env.SharedLibrary('orientation2Albedo', ['orientation2Albedo.cpp'])
 plugins += env.SharedLibrary('fillEmptyVoxels', ['fillEmptyVoxels.cpp'])
+plugins += env.SharedLibrary('calcDownSampleError', ['calcDownSampleError.cpp'])
 
 plugins += env.SharedLibrary('addimages', ['addimages.cpp'])
 plugins += env.SharedLibrary('joinrgb', ['joinrgb.cpp'])

@@ -613,6 +613,26 @@ public:
 		return 0;
 	}
 
+	void setFloat(int x, int y, int z, int c, float value) {
+		if (m_volumeType == EFloat32) {
+			if (m_channels == 1) {
+				float *floatData = (float *)m_data;
+				floatData[(z * m_res.y + y) * m_res.x + x] = value;
+			}
+			else if (m_channels == 3) {
+				float *floatData = (float *)m_data;
+				SLog(EInfo, "before set (%d, %d, %d, %d) = %.6f", x, y, z, c, value);
+				SLog(EInfo, "idx = %d", 3 * ((z * m_res.y + y) * m_res.x + x) + c);
+				SLog(EInfo, "%d, %d", floatData, m_data);
+				floatData[3 * ((z * m_res.y + y) * m_res.x + x) + c] = value;
+				SLog(EInfo, "after set");
+			}
+		}
+		else {
+			Log(EError, "setFloat is not implemented!");
+		}
+	}
+
 	bool supportsFloatLookups() const { return m_channels == 1; }
 	bool supportsSpectrumLookups() const { return m_channels == 3; }
 	bool supportsVectorLookups() const { return m_channels == 3; }

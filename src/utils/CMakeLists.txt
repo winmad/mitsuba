@@ -23,6 +23,7 @@ add_utility(splitGridVolume  splitGridVolume.cpp)
 add_utility(createGridVolume createGridVolume.cpp)
 add_utility(orientation2Albedo orientation2Albedo.cpp)
 add_utility(fillEmptyVoxels  fillEmptyVoxels.cpp)
+add_utility(calcDownSampleError calcDownSampleError.cpp)
 
 add_utility(addimages      addimages.cpp)
 add_utility(joinrgb        joinrgb.cpp)

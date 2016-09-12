@@ -34,7 +34,7 @@ public:
 		cdf.resize(numSGGXlobes);
 		pdf.resize(numSGGXlobes);
 
-		bool lazy = true;
+		bool lazy = false;
 
 		VolumeDataSource *originVol;
 
@@ -94,7 +94,7 @@ public:
 
 		bbox = originVol->getAABB();
 
-		alignLobes();
+		alignLobes(lazy);
 
 		Log(EInfo, "finish aligning, save volume data to file");
 
@@ -154,7 +154,7 @@ public:
 		}
 	}
 
-	void alignLobes() {
+	void alignLobes(bool lazy) {
 		stdVecs.clear();
 		if (numSGGXlobes == 2) {
 			stdVecs.push_back(Vector(1.f, 0.f, 0.f));
@@ -185,11 +185,31 @@ public:
 					for (int l = 0; l < numSGGXlobes; l++) {
 						int choose = -1;
 						float maxv = 0.f;
+						Vector w;
+						if (!lazy) {
+							Matrix3x3 Q;
+							Float eig[3];
+
+							Vector S1(s1[l][i][j][k]);
+							Vector S2(s2[l][i][j][k]);
+							Matrix3x3 S(S1[0], S2[0], S2[1],
+										S2[0], S1[1], S2[2],
+										S2[1], S2[2], S1[2]);
+							S.symEig(Q, eig);
+							// eig[0] < eig[1] == eig[2]
+							w = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+							//Log(EInfo, "%.6f, %.6f, %.6f", w.x, w.y, w.z);
+							if (!w.isZero())
+								w = normalize(w);
+						}
+						else {
+							w = s1[l][i][j][k];
+						}
 						if (pdf[l][i][j][k].x > 0) {
 							for (int c = 0; c < stdVecs.size(); c++) {
 								if (flag[c])
 									continue;
-								float v = abs(dot(s1[l][i][j][k], stdVecs[c]));
+								float v = abs(dot(w, stdVecs[c]));
 								if (v > maxv) {
 									maxv = v;
 									choose = c;
@@ -199,6 +219,7 @@ public:
 							if (choose != -1) {
 								newCdf[choose][i][j][k] = Vector(pdf[l][i][j][k]);
 								newS1[choose][i][j][k] = s1[l][i][j][k];
+								//newS1[choose][i][j][k] = w;
 								newS2[choose][i][j][k] = s2[l][i][j][k];
 								flag[choose] = true;
 							}

@@ -24,7 +24,7 @@ public:
 	int run(int argc, char **argv) {
 		if (argc != 3) {
 			cout << "Create a new grid volume" << endl;
-			cout << "Syntax: mtsutil createGridVolume <existing_grid_volume_1> <existing_grid_volume_2> <new_grid_volume>" << endl;
+			cout << "Syntax: mtsutil createGridVolume <existing_grid_volume> <new_grid_volume>" << endl;
 			return -1;
 		}
 
@@ -38,7 +38,7 @@ public:
 
 		AABB bbox = originVol->getAABB();
 		Vector3i res = originVol->getResolution();
-		int channels = 1;
+		int channels = 3;
 
 		Log(EInfo, "%s", originVol->getClass()->getName().c_str());
 		Log(EInfo, "res = (%d, %d, %d)", originVol->getResolution().x, originVol->getResolution().y, originVol->getResolution().z);
@@ -51,10 +51,56 @@ public:
 		for (int i = 0; i < res.x; i++) {
 			for (int j = 0; j < res.y; j++) {
 				for (int k = 0; k < res.z; k++) {
-					s[i][j][k] = Vector(1.f);
+					Vector v(originVol->lookupFloat(i, j, k, 0),
+						originVol->lookupFloat(i, j, k, 1),
+						originVol->lookupFloat(i, j, k, 2));
+
+					if (v.length() < 0.01) {
+						s[i][j][k] = v;
+						continue;
+					}
+
+					for (int c = 0; c < 3; c++) {
+						if (fabs(v[c]) < 0.01) {
+							v[c] = (Float)(rand() % 10000) * 1e-4 * 0.05f * (Float)(rand() % 2 * 2 - 1);
+						}
+					}
+					v = normalize(v);
+
+					s[i][j][k] = v;
 				}
 			}
 		}
+
+		/*
+		GridData s;
+		initS(s, Vector3i(2, 2, 2));
+		s[1][1][1] = s[0][1][0] = s[0][0][1] = s[1][0][0] = s[0][0][0] = Vector(1.0, 0.0, 0.0);
+		s[0][1][1] = s[1][1][0] = Vector(0.0, 0.0, 1.0);
+		s[1][0][1] = Vector(0.0);
+		*/
+
+		// create 4 cluster segmentation
+		/*
+		GridData s;
+		initS(s, res);
+#pragma omp parallel for
+		for (int i = 0; i < res.x; i++) {
+			for (int j = 0; j < res.y; j++) {
+				for (int k = 0; k < res.z; k++) {
+					Float x = (Float)(i) / (Float)(res.x - 1.f);
+					if (x < 0.25f)
+						s[i][j][k] = Vector(3.f);
+					else if (x < 0.5f)
+						s[i][j][k] = Vector(2.f);
+					else if (x < 0.75f)
+						s[i][j][k] = Vector(1.f);
+					else
+						s[i][j][k] = Vector(0.f);
+				}
+			}
+		}
+		*/
 
 		/*
 		Properties props2("gridvolume");
@@ -79,24 +125,24 @@ public:
 		for (int i = 0; i < res.x; i++) {
 			for (int j = 0; j < res.y; j++) {
 				for (int k = 0; k < res.z; k++) {
-					Float x = (Float)(i) / (Float)(res.x - 1.f);
-
-					if (x < 0.5f)
-						s[i][j][k] = left;
-					else
-						s[i][j][k] = right;
-
-// 					x = 1.f - x;
-// 					if (x < 0.2f)
-// 						s[i][j][k] = Vector(0.99f, 0.3f, 0.3f);
-// 					else if (x < 0.4f)
-// 						s[i][j][k] = Vector(0.3f, 0.99f, 0.3f);
-// 					else if (x < 0.6f)
-// 						s[i][j][k] = Vector(0.6f, 0.1f, 0.9f);
-// 					else if (x < 0.8f)
-// 						s[i][j][k] = Vector(0.9f, 0.45f, 0.1f);
+// 					Float x = (Float)(i) / (Float)(res.x - 1.f);
+// 					if (x < 0.5f)
+// 						s[i][j][k] = left;
 // 					else
-// 						s[i][j][k] = Vector(0.2f, 0.2f, 0.99f);
+// 						s[i][j][k] = right;
+
+					//x = 1.f - x;
+					Float idx = originVol->lookupFloat(i, j, k, 0);
+					if (idx == 0)
+						s[i][j][k] = Vector(0.99f, 0.3f, 0.3f);
+					else if (idx == 1)
+						s[i][j][k] = Vector(0.3f, 0.99f, 0.3f);
+					else if (idx == 2)
+						s[i][j][k] = Vector(0.6f, 0.1f, 0.9f);
+					else if (idx == 3)
+						s[i][j][k] = Vector(0.9f, 0.45f, 0.1f);
+					else
+						s[i][j][k] = Vector(0.2f, 0.2f, 0.99f);
 				}
 			}
 		}

@@ -71,7 +71,10 @@ public:
 		init(originVol);
 		cluster(originVol);
 
-		bool lazy = true;
+		// usually true
+		// uses false for shellmap2
+		bool lazy = false;
+
 		if (scale.x > 1 && numSGGXlobes > 1)
 			downSample(originVol, lazy);
 		else if (scale.x == 1)
@@ -391,7 +394,32 @@ public:
 					}
 
 					if (!lazy) {
+						if (w.length() < 1e-6f) {
+							s1[0][i][j][k] = Vector(0.f, 0.f, 0.f);
+							s2[0][i][j][k] = Vector(0.f, 0.f, 0.f);
+							cdf[0][i][j][k] = Vector(0.f);
+						}
+						else {
+							Frame dFrame(w);
+							Vector w1 = dFrame.s;
+							Vector w2 = dFrame.t;
 
+							Float gauss_sigma3 = d.sigmaT(1.f) * 2.f;
+							Float gauss_sigma1 = d.sigmaT(0.f) * 2.f;
+							Float sigma1 = gauss_sigma1;
+							Float sigma2 = gauss_sigma1;
+							Float sigma3 = gauss_sigma3;
+
+							Matrix3x3 basis(w1, w2, w);
+							Matrix3x3 D(Vector(sigma1 * sigma1, 0, 0), Vector(0, sigma2 * sigma2, 0), Vector(0, 0, sigma3 * sigma3));
+							Matrix3x3 basisT;
+							basis.transpose(basisT);
+							Matrix3x3 S = basis * D * basisT;
+
+							s1[0][i][j][k] = Vector(S.m[0][0], S.m[1][1], S.m[2][2]);
+							s2[0][i][j][k] = Vector(S.m[0][1], S.m[0][2], S.m[1][2]);
+							cdf[0][i][j][k] = Vector(1.f);
+						}
 					}
 					else {
 						if (w.length() < 1e-6f) {
@@ -468,7 +496,18 @@ public:
 					int c = 0;
 
 					if (!lazy) {
-					
+						if (sumS[0].length() < 1e-6f) {
+							s1[c][i / scale.x][j / scale.y][k / scale.z] = Vector(0.f);
+							s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(0.f);
+							cdf[c][i / scale.x][j / scale.y][k / scale.z] = Vector(0.f);
+						}
+						else {
+							s1[c][i / scale.x][j / scale.y][k / scale.z] = Vector(
+								sumS[c][0], sumS[c][1], sumS[c][2]);
+							s2[c][i / scale.x][j / scale.y][k / scale.z] = Vector(
+								sumS[c][3], sumS[c][4], sumS[c][5]);
+							cdf[c][i / scale.x][j / scale.y][k / scale.z] = Vector(1.f);
+						}
 					}
 					else {
 						if (sumS[0].length() < 1e-6f) {
@@ -594,6 +633,15 @@ public:
 		centers[0].resize(numClusters);
 		centers[1].resize(numClusters);
 		cnt.resize(numClusters);
+		//Log(EInfo, "%d %d", numClusters, numColors);
+
+		if (numClusters + 5 > numColors) {
+			for (int i = 0; i < numClusters; i++) {
+				centers[0][i] = data[diffIndices[i]];
+			}
+			return;
+		}
+
 		for (int i = 0; i < numClusters; i++) {
 			int k;
 			while (1) {
@@ -637,11 +685,11 @@ public:
 
 			iter++;
 			now = 1 - now;
-			//Log(EInfo, "====== Iter %d ======", iter);
-			for (int i = 0; i < numClusters; i++) {
-				//Log(EInfo, "old center %d, (%.8f, %.8f, %.8f)", i, centers[1 - now][i].x, centers[1 - now][i].y, centers[1 - now][i].z);
-				//Log(EInfo, "center %d, (%.8f, %.8f, %.8f)", i, centers[now][i].x, centers[now][i].y, centers[now][i].z);
-			}
+// 			Log(EInfo, "====== Iter %d ======", iter);
+// 			for (int i = 0; i < numClusters; i++) {
+// 				Log(EInfo, "old center %d, (%.8f, %.8f, %.8f)", i, centers[1 - now][i].x, centers[1 - now][i].y, centers[1 - now][i].z);
+// 				Log(EInfo, "center %d, (%.8f, %.8f, %.8f)", i, centers[now][i].x, centers[now][i].y, centers[now][i].z);
+// 			}
 
 			if (iter > 100 || flag)
 				break;

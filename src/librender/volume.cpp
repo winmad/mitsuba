@@ -59,6 +59,10 @@ Float VolumeDataSource::lookupFloat(int x, int y, int z, int c) const {
 	return 0;
 }
 
+void VolumeDataSource::setFloat(int x, int y, int z, int c, float value) {
+	Log(EError, "'%s': does not implement setFloat(gridPosition)!", getClass()->getName().c_str());
+}
+
 bool VolumeDataSource::supportsFloatLookups() const {
 	return false;
 }

@@ -1133,6 +1133,9 @@
     <ClCompile Include="..\src\integrators\path\volpath_simple_multi_lobe_hetero_diff.cpp">
       <Filter>Source Files\integrators\path</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\utils\calcDownSampleError.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

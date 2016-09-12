@@ -962,6 +962,7 @@
     <ClCompile Include="..\src\utils\albedoCluster.cpp" />
     <ClCompile Include="..\src\utils\albedoRemapping.cpp" />
     <ClCompile Include="..\src\utils\alignLobes.cpp" />
+    <ClCompile Include="..\src\utils\calcDownSampleError.cpp" />
     <ClCompile Include="..\src\utils\clampVolume.cpp" />
     <ClCompile Include="..\src\utils\cmp.cpp" />
     <ClCompile Include="..\src\utils\createGridVolume.cpp" />
