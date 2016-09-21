@@ -218,6 +218,10 @@ public:
 	}
 
 
+	void preDecomposition(int lobeIdx) {
+
+	}
+
 	void configure()
     {
         if ( !m_ready )
@@ -244,6 +248,17 @@ public:
 					loadFromFile(m_S1Files[i], phaseIdx + lobeComponents * i, "S1");
 					loadFromFile(m_S2Files[i], phaseIdx + lobeComponents * i + 1, "S2");
 					loadFromFile(m_phaseCdfFiles[i], phaseIdx + lobeComponents * i + 2, "cdf");
+				}
+			}
+
+			lazy = true;
+			if (lazy) {
+				w1.resize(m_numSGGXLobes);
+				w2.resize(m_numSGGXLobes);
+				w3.resize(m_numSGGXLobes);
+				sigma.resize(m_numSGGXLobes);
+				for (int i = 0; i < m_numSGGXLobes; i++) {
+					preDecomposition(i);
 				}
 			}
 
@@ -767,15 +782,25 @@ public:
 							s2value[0], s1value[1], s2value[2],
 							s2value[1], s2value[2], s1value[2]);
 						S.symEig(Q, eig);
-						// eig[0] < eig[1] == eig[2]
+						// eig[0] < eig[1] <= eig[2]
 						Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
 						w3 = m_volumeToWorld(w3);
 
 						if (!w3.isZero()) {
 							w3 = normalize(w3);
-							Frame frame(w3);
 
-							Matrix3x3 basis(frame.s, frame.t, w3);
+							Vector w1(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
+							w1 = m_volumeToWorld(w1);
+							w1 = normalize(w1);
+
+							Vector w2(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
+							w2 = m_volumeToWorld(w2);
+							w2 = normalize(w2);
+							
+							//Frame frame(w3);
+							//Matrix3x3 basis(frame.s, frame.t, w3);
+
+							Matrix3x3 basis(w1, w2, w3);
 							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
 							Matrix3x3 basisT;
 							basis.transpose(basisT);
@@ -790,6 +815,7 @@ public:
 						}
 					}
 					else {
+						// bad, don't use
 						Vector w3(s1value[0], s1value[1], s1value[2]);
 						w3 = m_volumeToWorld(w3);
 
@@ -944,6 +970,12 @@ protected:
 	// s1 = (Sxx, Syy, Szz), s2 = (Sxy, Sxz, Syz)
 	// or
 	// s1 = (w3.x, w3.y, w3.z), s2 = (sigma1, sigma2, sigma3), sigma1 = sigma2 > sigma3
+
+	bool lazy;
+	std::vector<std::vector<Vector> > w1;
+	std::vector<std::vector<Vector> > w2;
+	std::vector<std::vector<Vector> > w3;
+	std::vector<std::vector<Vector> > sigma;
 
 	Vector3i m_dataReso;
 	Transform m_volumeToWorld, m_worldToVolume;

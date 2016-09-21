@@ -646,7 +646,7 @@ protected:
 				return density;
 			}
 			else {
-				bool lazy = true;
+				bool lazy = false;
 #ifdef USE_STOC_EVAL
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL, 
 					clusterIndex, &S1, &S2, &_pdfLobe, lazy);
@@ -726,29 +726,50 @@ protected:
 					Matrix3x3 Q;
 					Float eig[3];
 					Matrix3x3 S;
-					Vector w3;
+					Vector w3, w1, w2;
 
 					if (!lazy) {
 						// handle orientation transform
 						S = Matrix3x3(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
 						S.symEig(Q, eig);
-						// eig[0] < eig[1] == eig[2]
+						// eig[0] < eig[1] <= eig[2]
 						w3 = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+						w1 = Vector(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
+						w2 = Vector(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
 					}
 					else {
+						// bad, don't use
 						w3 = Vector(S1[i][0], S1[i][1], S1[i][2]);
 						eig[1] = S2[i][0]; eig[2] = S2[i][1]; eig[0] = S2[i][2];
 					}
 
 					w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
+					
 					// seems missing in original implementation
-					//w3 = m_volumeToWorld(w3);
+					w3 = m_volumeToWorld(w3);
 
 					if (!w3.isZero()) {
 						w3 = normalize(w3);
-						Frame frame(w3);
 
-						Matrix3x3 basis(frame.s, frame.t, w3);
+						w1 = w1.x * tangFrame.s + w1.y * tangFrame.t + w1.z * tangFrame.n;
+						w1 = m_volumeToWorld(w1);
+						if (w1.isZero()) {
+							Log(EInfo, "bad w1: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w1.x, w1.y, w1.z,
+								w3.x, w3.y, w3.z);
+						}
+						w1 = normalize(w1);
+						
+						w2 = w2.x * tangFrame.s + w2.y * tangFrame.t + w2.z * tangFrame.n;
+						w2 = m_volumeToWorld(w2);
+						if (w2.isZero()) {
+							Log(EInfo, "bad w2: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w2.x, w2.y, w2.z,
+								w3.x, w3.y, w3.z);
+						}
+						w2 = normalize(w2);
+						
+						//Frame frame(w3);
+						//Matrix3x3 basis(frame.s, frame.t, w3);
+						Matrix3x3 basis(w1, w2, w3);
 						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
 						Matrix3x3 basisT;
 						basis.transpose(basisT);

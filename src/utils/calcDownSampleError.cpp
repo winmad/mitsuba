@@ -208,7 +208,7 @@ public:
 			}
 		}
 
-		Float norm_factor = 1e4f;
+		Float norm_factor = 1e2f;
 
 		Float cnt = 0.f;
 		for (int x = posRef.x; x < posRef.x + downScale; x++) {

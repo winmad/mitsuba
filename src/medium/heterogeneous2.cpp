@@ -810,7 +810,7 @@ protected:
 				return density;
 			}
 			else {
-				bool lazy = true;
+				bool lazy = false;
 				if (m_volume->getClass()->getName() == "ShellMappedDataSourceEx")
 					lazy = false;
 #ifdef USE_STOC_EVAL
@@ -885,6 +885,7 @@ protected:
 					density *= m_phaseFunction->sigmaDir(d, S1, S2, weightedPdfLobe, m_numLobes);
 				}
 				else {
+					// bad, don't use
 					for (int i = 0; i < m_numLobes; i++) {
 						Vector w3(S1[i][0], S1[i][1], S1[i][2]);
 						eig[1] = S2[i][0]; eig[2] = S2[i][1]; eig[0] = S2[i][2];

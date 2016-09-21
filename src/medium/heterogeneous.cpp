@@ -890,15 +890,24 @@ protected:
 
 					Matrix3x3 S(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
 					S.symEig(Q, eig);
-					// eig[0] < eig[1] == eig[2]
+					// eig[0] < eig[1] <= eig[2]
 					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
 					w3 = volumeToWorld(w3);
 
 					if (!w3.isZero()) {
 						w3 = normalize(w3);
-						Frame frame(w3);
 
-						Matrix3x3 basis(frame.s, frame.t, w3);
+						Vector w1(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
+						w1 = volumeToWorld(w1);
+						w1 = normalize(w1);
+						Vector w2(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
+						w2 = volumeToWorld(w2);
+						w2 = normalize(w2);
+
+						//Frame frame(w3);
+						//Matrix3x3 basis(frame.s, frame.t, w3);
+
+						Matrix3x3 basis(w1, w2, w3);
 						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
 						Matrix3x3 basisT;
 						basis.transpose(basisT);

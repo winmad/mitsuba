@@ -247,16 +247,24 @@ public:
 						s2[i][0], s1[i][1], s2[i][2],
 						s2[i][1], s2[i][2], s1[i][2]);
 					S.symEig(Q, eig);
-					// eig[0] < eig[1] == eig[2]
+					// eig[0] < eig[1] <= eig[2]
 					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-
 					w3 = m_volumeToWorld(w3.x * tang.dpdu + w3.y * tang.dpdv + w3.z * norm);
 
 					if (!w3.isZero()) {
 						w3 = normalize(w3);
-						Frame frame(w3);
 
-						Matrix3x3 basis(frame.s, frame.t, w3);
+						Vector w1(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
+						w1 = m_volumeToWorld(w1.x * tang.dpdu + w1.y * tang.dpdv + w1.z * norm);
+						w1 = normalize(w1);
+						Vector w2(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
+						w2 = m_volumeToWorld(w2.x * tang.dpdu + w2.y * tang.dpdv + w2.z * norm);
+						w2 = normalize(w2);
+						
+						//Frame frame(w3);
+						//Matrix3x3 basis(frame.s, frame.t, w3);
+						
+						Matrix3x3 basis(w1, w2, w3);
 						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
 						Matrix3x3 basisT;
 						basis.transpose(basisT);
