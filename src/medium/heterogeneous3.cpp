@@ -247,15 +247,9 @@ public:
 			Float fClusterIndex = 0.f;
 			int clusterIndex = 0;
 
-#ifdef USE_STOC_EVAL
-			Spectrum s1;
-			Spectrum s2;
-			Float pdfLobe;
-#else 
 			Spectrum s1[MAX_SGGX_LOBES];
 			Spectrum s2[MAX_SGGX_LOBES];
 			Float pdfLobe[MAX_SGGX_LOBES];
-#endif
 
             for (int i=0; i<nSamples; ++i) {
                 Float t = mint;
@@ -312,13 +306,9 @@ public:
 							Frame tangFrame;
 							tangFrame.s = dpdu; tangFrame.t = dpdv; tangFrame.n = norm;
 
-#ifdef USE_STOC_EVAL
-							density = lookupDensity(q, ray.d, tangFrame, NULL, NULL, &fClusterIndex, 
-								&s1, &s2, &pdfLobe) * m_scale;
-#else
 							density = lookupDensity(q, ray.d, tangFrame, NULL, NULL, &fClusterIndex,
 								s1, s2, pdfLobe) * m_scale;
-#endif
+		
 							/*
                             m_volume->lookupBundle(q, &density, &orientation, NULL, NULL,
 								NULL, NULL, NULL);
@@ -390,15 +380,9 @@ public:
         Float t = mint;
         int id = static_cast<int>(id0);
 
-#ifdef USE_STOC_EVAL
-		Spectrum s1;
-		Spectrum s2;
-		Float pdfLobe;
-#else 
 		Spectrum s1[MAX_SGGX_LOBES];
 		Spectrum s2[MAX_SGGX_LOBES];
 		Float pdfLobe[MAX_SGGX_LOBES];
-#endif
 
         while (true) {
             t -= math::fastlog(1 - sampler->next1D())*m_invMaxDensity;
@@ -451,15 +435,9 @@ public:
 					tangFrame.s = dpdu; tangFrame.t = dpdv; tangFrame.n = norm;
 					
 					if (m_volume->hasOrientation()) {
-#ifdef USE_STOC_EVAL
-						density = lookupDensity(q, ray.d, tangFrame,
-							&orientation, &albedo, &fClusterIndex,
-							&s1, &s2, &pdfLobe) * m_scale;
-#else
 						density = lookupDensity(q, ray.d, tangFrame,
 							&orientation, &albedo, &fClusterIndex,
 							s1, s2, pdfLobe) * m_scale;
-#endif
 
 						/*
 						m_volume->lookupBundle(q, &density, &orientation, &albedo, NULL,
@@ -473,15 +451,9 @@ public:
 						*/
 					}
 					else {
-#ifdef USE_STOC_EVAL
-						density = lookupDensity(q, ray.d, tangFrame,
-							NULL, &albedo, &fClusterIndex,
-							&s1, &s2, &pdfLobe) * m_scale;
-#else
 						density = lookupDensity(q, ray.d, tangFrame,
 							NULL, &albedo, &fClusterIndex,
 							s1, s2, pdfLobe) * m_scale;
-#endif
 					}
                 }
                 else {
@@ -517,18 +489,14 @@ public:
                 mRec.medium = this;
                 mRec.hasExtraInfo = true;
                 mRec.extra = tex;
-#ifdef USE_STOC_EVAL
-				mRec.s1 = s1;
-				mRec.s2 = s2;
-				mRec.pdfLobe = pdfLobe;
-#else
+
 				for (int i = 0; i < m_numLobes; i++) {
 					mRec.s1[i] = s1[i];
 					mRec.s2[i] = s2[i];
 					mRec.pdfLobe[i] = pdfLobe[i];
 					mRec.lobeScales[i] = m_lobeScales[clusterIndex][i];
 				}
-#endif
+
                 success = true;
                 break;
             }
@@ -573,16 +541,11 @@ protected:
         Spectrum *s1 = NULL, Spectrum *s2 = NULL, Float *pdfLobe = NULL) const {
 		Float density;
 		Vector orientation;
-#ifdef USE_STOC_EVAL
-		Spectrum S1(0.f);
-		Spectrum S2(0.f);
-		Float _pdfLobe(0.f);
-#else
+
 		Spectrum S1[MAX_SGGX_LOBES];
 		Spectrum S2[MAX_SGGX_LOBES];
 		Float _pdfLobe[MAX_SGGX_LOBES];
 		Float weightedPdfLobe[MAX_SGGX_LOBES];
-#endif
 
 		if (_orientation) *_orientation = Vector(0.f);
 		//if (pdfLobe) *pdfLobe = 0.f;
@@ -611,16 +574,6 @@ protected:
 				Float Sxx = S.m[0][0], Syy = S.m[1][1], Szz = S.m[2][2];
 				Float Sxy = S.m[0][1], Sxz = S.m[0][2], Syz = S.m[1][2];
 
-#ifdef USE_STOC_EVAL
-				S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
-				S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
-
-				if (s1 && s2 && pdfLobe) {
-                    *s1 = S1;
-                    *s2 = S2;
-					*pdfLobe = 1.f;
-				}
-#else
 				S1[0][0] = Sxx; S1[0][1] = Syy; S1[0][2] = Szz;
 				S2[0][0] = Sxy; S2[0][1] = Sxz; S2[0][2] = Syz;
 
@@ -629,7 +582,6 @@ protected:
 					s2[0] = S2[0];
 					pdfLobe[0] = 1.f;
 				}
-#endif
 
 				//Float sqrSum = Sxx * Sxx + Syy * Syy + Szz * Szz + Sxy * Sxy + Sxz * Sxz + Syz * Syz;
 				//if (!(Sxx == 0 && Syy == 0 && Szz == 0 && Sxy == 0 && Sxz == 0 && Syz == 0))
@@ -638,97 +590,32 @@ protected:
 				//else
 				//	return 0.f;
 
-#ifdef USE_STOC_EVAL
-				density *= m_phaseFunction->sigmaDir(d, S1, S2);
-#else
 				density *= m_phaseFunction->sigmaDir(d, S1, S2, pdfLobe, 1);
-#endif
+
 				return density;
 			}
 			else {
-				bool lazy = false;
-#ifdef USE_STOC_EVAL
-				m_volume->lookupBundle(p, &density, NULL, albedo, NULL, 
-					clusterIndex, &S1, &S2, &_pdfLobe, lazy);
+				bool lazy = true;
 
-				Float Sxx = S1[0], Syy = S1[1], Szz = S1[2];
-				Float Sxy = S2[0], Sxz = S2[1], Syz = S2[2];
-
-				Matrix3x3 Q;
-				Float eig[3];
-				Matrix3x3 S;
-				Vector w3;
-
-				if (!lazy) {
-					// handle orientation transform
-					S = Matrix3x3(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
-					S.symEig(Q, eig);
-					// eig[0] < eig[1] == eig[2]
-					w3 = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-				}
-				else {
-					w3 = Vector(S1[0], S1[1], S1[2]);
-					eig[1] = S2[0]; eig[2] = S2[1]; eig[0] = S2[2];
-				}
-
-				w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
-				// seems missing in original implementation
-				//w3 = m_volumeToWorld(w3);
-
-				if (!w3.isZero()) {
-					w3 = normalize(w3);
-					Frame frame(w3);
-
-					Matrix3x3 basis(frame.s, frame.t, w3);
-					Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-					Matrix3x3 basisT;
-					basis.transpose(basisT);
-					S = basis * D * basisT;
-
-					Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
-					Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
-
-					S1[0] = Sxx; S1[1] = Syy; S1[2] = Szz;
-					S2[0] = Sxy; S2[1] = Sxz; S2[2] = Syz;
-				}
-				else {
-					S1 = Spectrum(0.f);
-					S2 = Spectrum(0.f);
-				}
-
-				if (s1 && s2 && pdfLobe) {
-					*s1 = S1;
-					*s2 = S2;
-					*pdfLobe = _pdfLobe;
-				}
-				
-				density *= m_phaseFunction->sigmaDir(d, S1, S2);
-#else
 				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
 					clusterIndex, S1, S2, _pdfLobe, lazy);
 
-// 				if (_pdfLobe[0] + _pdfLobe[1] > 0.99) {
-// 					Log(EInfo, "(%.3f,%.3f,%.3f), (%.3f,%.3f,%.3f), %.3f\n(%.3f,%.3f,%.3f), (%.3f,%.3f,%.3f), %.3f",
-// 						S1[0][0], S1[0][1], S1[0][2], S2[0][0], S2[0][1], S2[0][2], _pdfLobe[0],
-// 						S1[1][0], S1[1][1], S1[1][2], S2[1][0], S2[1][1], S2[1][2], _pdfLobe[1]);
-// 				}
+				if (!lazy) {
+					for (int i = 0; i < m_numLobes; i++) {
+						if (_pdfLobe[i] < 1e-6f) {
+							S1[i] = Spectrum(0.f);
+							S2[i] = Spectrum(0.f);
+							continue;
+						}
 
-				for (int i = 0; i < m_numLobes; i++) {
-					if (_pdfLobe[i] < 1e-6f) {
-						S1[i] = Spectrum(0.f);
-						S2[i] = Spectrum(0.f);
-						continue;
-					}
+						Float Sxx = S1[i][0], Syy = S1[i][1], Szz = S1[i][2];
+						Float Sxy = S2[i][0], Sxz = S2[i][1], Syz = S2[i][2];
 
-					Float Sxx = S1[i][0], Syy = S1[i][1], Szz = S1[i][2];
-					Float Sxy = S2[i][0], Sxz = S2[i][1], Syz = S2[i][2];
+						Matrix3x3 Q;
+						Float eig[3];
+						Matrix3x3 S;
+						Vector w3, w1, w2;
 
-					Matrix3x3 Q;
-					Float eig[3];
-					Matrix3x3 S;
-					Vector w3, w1, w2;
-
-					if (!lazy) {
 						// handle orientation transform
 						S = Matrix3x3(Sxx, Sxy, Sxz, Sxy, Syy, Syz, Sxz, Syz, Szz);
 						S.symEig(Q, eig);
@@ -736,54 +623,91 @@ protected:
 						w3 = Vector(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
 						w1 = Vector(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
 						w2 = Vector(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
-					}
-					else {
-						// bad, don't use
-						w3 = Vector(S1[i][0], S1[i][1], S1[i][2]);
-						eig[1] = S2[i][0]; eig[2] = S2[i][1]; eig[0] = S2[i][2];
-					}
 
-					w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
+						w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
+
+						// seems missing in original implementation
+						w3 = m_volumeToWorld(w3);
+
+						if (!w3.isZero()) {
+							w3 = normalize(w3);
+
+							w1 = w1.x * tangFrame.s + w1.y * tangFrame.t + w1.z * tangFrame.n;
+							w1 = m_volumeToWorld(w1);
+							if (w1.isZero()) {
+								Log(EInfo, "bad w1: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w1.x, w1.y, w1.z,
+									w3.x, w3.y, w3.z);
+							}
+							w1 = normalize(w1);
+
+							w2 = w2.x * tangFrame.s + w2.y * tangFrame.t + w2.z * tangFrame.n;
+							w2 = m_volumeToWorld(w2);
+							if (w2.isZero()) {
+								Log(EInfo, "bad w2: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w2.x, w2.y, w2.z,
+									w3.x, w3.y, w3.z);
+							}
+							w2 = normalize(w2);
+
+							Matrix3x3 basis(w1, w2, w3);
+							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+							Matrix3x3 basisT;
+							basis.transpose(basisT);
+							S = basis * D * basisT;
+
+							Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
+							Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
+
+							S1[i][0] = Sxx; S1[i][1] = Syy; S1[i][2] = Szz;
+							S2[i][0] = Sxy; S2[i][1] = Sxz; S2[i][2] = Syz;
+						}
+						else {
+							S1[i] = Spectrum(0.f);
+							S2[i] = Spectrum(0.f);
+						}
+					}
+				}
+				else {
+					Vector w1[MAX_SGGX_LOBES];
+					Vector w2[MAX_SGGX_LOBES];
+					Vector w3[MAX_SGGX_LOBES];
+					Vector sigmaSqr[MAX_SGGX_LOBES];
+
+					m_volume->lookupSGGXFrame(p, w1, w2, w3, sigmaSqr);
 					
-					// seems missing in original implementation
-					w3 = m_volumeToWorld(w3);
-
-					if (!w3.isZero()) {
-						w3 = normalize(w3);
-
-						w1 = w1.x * tangFrame.s + w1.y * tangFrame.t + w1.z * tangFrame.n;
-						w1 = m_volumeToWorld(w1);
-						if (w1.isZero()) {
-							Log(EInfo, "bad w1: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w1.x, w1.y, w1.z,
-								w3.x, w3.y, w3.z);
+					for (int i = 0; i < m_numLobes; i++) {
+						if (_pdfLobe[i] < 1e-6f) {
+							S1[i] = Spectrum(0.f);
+							S2[i] = Spectrum(0.f);
+							continue;
 						}
-						w1 = normalize(w1);
-						
-						w2 = w2.x * tangFrame.s + w2.y * tangFrame.t + w2.z * tangFrame.n;
-						w2 = m_volumeToWorld(w2);
-						if (w2.isZero()) {
-							Log(EInfo, "bad w2: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w2.x, w2.y, w2.z,
-								w3.x, w3.y, w3.z);
+
+						w3[i] = w3[i].x * tangFrame.s + w3[i].y * tangFrame.t + w3[i].z * tangFrame.n;
+						w3[i] = m_volumeToWorld(w3[i]);
+						w3[i] = normalize(w3[i]);
+
+						if (!w3[i].isZero()) {
+							w1[i] = w1[i].x * tangFrame.s + w1[i].y * tangFrame.t + w1[i].z * tangFrame.n;
+							w2[i] = w2[i].x * tangFrame.s + w2[i].y * tangFrame.t + w2[i].z * tangFrame.n;
+							w1[i] = m_volumeToWorld(w1[i]);
+							w2[i] = m_volumeToWorld(w2[i]);
+							w1[i] = normalize(w1[i]);
+							w2[i] = normalize(w2[i]);
+
+							Matrix3x3 basis(w1[i], w2[i], w3[i]);
+							Matrix3x3 D(Vector(sigmaSqr[i][0], 0.f, 0.f), 
+								Vector(0.f, sigmaSqr[i][1], 0.f), 
+								Vector(0.f, 0.f, sigmaSqr[i][2]));
+							Matrix3x3 basisT;
+							basis.transpose(basisT);
+							Matrix3x3 S = basis * D * basisT;
+
+							S1[i][0] = S.m[0][0]; S1[i][1] = S.m[1][1]; S1[i][2] = S.m[2][2];
+							S2[i][0] = S.m[0][1]; S2[i][1] = S.m[0][2]; S2[i][2] = S.m[1][2];
 						}
-						w2 = normalize(w2);
-						
-						//Frame frame(w3);
-						//Matrix3x3 basis(frame.s, frame.t, w3);
-						Matrix3x3 basis(w1, w2, w3);
-						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-						Matrix3x3 basisT;
-						basis.transpose(basisT);
-						S = basis * D * basisT;
-
-						Sxx = S.m[0][0]; Syy = S.m[1][1]; Szz = S.m[2][2];
-						Sxy = S.m[0][1]; Sxz = S.m[0][2]; Syz = S.m[1][2];
-
-						S1[i][0] = Sxx; S1[i][1] = Syy; S1[i][2] = Szz;
-						S2[i][0] = Sxy; S2[i][1] = Sxz; S2[i][2] = Syz;
-					}
-					else {
-						S1[i] = Spectrum(0.f);
-						S2[i] = Spectrum(0.f);
+						else {
+							S1[i] = Spectrum(0.f);
+							S2[i] = Spectrum(0.f);
+						}
 					}
 				}
 
@@ -803,7 +727,7 @@ protected:
 				}
 				
 				density *= m_phaseFunction->sigmaDir(d, S1, S2, weightedPdfLobe, m_numLobes);
-#endif
+
 				return density;
 			}
 		}
@@ -813,7 +737,7 @@ protected:
 			orientation = orientation.x * tangFrame.s + orientation.y * tangFrame.t + orientation.z * tangFrame.n;
 
 			// seems missing in original implementation
-			//orientation = m_volumeToWorld(orientation);
+			orientation = m_volumeToWorld(orientation);
 
 			if (density != 0 && !orientation.isZero()) {
 				orientation = normalize(orientation);

@@ -72,16 +72,10 @@ public:
 
 	int numLobes;
 
-#ifdef USE_STOC_EVAL
-	Spectrum s1;
-	Spectrum s2;
-	Float pdfLobe;
-#else
 	Spectrum s1[MAX_SGGX_LOBES];
 	Spectrum s2[MAX_SGGX_LOBES];
 	Float pdfLobe[MAX_SGGX_LOBES];
 	Float lobeScales[MAX_SGGX_LOBES];
-#endif
 
 	bool hasExtraInfo;
 	Point extra;

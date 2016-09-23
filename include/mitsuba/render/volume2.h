@@ -35,6 +35,8 @@ public:
     virtual void lookupBundle(const Point &p,
         Float *density, Vector *direction, Spectrum *albedo, Float *gloss, Float *segmentation, 
 		Spectrum *s1, Spectrum *s2, Float *pdfLobe, bool lazy = false) const;
+	virtual void lookupSGGXFrame(const Point &p,
+		Vector *w1, Vector *w2, Vector *w3, Vector *sigmaSqr) const;
 
     virtual Float getMaximumFloatValueEx(uint32_t id) const = 0;
 

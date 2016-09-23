@@ -171,17 +171,12 @@ public:
         if ( albedo ) *albedo = Spectrum(0.0f);
         if ( gloss ) *gloss = 0.0f;
 		
-#ifdef USE_STOC_EVAL
-		if (s1) (*s1) = Spectrum(0.f);
-		if (s2) (*s2) = Spectrum(0.f);
-		if (pdfLobe) *pdfLobe = 0.f;
-#else
 		for (int i = 0; i < m_block->getNumLobes(); i++) {
 			if (s1) s1[i] = Spectrum(0.f);
 			if (s2) s2[i] = Spectrum(0.f);
 			if (pdfLobe) pdfLobe[i] = 0.f;
 		}
-#endif
+
 		if (segmentation) *segmentation = 0.f;
 
 		Point q = m_worldToVolume.transformAffine(_p);
@@ -204,81 +199,59 @@ public:
 			if (m_shell.lookupPoint(q, p, norm, tang)) {
 				clampPoint(p);
 				m_block->lookupBundle(m_textureToData.transformAffine(p), density, direction, albedo, gloss,
-					segmentation, s1, s2, pdfLobe);
+					segmentation, s1, s2, pdfLobe, lazy);
 
-				// handle orientation transform
-				Matrix3x3 Q;
-				Float eig[3];
-
-#ifdef USE_STOC_EVAL
-				Matrix3x3 S((*s1)[0], (*s2)[0], (*s2)[1], 
-					(*s2)[0], (*s1)[1], (*s2)[2], 
-					(*s2)[1], (*s2)[2], (*s1)[2]);
-				S.symEig(Q, eig);
-				// eig[0] < eig[1] == eig[2]
-				Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-				
-				w3 = m_volumeToWorld(w3.x * tang.dpdu + w3.y * tang.dpdv + w3.z * norm);
-
-				if (!w3.isZero()) {
-					w3 = normalize(w3);
-					Frame frame(w3);
-
-					Matrix3x3 basis(frame.s, frame.t, w3);
-					Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-					Matrix3x3 basisT;
-					basis.transpose(basisT);
-					S = basis * D * basisT;
-
-					(*s1)[0] = S.m[0][0]; (*s1)[1] = S.m[1][1]; (*s1)[2] = S.m[2][2];
-					(*s2)[0] = S.m[0][1]; (*s2)[1] = S.m[0][2]; (*s2)[2] = S.m[1][2];
-				}
-				else {
-					(*s1) = Spectrum(0.f);
-					(*s2) = Spectrum(0.f);
-				}
-#else
-				for (int i = 0; i < m_block->getNumLobes(); i++) {
+				if (!lazy) {
 					// handle orientation transform
 					Matrix3x3 Q;
 					Float eig[3];
 
-					Matrix3x3 S(s1[i][0], s2[i][0], s2[i][1],
-						s2[i][0], s1[i][1], s2[i][2],
-						s2[i][1], s2[i][2], s1[i][2]);
-					S.symEig(Q, eig);
-					// eig[0] < eig[1] <= eig[2]
-					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-					w3 = m_volumeToWorld(w3.x * tang.dpdu + w3.y * tang.dpdv + w3.z * norm);
+					for (int i = 0; i < m_block->getNumLobes(); i++) {
+						// handle orientation transform
+						Matrix3x3 Q;
+						Float eig[3];
 
-					if (!w3.isZero()) {
-						w3 = normalize(w3);
+						Matrix3x3 S(s1[i][0], s2[i][0], s2[i][1],
+							s2[i][0], s1[i][1], s2[i][2],
+							s2[i][1], s2[i][2], s1[i][2]);
+						S.symEig(Q, eig);
+						// eig[0] < eig[1] <= eig[2]
+						Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+						w3 = m_volumeToWorld(w3.x * tang.dpdu + w3.y * tang.dpdv + w3.z * norm);
 
-						Vector w1(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
-						w1 = m_volumeToWorld(w1.x * tang.dpdu + w1.y * tang.dpdv + w1.z * norm);
-						w1 = normalize(w1);
-						Vector w2(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
-						w2 = m_volumeToWorld(w2.x * tang.dpdu + w2.y * tang.dpdv + w2.z * norm);
-						w2 = normalize(w2);
-						
-						//Frame frame(w3);
-						//Matrix3x3 basis(frame.s, frame.t, w3);
-						
-						Matrix3x3 basis(w1, w2, w3);
-						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-						Matrix3x3 basisT;
-						basis.transpose(basisT);
-						S = basis * D * basisT;
+						if (!w3.isZero()) {
+							w3 = normalize(w3);
 
-						s1[i][0] = S.m[0][0]; s1[i][1] = S.m[1][1]; s1[i][2] = S.m[2][2];
-						s2[i][0] = S.m[0][1]; s2[i][1] = S.m[0][2]; s2[i][2] = S.m[1][2];
-					}
-					else {
-						s1[i] = Spectrum(0.f);
-						s2[i] = Spectrum(0.f);
+							Vector w1(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
+							w1 = m_volumeToWorld(w1.x * tang.dpdu + w1.y * tang.dpdv + w1.z * norm);
+							w1 = normalize(w1);
+							Vector w2(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
+							w2 = m_volumeToWorld(w2.x * tang.dpdu + w2.y * tang.dpdv + w2.z * norm);
+							w2 = normalize(w2);
+
+							//Frame frame(w3);
+							//Matrix3x3 basis(frame.s, frame.t, w3);
+
+							Matrix3x3 basis(w1, w2, w3);
+							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+							Matrix3x3 basisT;
+							basis.transpose(basisT);
+							S = basis * D * basisT;
+
+							s1[i][0] = S.m[0][0]; s1[i][1] = S.m[1][1]; s1[i][2] = S.m[2][2];
+							s2[i][0] = S.m[0][1]; s2[i][1] = S.m[0][2]; s2[i][2] = S.m[1][2];
+						}
+						else {
+							s1[i] = Spectrum(0.f);
+							s2[i] = Spectrum(0.f);
+						}
 					}
 				}
-#endif
+				else {
+					for (int i = 0; i < m_block->getNumLobes(); i++) {
+						s1[i] = s2[i] = Spectrum(0.f);
+					}
+				}
 			}
 		}
 		else {
@@ -289,6 +262,41 @@ public:
             }
         }
     }
+
+
+	void lookupSGGXFrame(const Point &_p,
+		Vector *w1, Vector *w2, Vector *w3, Vector *sigmaSqr) const {
+		Assert(w1 != NULL);
+		Assert(w2 != NULL);
+		Assert(w3 != NULL);
+		Assert(sigmaSqr != NULL);
+
+		Point q = m_worldToVolume.transformAffine(_p);
+		Point p;
+
+		Vector norm;
+		TangentSpace tang;
+		if (m_shell.lookupPoint(q, p, norm, tang)) {
+			clampPoint(p);
+			m_block->lookupSGGXFrame(m_textureToData.transformAffine(p),
+				w1, w2, w3, sigmaSqr);
+
+			for (int i = 0; i < m_block->getNumLobes(); i++) {
+				w3[i] = m_volumeToWorld(w3[i].x * tang.dpdu + w3[i].y * tang.dpdv + w3[i].z * norm);
+
+				if (!w3[i].isZero()) {
+					w3[i] = normalize(w3[i]);
+					w1[i] = m_volumeToWorld(w1[i].x * tang.dpdu + w1[i].y * tang.dpdv + w1[i].z * norm);
+					w1[i] = normalize(w1[i]);
+					w2[i] = m_volumeToWorld(w2[i].x * tang.dpdu + w2[i].y * tang.dpdv + w2[i].z * norm);
+					w2[i] = normalize(w2[i]);
+				}
+				else {
+					w1[i] = w2[i] = w3[i] = sigmaSqr[i] = Vector(0.f);
+				}
+			}
+		}
+	}
 
     bool supportsBundleLookups() const { return m_block->supportsBundleLookups(); }
 	bool supportsFloatLookups() const { return m_block->supportsFloatLookups(); }

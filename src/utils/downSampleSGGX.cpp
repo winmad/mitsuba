@@ -71,8 +71,7 @@ public:
 		init(originVol);
 		cluster(originVol);
 
-		// usually true
-		// uses false for shellmap2
+		// uses false in all cases
 		bool lazy = false;
 
 		if (scale.x > 1 && numSGGXlobes > 1)

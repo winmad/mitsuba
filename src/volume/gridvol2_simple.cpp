@@ -142,6 +142,82 @@ public:
 			m_albedo.serialize(stream);
 	}
 
+	void preDecomposition(int lobeIdx) {
+		int s1VolumeIdx = phaseIdx + lobeComponents * lobeIdx;
+		int s2VolumeIdx = phaseIdx + lobeComponents * lobeIdx + 1;
+		int cdfVolumeIdx = phaseIdx + lobeComponents * lobeIdx + 2;
+
+		int totCells = m_res.x * m_res.y * m_res.z;
+		m_w1[lobeIdx].resize(totCells);
+		m_w2[lobeIdx].resize(totCells);
+		m_w3[lobeIdx].resize(totCells);
+		m_sigmaSqr[lobeIdx].resize(totCells);
+
+		Spectrum s1value, s2value;
+
+		switch (m_volumeType[s1VolumeIdx])
+		{
+		case EFloat32:
+		{
+			const float3 *s1Data = (float3 *)m_data[s1VolumeIdx];
+			const float3 *s2Data = (float3 *)m_data[s2VolumeIdx];
+			const float *floatData = (float *)m_data[cdfVolumeIdx];
+
+			for (int i = 0; i < totCells; i++) {
+				s1value = s1Data[i].toSpectrum();
+				s2value = s2Data[i].toSpectrum();
+
+				if (!s1value.isZero() || !s2value.isZero()) {
+					Matrix3x3 Q;
+					Float eig[3];
+
+					Matrix3x3 S(s1value[0], s2value[0], s2value[1],
+						s2value[0], s1value[1], s2value[2],
+						s2value[1], s2value[2], s1value[2]);
+					S.symEig(Q, eig);
+					// eig[0] < eig[1] <= eig[2]
+					Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
+					w3 = m_volumeToWorld(w3);
+
+					if (!w3.isZero()) {
+						w3 = normalize(w3);
+
+						Vector w1(Q.m[0][1], Q.m[1][1], Q.m[2][1]);
+						w1 = m_volumeToWorld(w1);
+						w1 = normalize(w1);
+
+						Vector w2(Q.m[0][2], Q.m[1][2], Q.m[2][2]);
+						w2 = m_volumeToWorld(w2);
+						w2 = normalize(w2);
+
+						m_w1[lobeIdx][i] = w1;
+						m_w2[lobeIdx][i] = w2;
+						m_w3[lobeIdx][i] = w3;
+						m_sigmaSqr[lobeIdx][i] = Vector(eig[1], eig[2], eig[0]);
+					}
+					else {
+						m_w1[lobeIdx][i] = Vector(0.f);
+						m_w2[lobeIdx][i] = Vector(0.f);
+						m_w3[lobeIdx][i] = Vector(0.f);
+						m_sigmaSqr[lobeIdx][i] = Vector(0.f);
+					}
+
+				}
+				else {
+					m_w1[lobeIdx][i] = Vector(0.f);
+					m_w2[lobeIdx][i] = Vector(0.f);
+					m_w3[lobeIdx][i] = Vector(0.f);
+					m_sigmaSqr[lobeIdx][i] = Vector(0.f);
+				}
+			}
+		}
+		break;
+
+		default:
+			Log(EError, "Error in pre-decomposition: s1, s2 volume files should be EFloat32.");
+		}
+	}
+
 	void configure() {
         if ( !m_ready ) {
 			Properties props("independent");
@@ -179,6 +255,17 @@ public:
 					loadFromFile(m_S1Files[i], phaseIdx + lobeComponents * i, "S1");
 					loadFromFile(m_S2Files[i], phaseIdx + lobeComponents * i + 1, "S2");
 					loadFromFile(m_phaseCdfFiles[i], phaseIdx + lobeComponents * i + 2, "cdf");
+				}
+			}
+
+			m_lazy = true;
+			if (m_lazy) {
+				m_w1.resize(m_numSGGXLobes);
+				m_w2.resize(m_numSGGXLobes);
+				m_w3.resize(m_numSGGXLobes);
+				m_sigmaSqr.resize(m_numSGGXLobes);
+				for (int i = 0; i < m_numSGGXLobes; i++) {
+					preDecomposition(i);
 				}
 			}
 
@@ -401,97 +488,6 @@ public:
 			Assert(s2 != NULL);
 			Assert(pdfLobe != NULL);
 
-#ifdef USE_STOC_EVAL
-			std::vector<Float> cdfs;
-			for (int i = 0; i < m_numSGGXLobes; i++) {
-				const float *floatData = (float *)m_data[phaseIdx + lobeComponents * i + 2];
-				cdfs.push_back(floatData[idx]);
-			}
-
-			Float rnd = m_sampler->next1D();
-			int lobeIdx = (std::lower_bound(cdfs.begin(), cdfs.end(), rnd) - cdfs.begin());
-
-			if (lobeIdx < m_numSGGXLobes) {
-				int s1VolumeIdx = phaseIdx + lobeComponents * lobeIdx;
-				int s2VolumeIdx = phaseIdx + lobeComponents * lobeIdx + 1;
-				int cdfVolumeIdx = phaseIdx + lobeComponents * lobeIdx + 2;
-
-				Spectrum s1value, s2value;
-				
-				if (lobeIdx == 0)
-					*pdfLobe = cdfs[0];
-				else
-					*pdfLobe = cdfs[lobeIdx] - cdfs[lobeIdx - 1];
-
-				switch (m_volumeType[s1VolumeIdx])
-				{
-				case EFloat32:
-				{
-					const float3 *s1Data = (float3 *)m_data[s1VolumeIdx];
-					const float3 *s2Data = (float3 *)m_data[s2VolumeIdx];
-					s1value = s1Data[idx].toSpectrum();
-					s2value = s2Data[idx].toSpectrum();
-				}
-				break;
-				default:
-					s1value = Spectrum(0.f);
-					s2value = Spectrum(0.f);
-				}
-
-				if (!s1value.isZero()) {
-					if (!lazy) {
-						Matrix3x3 Q;
-						Float eig[3];
-
-						Matrix3x3 S(s1value[0], s2value[0], s2value[1],
-							s2value[0], s1value[1], s2value[2],
-							s2value[1], s2value[2], s1value[2]);
-						S.symEig(Q, eig);
-						// eig[0] < eig[1] == eig[2]
-						Vector w3(Q.m[0][0], Q.m[1][0], Q.m[2][0]);
-						w3 = m_volumeToWorld(w3);
-
-						if (!w3.isZero()) {
-							w3 = normalize(w3);
-							Frame frame(w3);
-
-							Matrix3x3 basis(frame.s, frame.t, w3);
-							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-							Matrix3x3 basisT;
-							basis.transpose(basisT);
-							S = basis * D * basisT;
-
-							s1value[0] = S.m[0][0]; s1value[1] = S.m[1][1]; s1value[2] = S.m[2][2];
-							s2value[0] = S.m[0][1]; s2value[1] = S.m[0][2]; s2value[2] = S.m[1][2];
-						}
-						else {
-							s1value = Spectrum(0.f);
-							s2value = Spectrum(0.f);
-						}
-					}
-					else {
-						Vector w3(s1value[0], s1value[1], s1value[2]);
-						w3 = m_volumeToWorld(w3);
-
-						if (!w3.isZero()) {
-							w3 = normalize(w3);
-							s1value[0] = w3.x; s1value[1] = w3.y; s1value[2] = w3.z;
-						}
-						else {
-							s1value = Spectrum(0.f);
-							s2value = Spectrum(0.f);
-						}
-					}
-				}
-				else {
-					s1value = Spectrum(0.f);
-					s2value = Spectrum(0.f);
-				}
-
-				*s1 = s1value;
-				*s2 = s2value;
-			}
-#else
 			for (int i = 0; i < m_numSGGXLobes; i++) {
 				int s1VolumeIdx = phaseIdx + lobeComponents * i;
 				int s2VolumeIdx = phaseIdx + lobeComponents * i + 1;
@@ -520,7 +516,7 @@ public:
 
 				pdfLobe[i] = cdf;	
 
-				if (!s1value.isZero()) {
+				if (!s1value.isZero() || !s2value.isZero()) {
 					if (!lazy) {
 						Matrix3x3 Q;
 						Float eig[3];
@@ -552,17 +548,8 @@ public:
 						}
 					}
 					else {
-						Vector w3(s1value[0], s1value[1], s1value[2]);
-						w3 = m_volumeToWorld(w3);
-
-						if (!w3.isZero()) {
-							w3 = normalize(w3);
-							s1value[0] = w3.x; s1value[1] = w3.y; s1value[2] = w3.z;
-						}
-						else {
-							s1value = Spectrum(0.f);
-							s2value = Spectrum(0.f);
-						}
+						s1value = Spectrum(0.f);
+						s2value = Spectrum(0.f);
 					}
 				}
 				else {
@@ -576,7 +563,22 @@ public:
 
 			for (int i = m_numSGGXLobes - 1; i >= 1; i--)
 				pdfLobe[i] -= pdfLobe[i - 1];
-#endif
+		}
+	}
+
+	void lookupSGGXFrame(const Point &p,
+		Vector *w1, Vector *w2, Vector *w3, Vector *sigmaSqr) const {
+		Assert(w1 != NULL);
+		Assert(w2 != NULL);
+		Assert(w3 != NULL);
+		Assert(sigmaSqr != NULL);
+
+		int idx = getCoord(p);
+		for (int i = 0; i < m_numSGGXLobes; i++) {
+			w1[i] = m_w1[i][idx];
+			w2[i] = m_w2[i][idx];
+			w3[i] = m_w3[i][idx];
+			sigmaSqr[i] = m_sigmaSqr[i][idx];
 		}
 	}
 
@@ -815,6 +817,12 @@ protected:
 	// s1 = (Sxx, Syy, Szz), s2 = (Sxy, Sxz, Syz)
 	// or
 	// s1 = (w3.x, w3.y, w3.z), s2 = (sigma1, sigma2, sigma3), sigma1 = sigma2 > sigma3
+
+	bool m_lazy;
+	std::vector<std::vector<Vector> > m_w1;
+	std::vector<std::vector<Vector> > m_w2;
+	std::vector<std::vector<Vector> > m_w3;
+	std::vector<std::vector<Vector> > m_sigmaSqr;
 
 	Vector3i m_res;
 	Transform m_worldToGrid;

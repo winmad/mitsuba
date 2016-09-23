@@ -19,6 +19,7 @@ std::string PhaseFunctionSamplingRecord::toString() const {
 PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
 	const Vector &wi, bool _useSGGX, ETransportMode mode)
 	: mRec(mRec), wi(wi), mode(mode), useSGGX(_useSGGX) {
+	/*
 	if (useSGGX) {
 		if (mRec.medium->getClass()->getName() == "HeterogeneousMedium") {
 // 			const VolumeDataSource *VolS1 = mRec.medium->getS1();
@@ -95,11 +96,13 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 // 			Sxy = mRec.s2[0]; Sxz = mRec.s2[1]; Syz = mRec.s2[2];
 		}
 	}
+	*/
 }
 
 PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRecord &mRec,
 	const Vector &wi, const Vector &wo, bool _useSGGX, ETransportMode mode)
 	: mRec(mRec), wi(wi), wo(wo), mode(mode), useSGGX(_useSGGX) {
+	/*
 	if (useSGGX) {
 		if (mRec.medium->getClass()->getName() == "HeterogeneousMedium") {
 // 			const VolumeDataSource *VolS1 = mRec.medium->getS1();
@@ -176,6 +179,7 @@ PhaseFunctionSamplingRecord::PhaseFunctionSamplingRecord(const MediumSamplingRec
 // 			Sxy = mRec.s2[0]; Sxz = mRec.s2[1]; Syz = mRec.s2[2];
 		}
 	}
+	*/
 }
 
 void PhaseFunction::configure() {

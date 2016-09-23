@@ -522,28 +522,17 @@ public:
 				Spectrum albedo;
 				Float fClusterIndex = 0.f;
 				int clusterIndex = 0;
-#ifdef USE_STOC_EVAL
-				Spectrum s1;
-				Spectrum s2;
-				Float pdfLobe;
-#else
+
 				Spectrum s1[MAX_SGGX_LOBES];
 				Spectrum s2[MAX_SGGX_LOBES];
 				Float pdfLobe[MAX_SGGX_LOBES];
-#endif
 
 				if (m_volume->hasOrientation())
 					m_volume->lookupBundle(mRec.p, NULL, &mRec.orientation, &albedo, NULL,
 						&fClusterIndex, NULL, NULL, NULL);
 				else {
-#ifdef USE_STOC_EVAL
 					m_volume->lookupBundle(mRec.p, NULL, NULL, &albedo, NULL,
-						&fClusterIndex, &s1, &s2, &pdfLobe);
-#else
-					m_volume->lookupBundle(mRec.p, NULL, NULL, &albedo, NULL,
-						&fClusterIndex, s1, s2, pdfLobe);
-#endif
-					Log(EInfo, "Wrong! lazy s1, s2...");
+						&fClusterIndex, s1, s2, pdfLobe, false);
 				}
 
 				if (m_useDiffAlbedoScales) {
@@ -559,18 +548,13 @@ public:
 				mRec.clusterIndex = clusterIndex;
 				mRec.albedoScale = m_albedoScales[clusterIndex];
 				mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
-#ifdef USE_STOC_EVAL
-				mRec.s1 = s1;
-				mRec.s2 = s2;
-				mRec.pdfLobe = pdfLobe;
-#else
+
 				for (int i = 0; i < m_numLobes; i++) {
 					mRec.s1[i] = s1[i];
 					mRec.s2[i] = s2[i];
 					mRec.pdfLobe[i] = pdfLobe[i];
 					mRec.lobeScales[i] = m_lobeScales[clusterIndex][i];
 				}
-#endif
 			}
 
 			Float expVal = math::fastexp(-integratedDensity);
@@ -599,15 +583,10 @@ public:
 			maxt = std::min(maxt, ray.maxt);
 
 			Float t = mint, densityAtT = 0;
-#ifdef USE_STOC_EVAL
-			Spectrum s1;
-			Spectrum s2;
-			Float pdfLobe;
-#else
+
 			Spectrum s1[MAX_SGGX_LOBES];
 			Spectrum s2[MAX_SGGX_LOBES];
 			Float pdfLobe[MAX_SGGX_LOBES];
-#endif
 
 			while (true) {
 				t -= math::fastlog(1-sampler->next1D()) * m_invMaxDensity;
@@ -619,12 +598,8 @@ public:
 				Float fClusterIndex = 0.f;
 				int clusterIndex = 0;
 
-#ifdef USE_STOC_EVAL
-				densityAtT = lookupDensity(p, ray.d, &albedo, &fClusterIndex, &s1, &s2, &pdfLobe) * m_scale;
-#else 
 				densityAtT = lookupDensity(p, ray.d, &albedo, &fClusterIndex, s1, s2, pdfLobe) * m_scale;
-#endif
-				
+			
 				#if defined(HETVOL_STATISTICS)
 					++avgRayMarchingStepsSampling;
 				#endif
@@ -653,18 +628,13 @@ public:
 					mRec.clusterIndex = clusterIndex;
 					mRec.albedoScale = m_albedoScales[clusterIndex];
 					mRec.sigmaA = Spectrum(densityAtT) - mRec.sigmaS;
-#ifdef USE_STOC_EVAL
-					mRec.s1 = s1;
-					mRec.s2 = s2;
-					mRec.pdfLobe = pdfLobe;
-#else
+
 					for (int i = 0; i < m_numLobes; i++) {
 						mRec.s1[i] = s1[i];
 						mRec.s2[i] = s2[i];
 						mRec.pdfLobe[i] = pdfLobe[i];
 						mRec.lobeScales[i] = m_lobeScales[clusterIndex][i];
 					}
-#endif
                     // XXX - what if a single channel has a 0 intensity value?
 					mRec.transmittance = mRec.sigmaS.isZero() 
 						? Spectrum(0.0f) : albedo/mRec.sigmaS;
@@ -683,15 +653,10 @@ public:
 		mRec.numLobes = m_numLobes;
 
 		if (m_method == ESimpsonQuadrature) {
-#ifdef USE_STOC_EVAL
-			Spectrum s1;
-			Spectrum s2;
-			Float pdfLobe;
-#else
 			Spectrum s1[MAX_SGGX_LOBES];
 			Spectrum s2[MAX_SGGX_LOBES];
 			Float pdfLobe[MAX_SGGX_LOBES];
-#endif
+			
 			Float expVal = math::fastexp(-integrateDensity(ray));
 			Float mintDensity = lookupDensity(ray(ray.mint), ray.d) * m_scale;
 			Float maxtDensity = 0.0f;
@@ -701,11 +666,9 @@ public:
 			
 			if (ray.maxt < std::numeric_limits<Float>::infinity()) {
 				Point p = ray(ray.maxt);
-#ifdef USE_STOC_EVAL
-				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &fClusterIndex, &s1, &s2, &pdfLobe) * m_scale;
-#else
+
 				maxtDensity = lookupDensity(p, ray.d, &maxtAlbedo, &fClusterIndex, s1, s2, pdfLobe) * m_scale;
-#endif
+
 				if (m_useDiffAlbedoScales) {
 					clusterIndex = (int)fClusterIndex;
 					maxtAlbedo *= m_albedoScales[clusterIndex];
@@ -721,18 +684,14 @@ public:
 			mRec.pdfSuccessRev = expVal * mintDensity;
 			mRec.sigmaS = maxtAlbedo * maxtDensity;
 			mRec.sigmaA = Spectrum(maxtDensity) - mRec.sigmaS;
-#ifdef USE_STOC_EVAL
-			mRec.s1 = s1;
-			mRec.s2 = s2;
-			mRec.pdfLobe = pdfLobe;
-#else
+
 			for (int i = 0; i < m_numLobes; i++) {
 				mRec.s1[i] = s1[i];
 				mRec.s2[i] = s2[i];
 				mRec.pdfLobe[i] = pdfLobe[i];
 				mRec.lobeScales[i] = m_lobeScales[clusterIndex][i];
 			}
-#endif
+
 			mRec.time = ray.time;
 			mRec.medium = this;
 
@@ -770,16 +729,11 @@ protected:
         Float density;
         Vector orientation;
 		Float _clusterIndex;
-#ifdef USE_STOC_EVAL
-		Spectrum S1(0.f);
-		Spectrum S2(0.f);
-		Float _pdfLobe(0.f);
-#else
+
 		Spectrum S1[MAX_SGGX_LOBES];
 		Spectrum S2[MAX_SGGX_LOBES];
 		Float _pdfLobe[MAX_SGGX_LOBES];
 		Float weightedPdfLobe[MAX_SGGX_LOBES];
-#endif
 
 		if (clusterIndex) *clusterIndex = 0.f;
 
@@ -810,50 +764,12 @@ protected:
 				return density;
 			}
 			else {
-				bool lazy = false;
-				if (m_volume->getClass()->getName() == "ShellMappedDataSourceEx")
-					lazy = false;
-#ifdef USE_STOC_EVAL
-				m_volume->lookupBundle(p, &density, NULL, albedo, NULL,
-					clusterIndex, &S1, &S2, &_pdfLobe, lazy);
+// 				bool lazy = false;
+// 				if (m_volume->getClass()->getName() == "ShellMappedDataSourceEx")
+// 					lazy = false;
 
-				Matrix3x3 basisT;
-				Matrix3x3 S;
-				Float eig[3];
+				bool lazy = true;
 
-				if (!lazy) {
-					density *= m_phaseFunction->sigmaDir(d, S1, S2);
-				}
-				else {
-					Vector w3(S1[0], S1[1], S1[2]);
-					eig[1] = S2[0]; eig[2] = S2[1]; eig[0] = S2[2];
-
-					if (!w3.isZero()) {
-						Frame frame(w3);
-
-						Matrix3x3 basis(frame.s, frame.t, w3);
-						Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
-							
-						basis.transpose(basisT);
-						S = basis * D * basisT;
-
-						S1[0] = S.m[0][0]; S1[1] = S.m[1][1]; S1[2] = S.m[2][2];
-						S2[0] = S.m[0][1]; S2[1] = S.m[0][2]; S2[2] = S.m[1][2];
-					}
-					else {
-						S1 = Spectrum(0.f);
-						S2 = Spectrum(0.f);
-					}
-					density *= m_phaseFunction->sigmaDir(d, S1, S2);
-				}
-
-				if (s1 && s2 && pdfLobe) {
-					*s1 = S1;
-					*s2 = S2;
-					*pdfLobe = _pdfLobe;
-				}
-
-#else
 				int clusterIdx;
 
 				if (m_useDiffAlbedoScales) {
@@ -877,24 +793,26 @@ protected:
 					weightedPdfLobe[i] = _pdfLobe[i] * m_lobeScales[clusterIdx][i];
 				}
 
-				Matrix3x3 basisT;
-				Matrix3x3 S;
-				Float eig[3];
-
 				if (!lazy) {
 					density *= m_phaseFunction->sigmaDir(d, S1, S2, weightedPdfLobe, m_numLobes);
 				}
 				else {
-					// bad, don't use
+					Vector w1[MAX_SGGX_LOBES];
+					Vector w2[MAX_SGGX_LOBES];
+					Vector w3[MAX_SGGX_LOBES];
+					Vector sigmaSqr[MAX_SGGX_LOBES];
+
+					m_volume->lookupSGGXFrame(p, w1, w2, w3, sigmaSqr);
+
+					Matrix3x3 basisT;
+					Matrix3x3 S;
+
 					for (int i = 0; i < m_numLobes; i++) {
-						Vector w3(S1[i][0], S1[i][1], S1[i][2]);
-						eig[1] = S2[i][0]; eig[2] = S2[i][1]; eig[0] = S2[i][2];
-
-						if (_pdfLobe[i] > 0 && !w3.isZero()) {
-							Frame frame(w3);
-
-							Matrix3x3 basis(frame.s, frame.t, w3);
-							Matrix3x3 D(Vector(eig[1], 0, 0), Vector(0, eig[2], 0), Vector(0, 0, eig[0]));
+						if (_pdfLobe[i] > 0 && !w3[i].isZero()) {
+							Matrix3x3 basis(w1[i], w2[i], w3[i]);
+							Matrix3x3 D(Vector(sigmaSqr[i][0], 0, 0), 
+								Vector(0, sigmaSqr[i][1], 0), 
+								Vector(0, 0, sigmaSqr[i][2]));
 
 							basis.transpose(basisT);
 							S = basis * D * basisT;
@@ -908,6 +826,7 @@ protected:
 						}
 						
 					}
+
 					density *= m_phaseFunction->sigmaDir(d, S1, S2, weightedPdfLobe, m_numLobes);
 				}
 
@@ -919,7 +838,6 @@ protected:
 					}
 				}
 
-#endif
 				return density;
 			}
 		}

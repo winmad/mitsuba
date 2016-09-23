@@ -55,7 +55,12 @@ bool VolumeDataSourceEx::supportsBundleLookups() const {
 void VolumeDataSourceEx::lookupBundle(const Point &p,
     Float *density, Vector *direction, Spectrum *albedo, Float *gloss, Float *segmentation,
 	Spectrum *s1, Spectrum *s2, Float *pdfLobe, bool lazy) const {
-	Log(EError, "'%s': does not implement lookup()!", getClass()->getName().c_str());
+	Log(EError, "'%s': does not implement lookupBundle()!", getClass()->getName().c_str());
+}
+
+void VolumeDataSourceEx::lookupSGGXFrame(const Point &p,
+	Vector *w1, Vector *w2, Vector *w3, Vector *sigmaSqr) const {
+	Log(EError, "'%s': does not implement lookupSGGXFrame()!", getClass()->getName().c_str());
 }
 
 bool VolumeDataSourceEx::hasOrientation() const {
