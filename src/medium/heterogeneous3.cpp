@@ -627,13 +627,13 @@ protected:
 						w3 = w3.x * tangFrame.s + w3.y * tangFrame.t + w3.z * tangFrame.n;
 
 						// seems missing in original implementation
-						w3 = m_volumeToWorld(w3);
+						//w3 = m_volumeToWorld(w3);
 
 						if (!w3.isZero()) {
 							w3 = normalize(w3);
 
 							w1 = w1.x * tangFrame.s + w1.y * tangFrame.t + w1.z * tangFrame.n;
-							w1 = m_volumeToWorld(w1);
+							//w1 = m_volumeToWorld(w1);
 							if (w1.isZero()) {
 								Log(EInfo, "bad w1: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w1.x, w1.y, w1.z,
 									w3.x, w3.y, w3.z);
@@ -641,7 +641,7 @@ protected:
 							w1 = normalize(w1);
 
 							w2 = w2.x * tangFrame.s + w2.y * tangFrame.t + w2.z * tangFrame.n;
-							w2 = m_volumeToWorld(w2);
+							//w2 = m_volumeToWorld(w2);
 							if (w2.isZero()) {
 								Log(EInfo, "bad w2: (%.6f, %.6f, %.6f), w3: (%.6f, %.6f, %.6f)", w2.x, w2.y, w2.z,
 									w3.x, w3.y, w3.z);
@@ -682,14 +682,14 @@ protected:
 						}
 
 						w3[i] = w3[i].x * tangFrame.s + w3[i].y * tangFrame.t + w3[i].z * tangFrame.n;
-						w3[i] = m_volumeToWorld(w3[i]);
+						//w3[i] = m_volumeToWorld(w3[i]);
 						w3[i] = normalize(w3[i]);
 
 						if (!w3[i].isZero()) {
 							w1[i] = w1[i].x * tangFrame.s + w1[i].y * tangFrame.t + w1[i].z * tangFrame.n;
 							w2[i] = w2[i].x * tangFrame.s + w2[i].y * tangFrame.t + w2[i].z * tangFrame.n;
-							w1[i] = m_volumeToWorld(w1[i]);
-							w2[i] = m_volumeToWorld(w2[i]);
+							//w1[i] = m_volumeToWorld(w1[i]);
+							//w2[i] = m_volumeToWorld(w2[i]);
 							w1[i] = normalize(w1[i]);
 							w2[i] = normalize(w2[i]);
 
@@ -737,7 +737,7 @@ protected:
 			orientation = orientation.x * tangFrame.s + orientation.y * tangFrame.t + orientation.z * tangFrame.n;
 
 			// seems missing in original implementation
-			orientation = m_volumeToWorld(orientation);
+			//orientation = m_volumeToWorld(orientation);
 
 			if (density != 0 && !orientation.isZero()) {
 				orientation = normalize(orientation);
