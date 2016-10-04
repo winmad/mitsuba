@@ -683,9 +683,9 @@ protected:
 
 						w3[i] = w3[i].x * tangFrame.s + w3[i].y * tangFrame.t + w3[i].z * tangFrame.n;
 						//w3[i] = m_volumeToWorld(w3[i]);
-						w3[i] = normalize(w3[i]);
 
 						if (!w3[i].isZero()) {
+							w3[i] = normalize(w3[i]);
 							w1[i] = w1[i].x * tangFrame.s + w1[i].y * tangFrame.t + w1[i].z * tangFrame.n;
 							w2[i] = w2[i].x * tangFrame.s + w2[i].y * tangFrame.t + w2[i].z * tangFrame.n;
 							//w1[i] = m_volumeToWorld(w1[i]);
