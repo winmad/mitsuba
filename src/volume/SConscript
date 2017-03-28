@@ -1,6 +1,7 @@
 Import('env', 'plugins')
 
 plugins += env.SharedLibrary('instancedvol', ['instancedvol.cpp'])
+plugins += env.SharedLibrary('shellvolume', ['shellmap.cpp'])
 plugins += env.SharedLibrary('shellvolume2', ['shellmap2.cpp'])
 plugins += env.SharedLibrary('tiledvol', ['tiledvol.cpp'])
 plugins += env.SharedLibrary('tiledvol2', ['tiledvol2.cpp'])

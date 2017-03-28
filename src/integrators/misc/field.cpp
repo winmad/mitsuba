@@ -58,6 +58,7 @@ public:
 		EPosition,
 		ERelativePosition,
 		EDistance,
+		EDepth,
 		EGeometricNormal,
 		EShadingNormal,
 		EUV,
@@ -78,6 +79,8 @@ public:
 			m_field = ERelativePosition;
 		} else if (field == "distance") {
 			m_field = EDistance;
+		} else if (field == "depth") {
+			m_field = EDepth;
 		} else if (field == "geoNormal") {
 			m_field = EGeometricNormal;
 		} else if (field == "shNormal") {
@@ -145,6 +148,15 @@ public:
 				break;
 			case EDistance:
 				result = Spectrum(its.t);
+				break;
+			case EDepth: {
+					const Sensor *sensor = rRec.scene->getSensor();
+					const Transform &t = sensor->getWorldTransform()->eval(its.t).inverse();
+					Point p = t(its.p);
+					Vector dir(p);
+					dir = normalize(dir);
+					result = Spectrum(std::abs(its.t * dir.z));
+				}
 				break;
 			case EGeometricNormal:
 				result.fromLinearRGB(its.geoFrame.n.x, its.geoFrame.n.y, its.geoFrame.n.z);

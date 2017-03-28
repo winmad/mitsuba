@@ -977,6 +977,7 @@
     <ClCompile Include="..\src\volume\gridvol2_simple.cpp" />
     <ClCompile Include="..\src\volume\gridvol_simple.cpp" />
     <ClCompile Include="..\src\volume\instancedvol.cpp" />
+    <ClCompile Include="..\src\volume\shellmap.cpp" />
     <ClCompile Include="..\src\volume\shellmap2.cpp" />
     <ClCompile Include="..\src\volume\tiledvol.cpp" />
     <ClCompile Include="..\src\volume\tiledvol2.cpp" />
