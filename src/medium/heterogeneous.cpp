@@ -720,6 +720,7 @@ public:
 			Spectrum s2;
 
 			while (true) {
+				mRec.prevP = ray(t);
 				t -= math::fastlog(1-sampler->next1D()) * m_invMaxDensity;
 				if (t >= maxt)
 					break;

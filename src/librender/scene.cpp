@@ -873,6 +873,29 @@ Spectrum Scene::sampleAttenuatedEmitterDirect(DirectSamplingRecord &dRec,
 	}
 }
 
+Spectrum Scene::sampleAttenuatedEmitterDirect(DirectSamplingRecord &dRec, Float delta,
+	const Medium *medium, int &interactions, const Point2 &_sample, Sampler *sampler) const {
+	Point2 sample(_sample);
+
+	/* Randomly pick an emitter */
+	Float emPdf;
+	size_t index = m_emitterPDF.sampleReuse(sample.x, emPdf);
+	const Emitter *emitter = m_emitters[index].get();
+	Spectrum value = emitter->sampleDirect(dRec, sample);
+
+	if (dRec.pdf != 0) {
+		value *= evalTransmittance(dRec.ref + dRec.d * delta, false,
+			dRec.p, emitter->isOnSurface(), dRec.time, medium,
+			interactions, sampler) / emPdf;
+		dRec.object = emitter;
+		dRec.pdf *= emPdf;
+		return value;
+	}
+	else {
+		return Spectrum(0.0f);
+	}
+}
+
 Spectrum Scene::sampleAttenuatedEmitterDirect(DirectSamplingRecord &dRec,
 		const Intersection &its, const Medium *medium, int &interactions,
 		const Point2 &_sample, Sampler *sampler) const {

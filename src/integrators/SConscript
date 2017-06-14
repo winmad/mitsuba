@@ -1,5 +1,8 @@
 Import('env', 'sys', 'plugins')
 
+plugins += env.SharedLibrary('volpath_simple_ao', ['path/volpath_simple_ao.cpp'])
+plugins += env.SharedLibrary('volpath_simple_ext', ['path/volpath_simple_ext.cpp'])
+
 plugins += env.SharedLibrary('volpath_simple_scale_diff', ['path/volpath_simple_scale_diff.cpp'])
 plugins += env.SharedLibrary('volpath_simple_diff', ['path/volpath_simple_diff.cpp'])
 

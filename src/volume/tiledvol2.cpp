@@ -76,7 +76,7 @@ public:
         AABB aabb0(Point(-0.5f*extents.x, -0.5f*extents.y, 0.0f), Point(0.5f*extents.x, 0.5f*extents.y, extents.z));
         m_aabb.reset();
 		for ( int i = 0; i < 8; ++i )
-			m_aabb.expandBy(aabb0.getCorner(i));
+			m_aabb.expandBy(m_volumeToWorld(aabb0.getCorner(i)));
 
 		std::ostringstream oss;
         oss << "Data AABB: " << aabb.toString() << "\nAABB: " << m_aabb.toString() << '\n';

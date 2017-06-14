@@ -43,6 +43,7 @@ public:
 
 	/// Location of the scattering interaction
 	Point p;
+	Point prevP;
 
 	/// Time value associated with the medium scattering event
 	Float time;

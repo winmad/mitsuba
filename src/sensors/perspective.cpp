@@ -177,6 +177,17 @@ public:
 			Vector((1-2*relOffset.x)/relSize.x - 1,
 			      -(1-2*relOffset.y)/relSize.y + 1, 0.0f)) *
 			Transform::scale(Vector(1.0f / relSize.x, 1.0f / relSize.y, 1.0f));
+
+		/* Debug: world space to camera space */
+		/*
+		printf("Camera Transform:\n");
+		const Transform& trans = m_worldTransform->eval(0).inverse();
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++)
+				printf("%.6f ", trans.getMatrix().m[i][j]);
+			printf("\n");
+		}
+		*/
 	}
 
 	/**

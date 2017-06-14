@@ -559,6 +559,10 @@ public:
 			const Medium *medium, int &interactions, const Point2 &sample,
 			Sampler *sampler = NULL) const;
 
+	Spectrum sampleAttenuatedEmitterDirect(DirectSamplingRecord &dRec, Float delta,
+		const Medium *medium, int &interactions, const Point2 &sample,
+		Sampler *sampler = NULL) const;
+
 	/**
 	 * \brief "Direct illumination" sampling routine for the main scene sensor
 	 * with support for participating media (medium variant)

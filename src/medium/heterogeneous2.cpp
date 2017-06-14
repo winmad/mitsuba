@@ -589,6 +589,7 @@ public:
 			Float pdfLobe[MAX_SGGX_LOBES];
 
 			while (true) {
+				mRec.prevP = ray(t);
 				t -= math::fastlog(1-sampler->next1D()) * m_invMaxDensity;
 				if (t >= maxt)
 					break;

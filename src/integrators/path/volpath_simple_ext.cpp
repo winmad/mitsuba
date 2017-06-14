@@ -1,31 +1,14 @@
 /*
 	Added by Lifan Wu
-	Dec 21, 2015
-	
-	keep tracking of derivatives with respect to albedo
-*/
+	Apr 28, 2017
 
-/*
-	This file is part of Mitsuba, a physically based rendering system.
-
-	Copyright (c) 2007-2014 by Wenzel Jakob and others.
-
-	Mitsuba is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License Version 3
-	as published by the Free Software Foundation.
-
-	Mitsuba is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program. If not, see <http://www.gnu.org/licenses/>.
+	Output an additional mask image indicating how many percent of rays passed through a pixel 
+	have interacted with the medium.
 */
 
 #include <mitsuba/render/scene.h>
 #include <mitsuba/core/statistics.h>
-#include <mitsuba/render/integrator.h>
+#include <mitsuba/render/renderproc.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -85,58 +68,68 @@ static StatsCounter avgPathLength("Volumetric path tracer", "Average path length
 *    one of the photon mappers may be preferable.
 * }
 */
-class SimpleDiffVolumetricPathTracer : public MonteCarloIntegrator {
+class SimpleVolumetricPathTracerExt : public MonteCarloIntegrator {
 public:
-	SimpleDiffVolumetricPathTracer(const Properties &props) : MonteCarloIntegrator(props) {
-		height = props.getInteger("height");
-		width = props.getInteger("width");
-		spp = props.getInteger("spp");
-		pixelNum = height * width;
-		prefix = props.getString("prefix", "");
+	SimpleVolumetricPathTracerExt(const Properties &props) : MonteCarloIntegrator(props) {
 		m_maxScattering = props.getInteger("maxScattering", -1);
+		m_maskFilename = props.getString("maskFilename", "");
 	}
 
 	/// Unserialize from a binary data stream
-	SimpleDiffVolumetricPathTracer(Stream *stream, InstanceManager *manager)
+	SimpleVolumetricPathTracerExt(Stream *stream, InstanceManager *manager)
 		: MonteCarloIntegrator(stream, manager) {
-		height = stream->readInt();
-		width = stream->readInt();
-		spp = stream->readInt();
-		prefix = stream->readString();
 		m_maxScattering = stream->readInt();
+		m_maskFilename = stream->readString();
 		configure();
 	}
 
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		MonteCarloIntegrator::serialize(stream, manager);
-		stream->writeInt(height);
-		stream->writeInt(width);
-		stream->writeInt(spp);
-		stream->writeString(prefix);
 		stream->writeInt(m_maxScattering);
+		stream->writeString(m_maskFilename);
 	}
 
-	void configure() {
-		pixelNum = height * width;
+	bool render(Scene *scene,
+		RenderQueue *queue, const RenderJob *job,
+		int sceneResID, int sensorResID, int samplerResID) {
+		ref<Scheduler> sched = Scheduler::getInstance();
+		ref<Sensor> sensor = static_cast<Sensor *>(sched->getResource(sensorResID));
+		ref<Film> film = sensor->getFilm();
 
-		LdA = new Spectrum[pixelNum];
-		//TdA = new Spectrum[pixelNum];
+		m_width = film->getCropSize().x;
+		m_height = film->getCropSize().y;
+		m_mask = new Float[m_width * m_height * 3];
 
-		for (int i = 0; i < pixelNum; i++) {
-			LdA[i] = Spectrum(0.f);
-			//TdA[i] = Spectrum(0.f);
-		}
+		size_t nCores = sched->getCoreCount();
+		const Sampler *sampler = static_cast<const Sampler *>(sched->getResource(samplerResID, 0));
+		size_t sampleCount = sampler->getSampleCount();
 
-		imageSeg = new int[pixelNum];
-		for (int i = 0; i < pixelNum; i++)
-			imageSeg[i] = 0;
-	}
+		Log(EInfo, "Starting render job (%ix%i, " SIZE_T_FMT " %s, " SIZE_T_FMT
+			" %s, " SSE_STR ") ..", film->getCropSize().x, film->getCropSize().y,
+			sampleCount, sampleCount == 1 ? "sample" : "samples", nCores,
+			nCores == 1 ? "core" : "cores");
 
-	~SimpleDiffVolumetricPathTracer() {
-		if (LdA != NULL)
-			delete[] LdA;
-		//if (TdA != NULL)
-		//	delete[] TdA;
+		/* This is a sampling-based integrator - parallelize */
+		ref<ParallelProcess> proc = new BlockedRenderProcess(job,
+			queue, scene->getBlockSize());
+		int integratorResID = sched->registerResource(this);
+		proc->bindResource("integrator", integratorResID);
+		proc->bindResource("scene", sceneResID);
+		proc->bindResource("sensor", sensorResID);
+		proc->bindResource("sampler", samplerResID);
+		scene->bindUsedResources(proc);
+		bindUsedResources(proc);
+		sched->schedule(proc);
+
+		m_process = proc;
+		sched->wait(proc);
+		m_process = NULL;
+		sched->unregisterResource(integratorResID);
+
+		savePfm(m_maskFilename.c_str(), m_mask, m_width, m_height);
+		delete[] m_mask;
+
+		return proc->getReturnStatus() == ParallelProcess::ESuccess;
 	}
 
 	void renderBlock(const Scene *scene,
@@ -163,14 +156,14 @@ public:
 
 		for (size_t i = 0; i < points.size(); ++i) {
 			Point2i offset = Point2i(points[i]) + Vector2i(block->getOffset());
-			int index = offset.x + offset.y * width;
+			int index = offset.x + offset.y * m_width;
 
 			if (stop)
 				break;
 
 			sampler->generate(offset);
 
-			Float cntLdA = 0.f;
+			Float numHitMedium = 0.f;
 
 			for (size_t j = 0; j < sampler->getSampleCount(); j++) {
 				rRec.newQuery(queryType, sensor->getMedium());
@@ -186,99 +179,26 @@ public:
 
 				sensorRay.scaleDifferential(diffScaleFactor);
 
-				Spectrum oneTdA(0.f);
-				Spectrum oneLdA(0.f);
-				int albedoSegs = 0;
-
-				spec *= Li(sensorRay, rRec, oneTdA, oneLdA, albedoSegs);
-
+				spec *= Li(sensorRay, rRec, numHitMedium);
 				block->put(samplePos, spec, rRec.alpha);
-
-				bool goodSample = true;
-				for (int c = 0; c < 3; c++) {
-					if (!std::isfinite(oneLdA[c]) || oneLdA[c] < 0) {
-						goodSample = false;
-						break;
-					}
-				}
-				
-				if (goodSample) {
-					LdA[index] += oneLdA;
-					cntLdA += 1.f;
-				}
-
-				imageSeg[index] |= albedoSegs;
 
 				sampler->advance();
 			}
 
-			if (cntLdA > 0.f) {
-				LdA[index] /= cntLdA;
-			}
-			else {
-				LdA[index] = Spectrum(0.f);
-			}
-		}
-
-		Float *data = new Float[(int)points.size() * 3]; 		
-		
-		std::string outfile = prefix + formatString("LdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
-		for (int i = 0; i < points.size(); i++) {
-			Point2i p = Point2i(points[i]);
-			int localIndex = p.x + p.y * block->getWidth();
-			Point2i offset = p + Vector2i(block->getOffset());
-			int globalIndex = offset.x + offset.y * width;
-			Spectrum color(LdA[globalIndex]);
+			numHitMedium /= (Float)(sampler->getSampleCount());
 			for (int c = 0; c < 3; c++) {
-				data[3 * localIndex + c] = color[c];
+				m_mask[3 * index + c] = numHitMedium;
 			}
 		}
-		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
-		
-		outfile = prefix + formatString("image_seg_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
-		for (int i = 0; i < points.size(); i++) {
-			Point2i p = Point2i(points[i]);
-			int localIndex = p.x + p.y * block->getWidth();
-			Point2i offset = p + Vector2i(block->getOffset());
-			int globalIndex = offset.x + offset.y * width;
-			Spectrum color(imageSeg[globalIndex]);
-			for (int c = 0; c < 3; c++) {
-				data[3 * localIndex + c] = color[c];
-			}
-		}
-		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());
-
-		/*
-		outfile = formatString("TdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
-		for (int i = 0; i < points.size(); i++) {
-			Point2i p = Point2i(points[i]);
-			int localIndex = p.x + p.y * block->getWidth();
-			Point2i offset = p + Vector2i(block->getOffset());
-			int globalIndex = offset.x + offset.y * width;
-			Spectrum color(TdA[globalIndex] / Float(spp));
-			for (int c = 0; c < 3; c++) {
-				data[3 * localIndex + c] = color[c];
-			}
-		}
-		savePfm(outfile.c_str(), data, block->getWidth(), block->getHeight());		
-		*/
-		delete[] data;
 	}
 
-	Spectrum Li(const RayDifferential &ray,
-		RadianceQueryRecord &rRec) const {
-		return Spectrum(0.f);
-	}
-
-	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, 
-		Spectrum &TdA, Spectrum &LdA, int &albedoSegs) const {
+	Spectrum Li(const RayDifferential &r, RadianceQueryRecord &rRec, Float &numHitMedium) const {
 		/* Some aliases and local variables */
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
 		MediumSamplingRecord mRec;
 		RayDifferential ray(r);
 		Spectrum Li(0.0f);
-
 		bool nullChain = true, scattered = false;
 		Float eta = 1.0f;
 
@@ -290,8 +210,6 @@ public:
 		if (m_maxDepth == 1)
 			rRec.type &= RadianceQueryRecord::EEmittedRadiance;
 
-		int thrAlbedoSegs = 0;
-
 		int numScattering = 0;
 
 		/**
@@ -300,7 +218,7 @@ public:
 		* exactly match the output of other integrators under all settings
 		* of this parameter.
 		*/
-		while ((rRec.depth <= m_maxDepth || m_maxDepth < 0) && 
+		while ((rRec.depth <= m_maxDepth || m_maxDepth < 0) &&
 			(numScattering <= m_maxScattering || m_maxScattering < 0)) {
 			/* ==================================================================== */
 			/*                 Radiative Transfer Equation sampling                 */
@@ -311,13 +229,7 @@ public:
 				*/
 				const PhaseFunction *phase = rRec.medium->getPhaseFunction();
 
-				Spectrum val = mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
-
-				throughput *= val;
-
-				if (thrAlbedoSegs == 0)
-					thrAlbedoSegs |= 1;
-				TdA = throughput + TdA * val;
+				throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
 
 				numScattering++;
 
@@ -339,12 +251,8 @@ public:
 						if (phase->getClass()->getName() == "SGGXPhaseFunction")
 							useSGGX = true;
 
-						Spectrum val = value * phase->eval(
-							PhaseFunctionSamplingRecord(mRec, -ray.d, dRec.d, useSGGX));
-						Li += throughput * val;
-						
-						albedoSegs |= thrAlbedoSegs;
-						LdA += TdA * val;
+						PhaseFunctionSamplingRecord pRec(mRec, -ray.d, dRec.d, useSGGX);
+						Li += throughput * value * phase->eval(pRec);
 					}
 				}
 
@@ -365,9 +273,7 @@ public:
 				Float phaseVal = phase->sample(pRec, rRec.sampler);
 				if (phaseVal == 0)
 					break;
-				
 				throughput *= phaseVal;
-				TdA *= phaseVal;
 
 				/* Trace a ray in this direction */
 				ray = Ray(mRec.p, pRec.wo, ray.time);
@@ -382,51 +288,30 @@ public:
 				Account for this and multiply by the proper per-color-channel transmittance.
 				*/
 
-				if (rRec.medium) {
-					Spectrum val = mRec.transmittance / mRec.pdfFailure;
-					throughput *= val;
-					TdA *= val;
-				}
+				if (rRec.medium)
+					throughput *= mRec.transmittance / mRec.pdfFailure;
 
 				if (!its.isValid()) {
 					/* If no intersection could be found, possibly return
 					attenuated radiance from a background luminaire */
 					if ((rRec.type & RadianceQueryRecord::EEmittedRadiance)
 						&& (!m_hideEmitters || scattered)) {
-						Spectrum val = scene->evalEnvironment(ray);
-						Spectrum value = throughput * val;
-						if (rRec.medium) {
-							Spectrum tmp = rRec.medium->evalTransmittance(ray, rRec.sampler);
-							value *= tmp;
-							val *= tmp;
-						}
-
+						Spectrum value = throughput * scene->evalEnvironment(ray);
+						if (rRec.medium)
+							value *= rRec.medium->evalTransmittance(ray, rRec.sampler);
 						Li += value;
-
-						albedoSegs |= thrAlbedoSegs;
-						LdA += TdA * val;
 					}
 					break;
 				}
 
 				/* Possibly include emitted radiance if requested */
 				if (its.isEmitter() && (rRec.type & RadianceQueryRecord::EEmittedRadiance)
-					&& (!m_hideEmitters || scattered)) {
-					Spectrum val = its.Le(-ray.d);
-					Li += throughput * val;
-
-					albedoSegs |= thrAlbedoSegs;
-					LdA += TdA * val;
-				}
+					&& (!m_hideEmitters || scattered))
+					Li += throughput * its.Le(-ray.d);
 
 				/* Include radiance from a subsurface integrator if requested */
-				if (its.hasSubsurface() && (rRec.type & RadianceQueryRecord::ESubsurfaceRadiance)) {
-					Spectrum val = its.LoSub(scene, rRec.sampler, -ray.d, rRec.depth);
-					Li += throughput * val;
-
-					albedoSegs |= thrAlbedoSegs;
-					LdA += TdA * val;
-				}
+				if (its.hasSubsurface() && (rRec.type & RadianceQueryRecord::ESubsurfaceRadiance))
+					Li += throughput * its.LoSub(scene, rRec.sampler, -ray.d, rRec.depth);
 
 				/* Prevent light leaks due to the use of shading normals */
 				Float wiDotGeoN = -dot(its.geoFrame.n, ray.d),
@@ -458,13 +343,8 @@ public:
 						Float woDotGeoN = dot(its.geoFrame.n, dRec.d);
 						/* Prevent light leaks due to the use of shading normals */
 						if (!m_strictNormals ||
-							woDotGeoN * Frame::cosTheta(bRec.wo) > 0) {
-							Spectrum val = value * bsdf->eval(bRec);
-							Li += throughput * val;
-
-							albedoSegs |= thrAlbedoSegs;
-							LdA += TdA * val;
-						}
+							woDotGeoN * Frame::cosTheta(bRec.wo) > 0)
+							Li += throughput * value * bsdf->eval(bRec);
 					}
 				}
 
@@ -512,8 +392,6 @@ public:
 				/* Keep track of the throughput, medium, and relative
 				refractive index along the path */
 				throughput *= bsdfVal;
-				TdA *= bsdfVal;
-
 				eta *= bRec.eta;
 				if (its.isMediumTransition())
 					rRec.medium = its.getTargetMedium(wo);
@@ -534,15 +412,22 @@ public:
 				if (rRec.nextSample1D() >= q)
 					break;
 				throughput /= q;
-				TdA /= q;
 			}
 		}
 		avgPathLength.incrementBase();
 		avgPathLength += rRec.depth;
 
+		if (numScattering > 0)
+			numHitMedium += 1.0;
+
 		return Li;
 	}
-	
+
+	Spectrum Li(const RayDifferential &ray,
+		RadianceQueryRecord &rRec) const {
+		return Spectrum(0.f);
+	}
+
 	void savePfm(const char *fileName, float *data, int width, int height) const {
 		char header[512];
 		sprintf(header, "PF\n%d %d\n-1.000000\n", width, height);
@@ -569,20 +454,16 @@ public:
 		return oss.str();
 	}
 
-	int height, width, pixelNum;
-	int spp;
-	Spectrum *LdA;
-	//Spectrum *TdA;
-
-	int *imageSeg;
-
-	std::string prefix;
-
 	int m_maxScattering;
+	std::string m_maskFilename;
+	
+	int m_width;
+	int m_height;
+	Float *m_mask;
 
 	MTS_DECLARE_CLASS()
 };
 
-MTS_IMPLEMENT_CLASS_S(SimpleDiffVolumetricPathTracer, false, MonteCarloIntegrator)
-MTS_EXPORT_PLUGIN(SimpleDiffVolumetricPathTracer, "Simple volumetric path tracer with albedo diff");
+MTS_IMPLEMENT_CLASS_S(SimpleVolumetricPathTracerExt, false, MonteCarloIntegrator)
+MTS_EXPORT_PLUGIN(SimpleVolumetricPathTracerExt, "Simple volumetric path tracer");
 MTS_NAMESPACE_END
