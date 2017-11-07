@@ -513,12 +513,20 @@ public:
 		}
 	}
 
+	Float smithLambda(const Vector &v, const Vector &m) const {
+		Float g1 = smithG1(v, m);
+		if (g1 < Epsilon)
+			return 1e10f;
+		return 1.0f / g1 - 1.0f;
+	}
+
 	/**
 	 * \brief Separable shadow-masking function based on Smith's
 	 * one-dimensional masking model
 	 */
 	inline Float G(const Vector &wi, const Vector &wo, const Vector &m) const {
 		return smithG1(wi, m) * smithG1(wo, m);
+		//return 1.0f / (1.0f + smithLambda(wi, m) + smithLambda(wo, m));
 	}
 
 	/// Return a string representation of the name of a distribution

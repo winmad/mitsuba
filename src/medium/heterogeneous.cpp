@@ -326,6 +326,9 @@ public:
 			} else if (name == "segmentation") {
 				Assert(volume->supportsFloatLookups());
 				m_segmentation = volume;
+			} else if (name == "densityTracking") {
+				Assert(volume->supportsFloatLookups());
+				m_densityTracking = volume;
 			} else {
 				Medium::addChild(name, child);
 			}
@@ -726,7 +729,13 @@ public:
 					break;
 
 				Point p = ray(t);
-				densityAtT = lookupDensity(p, ray.d, &s1, &s2) * m_scale;
+
+				// todo: only for experiment
+				if (m_densityTracking.get() != NULL)
+					densityAtT = lookupDensityTracking(p) * m_scale;
+				else
+					densityAtT = lookupDensity(p, ray.d, &s1, &s2) * m_scale;
+
 				#if defined(HETVOL_STATISTICS)
 					++avgRayMarchingStepsSampling;
 				#endif
@@ -950,6 +959,10 @@ protected:
 		}
 		return density;
 	}
+
+	inline Float lookupDensityTracking(const Point &p) const {
+		return m_densityTracking->lookupFloat(p);
+	}
 protected:
 	EIntegrationMethod m_method;
 	ref<VolumeDataSource> m_density;
@@ -968,6 +981,11 @@ protected:
 	int m_numClusters;
 	ref<VolumeDataSource> m_segmentation;
 	std::vector<Spectrum> m_albedoScales;
+
+	// only for simple experiment 
+	// assume m_densityTracking share the same AABB with m_density
+	// assume isotropic phase function
+	ref<VolumeDataSource> m_densityTracking;
 };
 
 MTS_IMPLEMENT_CLASS_S(HeterogeneousMedium, false, Medium)

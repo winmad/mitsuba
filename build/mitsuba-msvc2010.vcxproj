@@ -576,10 +576,13 @@
     </ClInclude>
     <ClInclude Include="..\include\mitsuba\mitsuba.h">
     </ClInclude>
+    <ClInclude Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.h" />
     <ClInclude Include="..\src\volume\tetra.h" />
     <ClInclude Include="..\src\volume\tetra2.h" />
   </ItemGroup>
   <ItemGroup Label="Source Files">
+    <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
+    <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
     <ClCompile Include="..\src\converter\mtsimport.cpp">
     </ClCompile>
     <ClCompile Include="..\src\converter\obj.cpp">
@@ -597,8 +600,6 @@
     <ClCompile Include="..\src\bsdfs\phong.cpp">
     </ClCompile>
     <ClCompile Include="..\src\bsdfs\ward.cpp">
-    </ClCompile>
-    <ClCompile Include="..\src\bsdfs\bump.cpp">
     </ClCompile>
     <ClCompile Include="..\src\bsdfs\null.cpp">
     </ClCompile>
@@ -895,6 +896,7 @@
     </ClCompile>
     <ClCompile Include="..\src\libcore\sched.cpp">
     </ClCompile>
+    <ClCompile Include="..\src\shapes\heightfield.cpp" />
     <ClCompile Include="..\src\tests\test_spectrum.cpp">
     </ClCompile>
     <ClCompile Include="..\src\tests\test_chisquare.cpp">
@@ -964,6 +966,9 @@
     <ClCompile Include="..\src\utils\albedoCluster.cpp" />
     <ClCompile Include="..\src\utils\albedoRemapping.cpp" />
     <ClCompile Include="..\src\utils\alignLobes.cpp" />
+    <ClCompile Include="..\src\utils\beckmannSurface.cpp" />
+    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp" />
+    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp" />
     <ClCompile Include="..\src\utils\calcDownSampleError.cpp" />
     <ClCompile Include="..\src\utils\clampVolume.cpp" />
     <ClCompile Include="..\src\utils\cmp.cpp" />
@@ -972,6 +977,8 @@
     <ClCompile Include="..\src\utils\downSampleSGGX.cpp" />
     <ClCompile Include="..\src\utils\downSampleVolume.cpp" />
     <ClCompile Include="..\src\utils\fillEmptyVoxels.cpp" />
+    <ClCompile Include="..\src\utils\heightfield2Trimesh.cpp" />
+    <ClCompile Include="..\src\utils\microfacet.cpp" />
     <ClCompile Include="..\src\utils\microflake2SGGX.cpp" />
     <ClCompile Include="..\src\utils\orientation2Albedo.cpp" />
     <ClCompile Include="..\src\utils\splitGridVolume.cpp" />

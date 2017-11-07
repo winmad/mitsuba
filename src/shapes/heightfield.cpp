@@ -666,7 +666,7 @@ public:
 		Vector2i size = m_dataSize;
 
 		/* Limit the size of the mesh */
-		while (size.x > 256 && size.y > 256) {
+		while (size.x > 2048 && size.y > 2048) {
 			size.x = std::max(size.x / 2, 2);
 			size.y = std::max(size.y / 2, 2);
 		}

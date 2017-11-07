@@ -55,7 +55,8 @@ public:
 	IndependentSampler(const Properties &props) : Sampler(props) {
 		/* Number of samples per pixel when used with a sampling-based integrator */
 		m_sampleCount = props.getSize("sampleCount", 4);
-		m_random = new Random();
+		m_seed = props.getInteger("seed", 1004);
+		m_random = new Random(m_seed);
 	}
 
 	IndependentSampler(Stream *stream, InstanceManager *manager)
@@ -113,6 +114,7 @@ public:
 	MTS_DECLARE_CLASS()
 private:
 	ref<Random> m_random;
+	uint64_t m_seed;
 };
 
 MTS_IMPLEMENT_CLASS_S(IndependentSampler, false, Sampler)

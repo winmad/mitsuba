@@ -179,9 +179,6 @@
     <ClCompile Include="..\src\bsdfs\ward.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\bsdfs\bump.cpp">
-      <Filter>Source Files\bsdfs</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\bsdfs\null.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
@@ -1145,6 +1142,30 @@
     <ClCompile Include="..\src\integrators\path\volpath_simple_ao.cpp">
       <Filter>Source Files\integrators\path</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\bsdfs\bumpmap.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\shapes\heightfield.cpp">
+      <Filter>Source Files\shapes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bsdfs\normalmap.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\beckmannSurface.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\microfacet.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\heightfield2Trimesh.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
@@ -1851,6 +1872,9 @@
     </ClInclude>
     <ClInclude Include="..\src\volume\tetra2.h">
       <Filter>Source Files\volume</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.h">
+      <Filter>Source Files\utils</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
