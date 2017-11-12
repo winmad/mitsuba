@@ -970,6 +970,7 @@
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp" />
     <ClCompile Include="..\src\utils\calcDownSampleError.cpp" />
+    <ClCompile Include="..\src\utils\calcPatchVisibility.cpp" />
     <ClCompile Include="..\src\utils\clampVolume.cpp" />
     <ClCompile Include="..\src\utils\cmp.cpp" />
     <ClCompile Include="..\src\utils\createGridVolume.cpp" />

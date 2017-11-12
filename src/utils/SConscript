@@ -4,6 +4,7 @@ plugins += env.SharedLibrary('beckmannSurface', ['beckmannSurface.cpp'])
 plugins += env.SharedLibrary('bsdfSimulator', ['bsdfSimulator/bsdfSimulator.cpp', 'bsdfSimulator/bsdfSimulator_proc.cpp'])
 plugins += env.SharedLibrary('microfacet', ['microfacet.cpp'])
 plugins += env.SharedLibrary('heightfield2Trimesh', ['heightfield2Trimesh.cpp'])
+plugins += env.SharedLibrary('calcPatchVisibility', ['calcPatchVisibility.cpp'])
 
 plugins += env.SharedLibrary('upSampleVolume', ['upSampleVolume.cpp'])
 plugins += env.SharedLibrary('albedoRemapping', ['albedoRemapping.cpp'])

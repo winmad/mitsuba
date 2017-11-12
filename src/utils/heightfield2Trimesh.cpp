@@ -25,7 +25,7 @@ public:
 
 		props = Properties("heightfield");
 		props.setTransform("toWorld", Transform::scale(Vector3(std::atof(argv[2]), std::atof(argv[3]), 1.0f)));
-		props.setFloat("scale", 1.0f);
+		props.setFloat("scale", std::atof(argv[4]));
 		Shape *heightfield = static_cast<Shape *> (PluginManager::getInstance()->
 			createObject(MTS_CLASS(Shape), props));
 		heightfield->addChild(texture);
@@ -34,8 +34,8 @@ public:
 		ref<TriMesh> trimesh = heightfield->createTriMesh();
 		fs::path filename(argv[1]);
 		
-		//filename.replace_extension(".obj");
-		//trimesh->writeOBJ(filename);
+		filename.replace_extension(".obj");
+		trimesh->writeOBJ(filename);
 		
 		filename.replace_extension(".trimesh");
 		ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);

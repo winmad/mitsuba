@@ -19,6 +19,8 @@ class TestMicrofacet : public Utility {
 		Vector wi(std::atof(argv[1]), std::atof(argv[2]), std::atof(argv[3]));
 		wi = normalize(wi);
 
+		Log(EInfo, "G1 = %.6f", dist.smithG1(wi, m));
+
 		int nTheta = 180;
 		int nPhi = 360;
 		double dTheta = 0.5 * M_PI / (double)nTheta;
@@ -48,12 +50,12 @@ class TestMicrofacet : public Utility {
 				wh = normalize(wh);
 				double cosTerm = std::max(0.0f, dot(wi, wh));
 				double visD_wh = dist.eval(wh) * cosTerm / totVisible;
-				double shadowGivenMaskTerm = (1.0 + dist.smithLambda(wi, m)) / (1.0 + dist.smithLambda(wi, m) + dist.smithLambda(wo, m));
-				//double shadowGivenMaskTerm = dist.smithG1(wo, m);
+				//double shadowGivenMaskTerm = (1.0 + dist.smithLambda(wi, m)) / (1.0 + dist.smithLambda(wi, m) + dist.smithLambda(wo, m));
+				double shadowGivenMaskTerm = dist.smithG1(wo, m);
 				res += shadowGivenMaskTerm * visD_wh * sinTheta * dTheta * dPhi / (4.0 * wh.z);
 			}
 		}
-		Log(EInfo, "G1 = %.6f", dist.smithG1(wi, m));
+		
 		Log(EInfo, "avg G2 = %.6f %.6f", res, res * dist.smithG1(wi, m));
 		return 0;
 	}

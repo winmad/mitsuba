@@ -22,18 +22,13 @@ public:
 		m_sqrtNumParticles = std::atoi(argv[5]);
 		m_size = std::atoi(argv[6]);
 		m_maxDepth = std::atoi(argv[7]);
-		if (argc == 12) {
-			m_xmin = std::atof(argv[8]);
-			m_xmax = std::atof(argv[9]);
-			m_ymin = std::atof(argv[10]);
-			m_ymax = std::atof(argv[11]);
-		}
-		else {
-			m_xmin = -1.0f;
-			m_xmax = 1.0f;
-			m_ymin = -1.0f;
-			m_ymax = 1.0f;
-		}
+		
+		m_xmin = std::atof(argv[8]);
+		m_xmax = std::atof(argv[9]);
+		m_ymin = std::atof(argv[10]);
+		m_ymax = std::atof(argv[11]);
+
+		m_shadowOption = std::atoi(argv[12]);
 		
 		// init
 		m_scene->initialize();
@@ -62,7 +57,7 @@ public:
 			samplers[i]->decRef();
 
 		ref<BSDFSimulatorProcess> proc = new BSDFSimulatorProcess(m_wi,
-			m_sqrtNumParticles, m_size, m_maxDepth, AABB2(Point2(m_xmin, m_ymin), Point2(m_xmax, m_ymax)));
+			m_sqrtNumParticles, m_size, m_maxDepth, AABB2(Point2(m_xmin, m_ymin), Point2(m_xmax, m_ymax)), m_shadowOption);
 		proc->bindResource("scene", sceneResID);
 		proc->bindResource("sampler", samplerResID);
 		m_scene->bindUsedResources(proc);
@@ -323,6 +318,7 @@ public:
 	int m_size;
 	int m_maxDepth;
 	double m_xmin, m_xmax, m_ymin, m_ymax;
+	int m_shadowOption;
 
 	MTS_DECLARE_UTILITY()
 };

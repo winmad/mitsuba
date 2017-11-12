@@ -85,8 +85,9 @@ std::string SphericalDistribution::toString() const {
 
 // WorkProcessor
 BSDFRayTracer::BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, 
-		int maxDepth, const AABB2 &aabb)
-	: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), m_maxDepth(maxDepth), m_aabb(aabb) { }
+		int maxDepth, const AABB2 &aabb, int shadowOption)
+	: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), m_maxDepth(maxDepth), 
+	m_aabb(aabb), m_shadowOption(shadowOption) { }
 
 ref<WorkUnit> BSDFRayTracer::createWorkUnit() const {
 	return new RangeWorkUnit();
@@ -97,7 +98,7 @@ ref<WorkResult> BSDFRayTracer::createWorkResult() const {
 }
 
 ref<WorkProcessor> BSDFRayTracer::clone() const {
-	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_maxDepth, m_aabb);
+	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_maxDepth, m_aabb, m_shadowOption);
 }
 
 void BSDFRayTracer::prepare() {
@@ -113,13 +114,19 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 	//m_sampler->generate(Point2i(0));
 
 	res->clear();
+	
 	for (size_t i = range->getRangeStart(); i <= range->getRangeEnd() && !stop; i++) {
-		Point o = sampleRayOrigin(i);
+		bool success;
+		Point o = sampleRayOrigin(i, success);
+		if (!success)
+			continue;
+
 		RayDifferential ray(o, -m_wi, 0);
 		RadianceQueryRecord rRec(m_scene, m_sampler);
 		rRec.type = RadianceQueryRecord::ERadiance;
 
-		Spectrum throughput = sampleReflectance(ray, rRec);
+		Intersection its;
+		Spectrum throughput = sampleReflectance(ray, rRec, its);
 
 		if (throughput[0] < -Epsilon)
 			continue;
@@ -128,24 +135,48 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			throughput = Spectrum(0.f);
 
 		if (!throughput.isZero()) {
-			Assert(!m_scene->rayIntersect(ray));
+			if (m_shadowOption == 1) {
+				if (its.isValid() && m_aabb.contains(Point2(its.p.x, its.p.y)))
+					throughput = Spectrum(0.f);
+			}
+			else if (m_shadowOption == 2) {
+				if (its.isValid())
+					throughput = Spectrum(0.f);
+			}
 		}
 
 		res->put(ray.d, throughput, normFactor);
 	}
 }
 
-Point BSDFRayTracer::sampleRayOrigin(int idx) {
+Point BSDFRayTracer::sampleRayOrigin(int idx, bool &success) {
 	int r = idx / m_sqrtNumParticles;
 	int c = idx % m_sqrtNumParticles;
 	double x = m_aabb.min.x + (c + m_sampler->next1D()) / (double)m_sqrtNumParticles * (m_aabb.max.x - m_aabb.min.x);
 	double y = m_aabb.min.y + (r + m_sampler->next1D()) / (double)m_sqrtNumParticles * (m_aabb.max.y - m_aabb.min.y);
-	Point o(x, y, 0);
-	o = o + m_wi * 1e3;
+
+	/*
+	Point o(x, y, 1e2);
+	Ray ray(o, Vector(0, 0, -1.0f), 0);
+	Intersection its;
+	m_scene->rayIntersect(ray, its);
+
+	ray = Ray(its.p + m_wi * Epsilon, m_wi, 0);
+	success = !m_scene->rayIntersect(ray);
+
+	Point res = its.p + m_wi * 1e3;
+	return res;
+	*/
+
+	Point o(x, y, 10.0f);
+	o += m_wi * 1e3;
+	Ray ray(o, -m_wi, 0);
+	success = m_scene->rayIntersect(ray);
+
 	return o;
 }
 
-Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec) {
+Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts) {
 	const Scene *scene = rRec.scene;
 	Intersection &its = rRec.its;
 	MediumSamplingRecord mRec;
@@ -154,6 +185,8 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 	Spectrum throughput(1.0f);
 
 	while (rRec.depth <= m_maxDepth) {
+		getIts = its;
+
 		if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler)) {
 			const PhaseFunction *phase = rRec.medium->getPhaseFunction();
 			throughput *= mRec.sigmaS * mRec.transmittance / mRec.pdfSuccess;
@@ -173,8 +206,9 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			if (rRec.medium)
 				throughput *= mRec.transmittance / mRec.pdfFailure;
 
-			if (!its.isValid())
+			if (!its.isValid()) {
 				return throughput;
+			}
 
 			const BSDF *bsdf = its.getBSDF();
 			BSDFSamplingRecord bRec(its, rRec.sampler);
@@ -197,7 +231,8 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 		}
 		rRec.depth++;
 	}
-	return Spectrum(0.0f);
+
+	return throughput;
 }
 
 BSDFRayTracer::BSDFRayTracer(Stream *stream, InstanceManager *manager) {
@@ -220,9 +255,9 @@ void BSDFRayTracer::serialize(Stream *stream, InstanceManager *manager) const {
 
 // ParallelProcess
 BSDFSimulatorProcess::BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles,
-		int size, int maxDepth, const AABB2 &aabb)
+		int size, int maxDepth, const AABB2 &aabb, int shadowOption)
 		: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), 
-		m_maxDepth(maxDepth), m_aabb(aabb) {
+		m_maxDepth(maxDepth), m_aabb(aabb), m_shadowOption(shadowOption) {
 	m_numParticles = m_sqrtNumParticles * m_sqrtNumParticles;
 	m_start = 0;
 	m_granularity = std::max((size_t)1, m_numParticles 
@@ -271,7 +306,7 @@ void BSDFSimulatorProcess::processResult(const WorkResult *result, bool cancelle
 }
 
 ref<WorkProcessor> BSDFSimulatorProcess::createWorkProcessor() const {
-	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_maxDepth, m_aabb);
+	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_maxDepth, m_aabb, m_shadowOption);
 }
 
 MTS_IMPLEMENT_CLASS(SphericalDistribution, false, WorkResult)

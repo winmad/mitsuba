@@ -36,9 +36,10 @@ public:
 
 class BSDFRayTracer : public WorkProcessor {
 public:
-	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, int maxDepth, const AABB2 &aabb);
-	Point sampleRayOrigin(int idx);
-	Spectrum sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec);
+	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, int maxDepth, 
+		const AABB2 &aabb, int shadowOption);
+	Point sampleRayOrigin(int idx, bool &success);
+	Spectrum sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts);
 
 	ref<WorkUnit> createWorkUnit() const;
 	ref<WorkResult> createWorkResult() const;
@@ -60,11 +61,13 @@ public:
 	int m_size;
 	int m_maxDepth;
 	AABB2 m_aabb;
+	int m_shadowOption;
 };
 
 class BSDFSimulatorProcess : public ParallelProcess {
 public:
-	BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles, int size, int maxDepth, const AABB2 &aabb);
+	BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles, int size, int maxDepth, 
+		const AABB2 &aabb, int shadowOption);
 	void setGranularity(int granularity);
 
 	EStatus generateWork(WorkUnit *unit, int worker);
@@ -87,6 +90,7 @@ public:
 	int m_size;
 	int m_maxDepth;
 	AABB2 m_aabb;
+	int m_shadowOption;
 	ref<SphericalDistribution> m_res;
 };
 
