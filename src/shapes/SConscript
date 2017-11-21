@@ -15,4 +15,6 @@ plugins += env.SharedLibrary('cube', ['cube.cpp'])
 plugins += env.SharedLibrary('heightfield', ['heightfield.cpp'])
 #plugins += env.SharedLibrary('deformable', ['deformable.cpp'])
 
+plugins += env.SharedLibrary('tiled_heightfield', ['tiled_heightfield.cpp'])
+
 Export('plugins')

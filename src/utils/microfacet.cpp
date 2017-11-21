@@ -13,10 +13,10 @@ MTS_NAMESPACE_BEGIN
 
 class TestMicrofacet : public Utility {
 	int run(int argc, char **argv) {
-		MicrofacetDistribution dist(MicrofacetDistribution::EBeckmann, 1.0f);
+		MicrofacetDistribution dist(MicrofacetDistribution::EBeckmann, std::atof(argv[1]));
 		Vector m(0, 0, 1);
 		
-		Vector wi(std::atof(argv[1]), std::atof(argv[2]), std::atof(argv[3]));
+		Vector wi(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]));
 		wi = normalize(wi);
 
 		Log(EInfo, "G1 = %.6f", dist.smithG1(wi, m));

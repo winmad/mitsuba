@@ -897,6 +897,7 @@
     <ClCompile Include="..\src\libcore\sched.cpp">
     </ClCompile>
     <ClCompile Include="..\src\shapes\heightfield.cpp" />
+    <ClCompile Include="..\src\shapes\tiled_heightfield.cpp" />
     <ClCompile Include="..\src\tests\test_spectrum.cpp">
     </ClCompile>
     <ClCompile Include="..\src\tests\test_chisquare.cpp">
@@ -970,6 +971,8 @@
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp" />
     <ClCompile Include="..\src\utils\calcDownSampleError.cpp" />
+    <ClCompile Include="..\src\utils\calcPatchDirVis.cpp" />
+    <ClCompile Include="..\src\utils\calcPatchNDF.cpp" />
     <ClCompile Include="..\src\utils\calcPatchVisibility.cpp" />
     <ClCompile Include="..\src\utils\clampVolume.cpp" />
     <ClCompile Include="..\src\utils\cmp.cpp" />

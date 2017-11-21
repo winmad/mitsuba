@@ -39,21 +39,48 @@ public:
 		m_res = new Bitmap(Bitmap::EPixelFormat::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
 		float *data = m_res->getFloat32Data();
 
-//#pragma omp parallel for
+		m_hmap = m_scene->getShapes()[0];
+
+		/*
+		int m = 4;
+		for (int i = 0; i <= m; i++) {
+			for (int j = 0; j <= m; j++) {
+				double x = m_aabb.min.x + (double)j / (double)m * (m_aabb.max.x - m_aabb.min.x);
+				double y = m_aabb.min.y + (double)i / (double)m * (m_aabb.max.y - m_aabb.min.y);
+				Point o(x, y, 1e2);
+				Ray ray(o, Vector(0, 0, -1), 0);
+				Intersection its;
+				m_scene->rayIntersect(ray, its);
+				Float h = hmap->getHeight(o);
+				if (std::abs(h - its.p.z) > Epsilon) {
+					Log(EInfo, "different heights: %.6f %.6f", h, its.p.z);
+				}
+
+				Vector normal = hmap->getNormal(o);
+				Vector diff = normal - its.geoFrame.n;
+				if (diff.length() > Epsilon) {
+					Log(EInfo, "different normals: (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)",
+						normal.x, normal.y, normal.z,
+						its.geoFrame.n.x, its.geoFrame.n.y, its.geoFrame.n.z);
+				}
+			}
+		}
+		return 0;
+		*/
+
+#pragma omp parallel for
 		for (int r = 0; r < m_size; r++) {
 			for (int c = 0; c < m_size; c++) {
 				double res = 0.0f;
 				for (int i = 0; i < m_sqrtSpp; i++) {
 					for (int j = 0; j < m_sqrtSpp; j++) {
-						double y = (r + m_sampler->next1D()) / (double)m_size * 2.0 - 1.0;
-						double x = (c + m_sampler->next1D()) / (double)m_size * 2.0 - 1.0;
+						double y = (r + 0.5) / (double)m_size * 2.0 - 1.0;
+						double x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
 						double z = 1.0 - x * x - y * y;
 						if (z < Epsilon)
 							continue;
 						z = std::sqrt(z);
 						Vector wo(x, y, z);
-
-						//Log(EInfo, "%.6f, %.6f, %.6f", wo.x, wo.y, wo.z);
 
 						Point o = sampleRayOrigin(i, j, m_sampler);
 						Ray ray(o + wo * Epsilon, wo, 0);
@@ -64,19 +91,38 @@ public:
 						Intersection its;
 						double vis = 0.0f;
 
+						// verify ray.o is above the heightfield
+						bool isInside = false;
+						Float h = m_hmap->getHeight(ray.o);
+						if (h > ray.o.z) {
+							isInside = true;
+							//Log(EInfo, "ray origin is inside, %.6f, %.6f", ray.o.z, its.p.z);
+						}
+
 						if (m_shadowOption == 1) {
 							bool flag = m_scene->rayIntersect(ray, its);
-							if (!flag || !m_aabb.contains(Point2(its.p.x, its.p.y)))
+							if (!isInside && (!flag || (its.isValid() && !m_aabb.contains(Point2(its.p.x, its.p.y))))) {
 								vis = 1.0f;
+// 								if (its.isValid() && dot(its.geoFrame.n, -ray.d) < Epsilon) {
+// 									vis = 0.f;
+// 									Log(EInfo, "back face normal = (%.6f, %.6f, %.6f)", its.geoFrame.n.x,
+// 										its.geoFrame.n.y, its.geoFrame.n.z);
+// 								}
+							}
 						}
 						else if (m_shadowOption == 2) {
 							m_scene->rayIntersect(invRay, its);
-							if (m_aabb.contains(Point2(its.p.x, its.p.y)))
+							if (its.isValid() && m_aabb.contains(Point2(its.p.x, its.p.y)))
 								vis = 1.0f;
 						}
 						else if (m_shadowOption == 3) {
-							m_scene->rayIntersect(invRay, its);
-							if ((its.p - o).length() < Epsilon) {
+							//m_scene->rayIntersect(invRay, its);
+							//if (!isInside && its.isValid() && (its.p - o).length() < Epsilon) {
+							//	vis = 1.0f;
+							//}
+
+							bool flag = m_scene->rayIntersect(ray);
+							if (!isInside && !flag) {
 								vis = 1.0f;
 							}
 						}
@@ -119,16 +165,19 @@ public:
 	Point sampleRayOrigin(int i, int j, Sampler *sampler) {
 		double x = m_aabb.min.x + (j + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
 		double y = m_aabb.min.y + (i + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.y - m_aabb.min.y);
+		Point o(x, y, 0);
+		double z = m_hmap->getHeight(o);
+		return Point(x, y, z);
 
-		Point o(x, y, 1e2);
-		Ray ray(o, Vector(0, 0, -1.0f), 0);
-		Intersection its;
-		m_scene->rayIntersect(ray, its);
-
-		return its.p;
+// 		Point o(x, y, 1e2);
+// 		Ray ray(o, Vector(0, 0, -1.0f), 0);
+// 		Intersection its;
+// 		m_scene->rayIntersect(ray, its);
+//		return its.p;
 	}
 
 	ref<Scene> m_scene;
+	Shape *m_hmap;
 	ref<Sampler> m_sampler;
 	int m_sqrtSpp, m_spp;
 	int m_size;
