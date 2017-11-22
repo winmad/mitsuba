@@ -141,7 +141,7 @@ public:
 
 		normFactor = (double)m_numParticles / (double)totalValidParticles;
 
-		ref<Bitmap> bitmap = new Bitmap(Bitmap::EPixelFormat::ESpectrum, Bitmap::EFloat32, Vector2i(m_size));
+		ref<Bitmap> bitmap = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat32, Vector2i(m_size));
 		float *data = bitmap->getFloat32Data();
 		for (int r = 0; r < m_size; r++) {
 			for (int c = 0; c < m_size; c++) {
@@ -296,7 +296,7 @@ public:
 			}
 		}
 
-		ref<Bitmap> bitmap = new Bitmap(Bitmap::EPixelFormat::ESpectrum, Bitmap::EFloat32, Vector2i(m_size));
+		ref<Bitmap> bitmap = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat32, Vector2i(m_size));
 		float *data = bitmap->getFloat32Data();
 		for (int r = 0; r < m_size; r++) {
 			for (int c = 0; c < m_size; c++) {

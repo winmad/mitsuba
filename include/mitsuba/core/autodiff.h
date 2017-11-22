@@ -161,6 +161,12 @@ public:
 		return *this;
 	}
 
+	inline DScalar1& operator*=(const DScalar1 &v) {
+	    grad = v.grad * value + grad * v.value;
+    	value *= v.value;
+    	return *this;
+	}
+
 	/// @}
 	// ======================================================================
 

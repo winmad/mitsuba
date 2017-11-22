@@ -121,6 +121,7 @@ bool ShapeKDTree::rayIntersect(const Ray &ray, Intersection &its) const {
 	#endif
 
 	++raysTraced;
+	
 	if (m_aabb.rayIntersect(ray, mint, maxt)) {
 		/* Use an adaptive ray epsilon */
 		Float rayMinT = ray.mint;

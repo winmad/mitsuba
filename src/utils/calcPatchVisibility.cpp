@@ -36,7 +36,7 @@ public:
 			createObject(MTS_CLASS(Sampler), props));
 		m_sampler->configure();
 
-		m_res = new Bitmap(Bitmap::EPixelFormat::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
+		m_res = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
 		float *data = m_res->getFloat32Data();
 
 		m_hmap = m_scene->getShapes()[0];

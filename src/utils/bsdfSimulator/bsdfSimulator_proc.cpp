@@ -9,7 +9,7 @@ MTS_NAMESPACE_BEGIN
 
 // WorkResult
 SphericalDistribution::SphericalDistribution(int size) : m_size(size) {
-	m_values = new Bitmap(Bitmap::EPixelFormat::ESpectrum, Bitmap::EFloat64, Vector2i(m_size));
+	m_values = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat64, Vector2i(m_size));
 }
 
 void SphericalDistribution::clear() {
@@ -52,7 +52,7 @@ void SphericalDistribution::scale(double scale) {
 void SphericalDistribution::saveExr(fs::path filename) {
 	filename.replace_extension(".exr");
 	ref<Bitmap> bitmap;
-	bitmap = m_values->convert(Bitmap::EPixelFormat::ERGB, Bitmap::EFloat32);
+	bitmap = m_values->convert(Bitmap::ERGB, Bitmap::EFloat32);
 	ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);
 	bitmap->write(Bitmap::EOpenEXR, stream);
 }
