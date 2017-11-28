@@ -140,7 +140,8 @@ public:
 			return 0;
 	}
 
-	bool rayIntersectLocal(const Ray &_ray, Float mint, Float maxt, Float &t, Float blockX, Float blockY, void *tmp) const {
+	bool rayIntersectLocal(const Ray &_ray, Float mint, Float maxt, Float &t, 
+		Float blockX, Float blockY, void *tmp) const {
 		StackEntry stack[MTS_QTREE_MAXDEPTH];
 
 		Ray ray(_ray);

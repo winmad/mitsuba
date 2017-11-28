@@ -8,7 +8,7 @@
 #include <mitsuba/mitsuba.h>
 #include <mitsuba/render/trimesh.h>
 #include <mitsuba/core/tls.h>
-
+#include <mitsuba/core/triangle.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -180,7 +180,11 @@ public:
 		Point4 bb;
 
 		//if ( !lookup(p, 1, id, bb) ) return false;
-		if ( !lookup(p, id, bb) ) return false;
+		if ( !lookup(p, id, bb) ) {
+			//printf("(%.6f, %.6f, %.6f, %.6f), %.6f\n", bb.x, bb.y, bb.z, bb.w, 
+			//	bb.x + bb.y + bb.z + bb.w);
+			return false;
+		}
 		tex = m_vtxTexcoord[m_tetra[id].idx[0]]*bb.x
 			+ m_vtxTexcoord[m_tetra[id].idx[1]]*bb.y
 			+ m_vtxTexcoord[m_tetra[id].idx[2]]*bb.z
@@ -198,6 +202,74 @@ public:
 					 + m_vtxTangent[m_tetra[id].idx[2]].dpdv*bb.z
 					 + m_vtxTangent[m_tetra[id].idx[3]].dpdv*bb.w;
 
+		return true;
+	}
+
+	// assume the ray origin is on one face of the tetrahedron
+	bool rayIntersectTetrahedron(const Ray &_ray, Float &tFar, 
+		Point &texNear, Point &texFar) const {
+		uint32_t id;
+		Point4 bb;
+
+		Ray ray(_ray);
+		Float eps = Epsilon * 2.0f;
+		ray.o += ray.d * eps;
+
+		if (!lookup(ray.o, id, bb))
+			return false;
+
+		for (int i = 0; i < 4; i++) {
+			if (bb[i] < -Epsilon || bb[i] > 1.0f + Epsilon)
+				printf("Error in rayIntersectTetrahedron: (%.6f, %.6f, %.6f, %.6f)\n", 
+					bb[0], bb[1], bb[2], bb[3]);
+		}
+
+		tFar = std::numeric_limits<Float>::infinity();
+		const int tris[4][3] = {{0, 1, 2}, {0, 1, 3}, {1, 2, 3}, {0, 2, 3}};
+		for (int f = 0; f < 4; f++) {
+			Point p[3];
+			for (int i = 0; i < 3; i++) {
+				p[i] = m_vtxPosition[m_tetra[id].idx[tris[f][i]]];				
+			}
+			Float u, v, t;
+			if (Triangle::rayIntersect(p[0], p[1], p[2], ray, u, v, t)) {
+				if (t > 0)
+					tFar = std::min(tFar, t);
+			}
+		}
+
+		if (tFar == std::numeric_limits<Float>::infinity())
+			return false;
+		tFar += eps;
+
+		bool flag;
+		flag = m_tetra[id].inside(m_vtxPosition, _ray.o, bb);
+		texNear = m_vtxTexcoord[m_tetra[id].idx[0]] * bb.x 
+				+ m_vtxTexcoord[m_tetra[id].idx[1]] * bb.y
+				+ m_vtxTexcoord[m_tetra[id].idx[2]] * bb.z
+				+ m_vtxTexcoord[m_tetra[id].idx[3]] * bb.w;
+		/*
+		if (!flag) {
+			printf("Error in rayIntersectTetrahedron: not inside!\n");
+			printf("bb near: (%.6f, %.6f, %.6f, %.6f)\n",
+				bb.x, bb.y, bb.z, bb.w);
+		}
+		*/	
+		
+		flag &= m_tetra[id].inside(m_vtxPosition, _ray(tFar), bb);
+		texFar = m_vtxTexcoord[m_tetra[id].idx[0]] * bb.x 
+				+ m_vtxTexcoord[m_tetra[id].idx[1]] * bb.y
+				+ m_vtxTexcoord[m_tetra[id].idx[2]] * bb.z
+				+ m_vtxTexcoord[m_tetra[id].idx[3]] * bb.w;
+
+		/*
+		if (!flag) {
+			printf("Error in rayIntersectTetrahedron: not inside!\n");
+			printf("bb far: (%.6f, %.6f, %.6f, %.6f)\n",
+				bb.x, bb.y, bb.z, bb.w);
+		}
+		*/
+		
 		return true;
 	}
 
