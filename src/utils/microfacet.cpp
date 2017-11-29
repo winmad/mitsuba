@@ -33,7 +33,7 @@ class TestMicrofacet : public Utility {
 			for (int j = 0; j < nPhi; j++) {
 				double phi = (j + 0.5f) * dPhi;
 				Vector wm(sinTheta * std::cos(phi), sinTheta * std::sin(phi), std::cos(theta));
-				double cosTerm = std::max(0.0f, dot(wi, wm));
+				double cosTerm = std::max(0.0, dot(wi, wm));
 				totVisible += dist.eval(wm) * cosTerm * sinTheta * dTheta * dPhi;
 			}
 		}
@@ -48,7 +48,7 @@ class TestMicrofacet : public Utility {
 				Vector wo(sinTheta * std::cos(phi), sinTheta * std::sin(phi), std::cos(theta));
 				Vector wh = wi + wo;
 				wh = normalize(wh);
-				double cosTerm = std::max(0.0f, dot(wi, wh));
+				double cosTerm = std::max(0.0, dot(wi, wh));
 				double visD_wh = dist.eval(wh) * cosTerm / totVisible;
 				//double shadowGivenMaskTerm = (1.0 + dist.smithLambda(wi, m)) / (1.0 + dist.smithLambda(wi, m) + dist.smithLambda(wo, m));
 				double shadowGivenMaskTerm = dist.smithG1(wo, m);

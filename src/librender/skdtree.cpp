@@ -134,6 +134,11 @@ bool ShapeKDTree::rayIntersect(const Ray &ray, Intersection &its) const {
 
 		if (EXPECT_TAKEN(maxt > mint)) {
 			if (rayIntersectHavran<false>(ray, mint, maxt, its.t, temp)) {
+				// hack by Lifan: to fix the intersection issue in shellmap_heightfield
+				if (its.t == std::numeric_limits<Float>::infinity()) {
+					return false;
+				}
+
 				fillIntersectionRecord<true>(ray, temp, its);
 				return true;
 			}

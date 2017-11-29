@@ -250,11 +250,11 @@ ref<TriMesh> Shape::createTriMesh() {
 	return NULL;
 }
 
-Float Shape::getHeight(const Point &p) {
+Float Shape::getHeight(const Point &p) const {
 	NotImplementedError("getHeight");
 }
 
-Vector Shape::getNormal(const Point &p) {
+Vector Shape::getNormal(const Point &p) const {
 	NotImplementedError("getNormal");
 }
 

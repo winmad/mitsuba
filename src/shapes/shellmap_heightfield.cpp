@@ -43,7 +43,7 @@ public:
         m_shellFilename = props.getString("shellFilename");
 
         // correspond to z=1 in texture space
-        m_heightOffset = props.getFloat("heightOffset", 0.01f);
+        m_maxHeight = props.getFloat("maxHeight", -1.0);
 
         m_debug = false;
     }
@@ -52,7 +52,7 @@ public:
         : Shape(stream, manager) {
         m_objectToWorld = Transform(stream);
         m_shellFilename = stream->readString();
-        m_heightOffset = stream->readFloat();
+        m_maxHeight = stream->readFloat();
         m_block = static_cast<Shape *>(manager->getInstance(stream));
         m_meshBound = static_cast<Shape *>(manager->getInstance(stream));
         configure();
@@ -65,7 +65,7 @@ public:
         Shape::serialize(stream, manager);
         m_objectToWorld.serialize(stream);
         stream->writeString(m_shellFilename);
-        stream->writeFloat(m_heightOffset);
+        stream->writeFloat(m_maxHeight);
         manager->serialize(stream, m_block.get());
         manager->serialize(stream, m_meshBound.get());
     }
@@ -195,6 +195,7 @@ public:
                     Log(EInfo, "*** found intersection ***");
                     Log(EInfo, "ratio = %.6f, final dist = %.6f", ratio, t);
                 }
+
                 return true;
             }
             else {
@@ -230,7 +231,7 @@ public:
         bool flag = m_shell.lookupPoint(posShell, tex, norm, tang);
 
         if (!flag) {
-            Log(EInfo, "dist = %.6f", its.t);
+            Log(EInfo, "p = (%.6f, %.6f, %.6f), dist = %.6f", its.p.x, its.p.y, its.p.z, its.t);
             Log(EError, "Not inside tetrahedra!");
             return;
         }
@@ -256,10 +257,15 @@ public:
         its.dpdu = m_objectToWorld(dpduShell);
         its.dpdv = m_objectToWorld(dpdvShell);
 
-        its.geoFrame = Frame(normWorld);
-        //its.geoFrame.n = normWorld;
-        //its.geoFrame.s = normalize(its.dpdu);
-        //its.geoFrame.t = cross(its.geoFrame.n, its.geoFrame.s);
+        /*
+        its.geoFrame.n = normWorld;
+        its.geoFrame.s = normalize(its.dpdu);
+        its.geoFrame.t = cross(its.geoFrame.n, its.geoFrame.s);
+        */
+
+        its.geoFrame.s = normalize(its.dpdu);
+        its.geoFrame.t = normalize(its.dpdv - dot(its.dpdv, its.geoFrame.s) * its.geoFrame.s);
+        its.geoFrame.n = cross(its.geoFrame.s, its.geoFrame.t);
 
         its.shFrame.n = its.geoFrame.n;
 
@@ -280,11 +286,25 @@ public:
             Log(EError, "No mesh boundary specified!");
 
         m_worldToObject = m_objectToWorld.inverse();
+        
         AABB blockAABB = m_block->getAABB();
-        blockAABB.min.z -= m_heightOffset;
-        blockAABB.max.z += m_heightOffset;
+        Float maxz = m_maxHeight;
+        /*
+        if (blockAABB.max.z - blockAABB.min.z > Epsilon) {
+            maxz = blockAABB.max.z + blockAABB.getExtents().z * 0.01;
+        }
+        else {
+            if (m_maxHeight < 0)
+                Log(EError, "Singular texture mapping in z!");
+            maxz = m_maxHeight;
+        }
+        */
+        blockAABB.min.z = 0;
+        blockAABB.max.z = maxz;
+        
         m_textureToData = Transform::translate(Vector(blockAABB.min)) * 
             Transform::scale(blockAABB.getExtents());
+
         m_dataToTexture = m_textureToData.inverse();
 
         fs::path resolved = Thread::getThread()->getFileResolver()->resolve(m_shellFilename);
@@ -338,7 +358,7 @@ private:
     void clampTexPoint(Point &p) const {
         if (p.z < -Epsilon || p.z > 1.0f + Epsilon) {
             //Log(EError, "bad z = %.6f", p.z);
-            p.z = math::clamp(p.z, 0.0f, 1.0f);
+            p.z = math::clamp(p.z, 0.0, 1.0);
         }
         p.x -= math::floorToInt(p.x);
         p.y -= math::floorToInt(p.y);
@@ -365,7 +385,7 @@ protected:
     ref<Shape> m_meshBound;
     ref<ShapeKDTree> m_kdtree;
     TetrahedronMesh m_shell;
-    Float m_heightOffset;
+    Float m_maxHeight;
     Transform m_worldToObject, m_objectToWorld;
     Transform m_textureToData, m_dataToTexture;
     AABB m_aabb;

@@ -362,6 +362,15 @@ public:
 		Point posWorld = _ray.o;
 		m_worldToObject(_ray, ray);
 
+		// check if the ray origin is below the heightfield
+		/*
+		if (m_basePlaneAABB.contains(Point2(ray.o.x, ray.o.y))) {
+			Float h = getHeight(_ray.o);
+			if (ray.o.z > -Epsilon && ray.o.z < h + Epsilon)
+				return false;
+		}
+		*/
+
 // 		Log(EInfo, "------------------------------------");
 // 		Log(EInfo, "ray world: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
 // 			_ray.o.x, _ray.o.y, _ray.o.z, _ray.d.x, _ray.d.y, _ray.d.z);
@@ -684,6 +693,11 @@ public:
 		m_totAABB = AABB(
 			Point3(0, 0, m_dataAABB.min.z),
 			Point3(m_levelSize0f.x * m_tileX, m_levelSize0f.y * m_tileY, m_dataAABB.max.z));
+
+		m_basePlaneAABB = AABB2(
+			Point2(0, 0),
+			Point2(m_levelSize0f.x * m_tileX, m_levelSize0f.y * m_tileY)
+		);
 	}
 
 	ref<TriMesh> createTriMesh() {
@@ -749,7 +763,7 @@ public:
 		return mesh.get();
 	}
 
-	Float getHeight(const Point &_p) {
+	Float getHeight(const Point &_p) const {
 		Point p = m_worldToObject.transformAffine(_p);
 		int x = math::floorToInt(p.x);
 		int y = math::floorToInt(p.y);
@@ -778,7 +792,7 @@ public:
 		return res;
 	}
 
-	Vector getNormal(const Point &_p) {
+	Vector getNormal(const Point &_p) const {
 		Point p = m_worldToObject.transformAffine(_p);
 		int x = math::floorToInt(p.x);
 		int y = math::floorToInt(p.y);
@@ -862,6 +876,7 @@ private:
 	Vector2i m_totDataSize;
 	Vector2 m_invTotSize;
 	AABB m_totAABB;
+	AABB2 m_basePlaneAABB;
 };
 
 MTS_IMPLEMENT_CLASS_S(TiledHeightfield, false, Shape)

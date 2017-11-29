@@ -33,7 +33,7 @@ struct Cone {
 		if (d2 == 0) return 0.f;
 		Float d = sqrt(d2);
 		Float result = (d2 - r2 + 1.f) / (d * 2.f);
-		return std::min(std::max(result, 0.f), 1.f);
+		return std::min(std::max(result, 0.0), 1.0);
 	}
 
 	inline Float getAngleSin() const {

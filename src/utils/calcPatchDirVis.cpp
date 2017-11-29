@@ -122,15 +122,15 @@ public:
 					totWeight += cosM;
 				}
 
-				avgVisCos += vis[i][j] * std::max(0.f, dot(m_wi, normals[i][j])) / (double)m_spp;
+				avgVisCos += vis[i][j] * std::max(0.0, dot(m_wi, normals[i][j])) / (double)m_spp;
 				avgNormal += normals[i][j] * weights[i][j];
 // 				if (normals[i][j].z < 0) {
 // 					Log(EInfo, "n = (%.6f, %.6f, %.6f)", normals[i][j].x, normals[i][j].y, normals[i][j].z);
 // 				}
-				avgProjArea += std::max(0.f, normals[i][j].z) * weights[i][j];
+				avgProjArea += std::max(0.0, normals[i][j].z) * weights[i][j];
 
-				totVisPosProjArea += vis[i][j] * std::max(0.f, dot(m_wi, normals[i][j])) * weights[i][j];
-				totPosProjArea += std::max(0.f, dot(m_wi, normals[i][j])) * weights[i][j];
+				totVisPosProjArea += vis[i][j] * std::max(0.0, dot(m_wi, normals[i][j])) * weights[i][j];
+				totPosProjArea += std::max(0.0, dot(m_wi, normals[i][j])) * weights[i][j];
 			}
 		}
 		avgVis /= totWeight;

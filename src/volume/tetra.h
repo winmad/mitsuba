@@ -95,11 +95,19 @@ public:
 			uint32_t i;
 			for ( i = 0; i < m_vertexCount; ++i )
 			{
+#ifdef DOUBLE_PRECISION
+				VERIFY_VALUE(fscanf(fin, "%lf %lf %lf", &m_vtxPosition[i].x, &m_vtxPosition[i].y, &m_vtxPosition[i].z), 3);
+				VERIFY_VALUE(fscanf(fin, "%lf %lf %lf", &m_vtxTexcoord[i].x, &m_vtxTexcoord[i].y, &m_vtxTexcoord[i].z), 3);
+				VERIFY_VALUE(fscanf(fin, "%lf %lf %lf", &m_vtxNormal[i].x, &m_vtxNormal[i].y, &m_vtxNormal[i].z), 3);
+				VERIFY_VALUE(fscanf(fin, "%lf %lf %lf", &m_vtxTangent[i].dpdu.x, &m_vtxTangent[i].dpdu.y, &m_vtxTangent[i].dpdu.z), 3);
+				VERIFY_VALUE(fscanf(fin, "%lf %lf %lf", &m_vtxTangent[i].dpdv.x, &m_vtxTangent[i].dpdv.y, &m_vtxTangent[i].dpdv.z), 3);
+#else
 				VERIFY_VALUE(fscanf(fin, "%f %f %f", &m_vtxPosition[i].x, &m_vtxPosition[i].y, &m_vtxPosition[i].z), 3);
 				VERIFY_VALUE(fscanf(fin, "%f %f %f", &m_vtxTexcoord[i].x, &m_vtxTexcoord[i].y, &m_vtxTexcoord[i].z), 3);
 				VERIFY_VALUE(fscanf(fin, "%f %f %f", &m_vtxNormal[i].x, &m_vtxNormal[i].y, &m_vtxNormal[i].z), 3);
 				VERIFY_VALUE(fscanf(fin, "%f %f %f", &m_vtxTangent[i].dpdu.x, &m_vtxTangent[i].dpdu.y, &m_vtxTangent[i].dpdu.z), 3);
 				VERIFY_VALUE(fscanf(fin, "%f %f %f", &m_vtxTangent[i].dpdv.x, &m_vtxTangent[i].dpdv.y, &m_vtxTangent[i].dpdv.z), 3);
+#endif
 			}
 			for ( i = 0; i < m_tetrahedronCount; ++i )
 				VERIFY_VALUE(fscanf(fin, "%u %u %u %u", &m_tetra[i].idx[0], &m_tetra[i].idx[1], &m_tetra[i].idx[2], &m_tetra[i].idx[3]), 4);
@@ -108,6 +116,17 @@ public:
 
 			for ( i = 0; i < m_tetrahedronCount; ++i )
 				m_aabb.expandBy(m_tetra[i].getAABB(m_vtxPosition));
+
+			// fix vertex ordering for each face
+        	for ( uint32_t i = 0; i < m_tetrahedronCount; ++i )
+        	{
+            	Tetrahedron &t = m_tetra[i];
+            	Vector e1 = normalize(m_vtxPosition[t.idx[2]] - m_vtxPosition[t.idx[1]]);
+            	Vector e2 = normalize(m_vtxPosition[t.idx[3]] - m_vtxPosition[t.idx[1]]);
+            	Vector e = cross(e1, e2);
+	            if ( dot(e, Vector(m_vtxPosition[t.idx[0]])) < dot(e, Vector(m_vtxPosition[t.idx[1]])) )
+                	std::swap(t.idx[2], t.idx[3]);
+        	}
 
 			// build BVH
 			m_list = new uint32_t[m_tetrahedronCount];
@@ -212,7 +231,7 @@ public:
 		Point4 bb;
 
 		Ray ray(_ray);
-		Float eps = Epsilon * 2.0f;
+		Float eps = ShadowEpsilon;
 		ray.o += ray.d * eps;
 
 		if (!lookup(ray.o, id, bb))
@@ -225,7 +244,7 @@ public:
 		}
 
 		tFar = std::numeric_limits<Float>::infinity();
-		const int tris[4][3] = {{0, 1, 2}, {0, 1, 3}, {1, 2, 3}, {0, 2, 3}};
+		const int tris[4][3] = {{0, 1, 2}, {0, 3, 1}, {1, 3, 2}, {0, 2, 3}};
 		for (int f = 0; f < 4; f++) {
 			Point p[3];
 			for (int i = 0; i < 3; i++) {

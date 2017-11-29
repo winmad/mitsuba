@@ -98,7 +98,7 @@ public:
 
 		m_width = film->getCropSize().x;
 		m_height = film->getCropSize().y;
-		m_mask = new Float[m_width * m_height * 3];
+		m_mask = new float[m_width * m_height * 3];
 
 		size_t nCores = sched->getCoreCount();
 		const Sampler *sampler = static_cast<const Sampler *>(sched->getResource(samplerResID, 0));
@@ -459,7 +459,7 @@ public:
 	
 	int m_width;
 	int m_height;
-	Float *m_mask;
+	float *m_mask;
 
 	MTS_DECLARE_CLASS()
 };

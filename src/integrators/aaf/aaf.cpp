@@ -166,7 +166,7 @@ public:
 				int index = x + y * width;
 				if (m_adaptive) {
 					spp[index] = calcSpp(slopes[0][index].x, slopes[0][index].y, OmegaXf[0][index], projDists[index]);
-					spp[index] = math::clamp(spp[index], (Float)m_minSamples, 1024.f);
+					spp[index] = math::clamp(spp[index], (Float)m_minSamples, 1024.0);
 				}
 				else {
 					spp[index] = (Float)m_minSamples;
@@ -219,7 +219,7 @@ public:
 		}
 		objId.resize(pixelNums);
 		projDists.resize(pixelNums);
-		Float *data = new Float[pixelNums * 3];
+		float *data = new float[pixelNums * 3];
 
 		Float xfov = ((PerspectiveCamera*)sensor)->getXFov();
 		m_timer->start();
@@ -435,7 +435,7 @@ public:
 			}
 		}
 
-		Float *data = new Float[pixelNum * 3];
+		float *data = new float[pixelNum * 3];
 		for (int y = 0; y < height; y++) {
 			for (int x = 0; x < width; x++) {
 				int index = x + y * width;
