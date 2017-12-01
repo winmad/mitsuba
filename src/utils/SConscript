@@ -6,6 +6,7 @@ plugins += env.SharedLibrary('microfacet', ['microfacet.cpp'])
 plugins += env.SharedLibrary('heightfield2Trimesh', ['heightfield2Trimesh.cpp'])
 plugins += env.SharedLibrary('calcPatchVisibility', ['calcPatchVisibility.cpp'])
 plugins += env.SharedLibrary('calcPatchNDF', ['calcPatchNDF.cpp'])
+plugins += env.SharedLibrary('calcPatchDirVisSimple', ['calcPatchDirVis_simple.cpp'])
 plugins += env.SharedLibrary('calcPatchDirVis', ['calcPatchDirVis.cpp'])
 plugins += env.SharedLibrary('testTiledHeightfield', ['testTiledHeightfield.cpp'])
 

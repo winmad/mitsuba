@@ -46,36 +46,40 @@ public:
 
         compare(o, d, true);
 
-        for (int i = 0; i < 0; i++) {
-            o.x = (m_sampler->next1D() * 2.0 - 1) * 500.0;
-            o.y = (m_sampler->next1D() * 2.0 - 1) * 500.0;
-            o.z = 20;
+        if (false) {
+            for (int i = 0; i < 1000; i++) {
+                o.x = (m_sampler->next1D() * 2.0 - 1) * 500.0;
+                o.y = (m_sampler->next1D() * 2.0 - 1) * 500.0;
+                o.z = 20;
 
-            d.x = m_sampler->next1D();
-            d.y = m_sampler->next1D();
-            d.z = -1;
-            d = normalize(d);
+                d.x = m_sampler->next1D();
+                d.y = m_sampler->next1D();
+                d.z = -1;
+                d = normalize(d);
 
-            if (!compare(o, d)) {
-                Log(EInfo, "--- fail cmp test %d ---", i);
-                compare(o, d, true);
+                if (!compare(o, d)) {
+                    Log(EInfo, "--- fail cmp test %d ---", i);
+                    compare(o, d, true);
+                }
             }
         }
 
-        bool flag = true;
-        for (int i = 0; i < 5; i++) {
-            o.x = (m_sampler->next1D() * 2.0 - 1) * 1024.0;
-            o.y = (m_sampler->next1D() * 2.0 - 1) * 1024.0;
-            o.z = 20;
+        if (true) {
+            bool flag = true;
+            for (int i = 0; i < 1000; i++) {
+                o.x = (m_sampler->next1D() * 2.0 - 1) * 1024.0;
+                o.y = (m_sampler->next1D() * 2.0 - 1) * 1024.0;
+                o.z = 20;
 
-            if (!testGetHeightAndNormal(o, true)) {
-                flag = false;
-                Log(EInfo, "--- fail unit test %d ---", i);
-                testGetHeightAndNormal(o, true);
+                if (!testGetHeightAndNormal(o, true)) {
+                    flag = false;
+                    Log(EInfo, "--- fail unit test %d ---", i);
+                    testGetHeightAndNormal(o, true);
+                }
             }
+            if (flag)
+                Log(EInfo, "--- unit test success ---");
         }
-        if (flag)
-            Log(EInfo, "--- unit test success ---");
 		return 0;
     }
     
@@ -136,11 +140,19 @@ public:
         m_tiledHmap->fillIntersectionRecord(ray, (void*)(&temp), its);
 
         Float h = m_tiledHmap->getHeight(o);
-        Vector n = m_tiledHmap->getNormal(o);
+        Normal n = m_tiledHmap->getNormal(o);
+
+        Point pos;
+        Normal normal;
+        m_tiledHmap->getPosAndNormal(its.uv, &pos, &normal);
 
         if (verbose) {
             Log(EInfo, "h: %.6f, %.6f", h, its.p.z);
             Log(EInfo, "n: (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", n.x, n.y, n.z,
+                its.geoFrame.n.x, its.geoFrame.n.y, its.geoFrame.n.z);
+            Log(EInfo, "p: (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", pos.x, pos.y, pos.z,
+                its.p.x, its.p.y, its.p.z);
+            Log(EInfo, "n: (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", normal.x, normal.y, normal.z,
                 its.geoFrame.n.x, its.geoFrame.n.y, its.geoFrame.n.z);
         }
 
@@ -148,6 +160,10 @@ public:
         if (std::abs(h - its.p.z) > 1e-3f)
             flag = false;
         if ((n - its.geoFrame.n).length() > 1e-3f)
+            flag = false;
+        if ((pos - its.p).length() > 1e-3f)
+            flag = false;
+        if ((normal - its.geoFrame.n).length() > 1e-3f)
             flag = false;
         return flag;
     }

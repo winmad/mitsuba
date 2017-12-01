@@ -232,9 +232,11 @@ public:
 	 */
 	virtual ref<TriMesh> createTriMesh();
 
+	virtual void getPosAndNormal(const Point2 &uv, Point *pos, Normal *normal) const;
+
 	// Utility for heightfield
 	virtual Float getHeight(const Point &p) const;
-	virtual Vector getNormal(const Point &p) const;
+	virtual Normal getNormal(const Point &p) const;
 
 	//! @}
 	// =============================================================

@@ -15,6 +15,8 @@
 #define MTS_QTREE_MAXDEPTH  50
 #define MTS_QTREE_FASTSTART 1
 
+//#define TILED_HEIGHTFIELD_DEBUG
+
 MTS_NAMESPACE_BEGIN
 
 static StatsCounter numTraversals("Height field", "Traversal operations per query", EAverage);
@@ -371,12 +373,14 @@ public:
 		}
 		*/
 
-// 		Log(EInfo, "------------------------------------");
-// 		Log(EInfo, "ray world: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
-// 			_ray.o.x, _ray.o.y, _ray.o.z, _ray.d.x, _ray.d.y, _ray.d.z);
-// 		Log(EInfo, "ray local: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
-// 			ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
-// 		Log(EInfo, "mint = %.6f, maxt = %.6f", mint, maxt);
+#ifdef TILED_HEIGHTFIELD_DEBUG
+ 		Log(EInfo, "------------------------------------");
+ 		Log(EInfo, "ray world: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
+ 			_ray.o.x, _ray.o.y, _ray.o.z, _ray.d.x, _ray.d.y, _ray.d.z);
+ 		Log(EInfo, "ray local: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
+ 			ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
+		Log(EInfo, "mint = %.6f, maxt = %.6f", mint, maxt);
+#endif
 
 		Point enterPt, exitPt;
 		Float nearT = mint, farT = maxt;
@@ -404,20 +408,24 @@ public:
 			ray.o.y = posLocal.y - m_dataSize.y * blockY;
 			ray.o.z = posLocal.z;
 
-// 			Log(EInfo, "===== local block intersect =====");
-// 			Log(EInfo, "block: (%d, %d)", blockX, blockY);
-// 			Log(EInfo, "ray in local block: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
-// 				ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
-// 			Log(EInfo, "mint = %.3f, maxt = %.3f", mint, maxt);
+#ifdef TILED_HEIGHTFIELD_DEBUG
+ 			Log(EInfo, "===== local block intersect =====");
+ 			Log(EInfo, "block: (%d, %d)", blockX, blockY);
+ 			Log(EInfo, "ray in local block: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
+ 				ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
+			Log(EInfo, "mint = %.3f, maxt = %.3f", mint, maxt);
+#endif 
 
 			bool flag = rayIntersectLocal(ray, mint, maxt, tLocal, blockX, blockY, temp);
 
 			if (flag) {
-// 				if (temp) {
-// 					PatchIntersectionRecord &tmp = *((PatchIntersectionRecord *)temp);
-// 					Log(EInfo, "texel = (%d, %d), uv = (%.3f, %.3f)",
-// 						tmp.x, tmp.y, tmp.p.x, tmp.p.y);
-// 	 			}
+#ifdef TILED_HEIGHTFIELD_DEBUG
+ 				if (temp) {
+ 					PatchIntersectionRecord &tmp = *((PatchIntersectionRecord *)temp);
+ 					Log(EInfo, "texel = (%d, %d), uv = (%.3f, %.3f)",
+ 						tmp.x, tmp.y, tmp.p.x, tmp.p.y);
+				}
+#endif
 				t += tLocal;
 				return true;
 			}
@@ -792,7 +800,7 @@ public:
 		return res;
 	}
 
-	Vector getNormal(const Point &_p) const {
+	Normal getNormal(const Point &_p) const {
 		Point p = m_worldToObject.transformAffine(_p);
 		int x = math::floorToInt(p.x);
 		int y = math::floorToInt(p.y);
@@ -810,7 +818,7 @@ public:
 			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
 			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
 
-		Vector normal = m_objectToWorld(
+		Normal normal = m_objectToWorld(
 			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
 			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
 
@@ -821,6 +829,43 @@ public:
 
 		normal = normalize(normal);
 		return normal;
+	}
+
+	void getPosAndNormal(const Point2 &uv, Point *pos, Normal *normal) const {
+		Point p;
+		p.x = uv.x * (m_levelSize0f.x * m_tileX);
+		p.y = uv.y * (m_levelSize0f.y * m_tileY);
+		int x = math::floorToInt(p.x);
+		int y = math::floorToInt(p.y);
+		Float u = p.x - x;
+		Float v = p.y - y;
+		int blockX = math::floorToInt((Float)x / m_dataSize.x);
+		int blockY = math::floorToInt((Float)y / m_dataSize.y);
+		x -= m_dataSize.x * blockX;
+		y -= m_dataSize.y * blockY;
+		int width = m_dataSize.x;
+
+		Float
+			f00 = m_data[y     * width + x],
+			f01 = m_data[((y + 1) % m_dataSize.y) * width + x],
+			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
+			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
+
+		p.z = (1.0f - u) * (1.0f - v) * f00 + (1.0f - u) * v * f01 +
+			u * (1.0f - v) * f10 + u * v * f11;
+		p = m_objectToWorld(p);
+
+		Normal norm = m_objectToWorld(
+			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
+			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
+		norm = normalize(norm);
+
+		if (pos != NULL) {
+			*pos = p;
+		}
+		if (normal != NULL) {
+			*normal = norm;
+		}
 	}
 
 	std::string toString() const {

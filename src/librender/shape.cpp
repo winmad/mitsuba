@@ -250,13 +250,18 @@ ref<TriMesh> Shape::createTriMesh() {
 	return NULL;
 }
 
+void Shape::getPosAndNormal(const Point2 &uv, Point *pos, Normal *normal) const {
+	NotImplementedError("getPosAndNormal");
+}
+
 Float Shape::getHeight(const Point &p) const {
 	NotImplementedError("getHeight");
 }
 
-Vector Shape::getNormal(const Point &p) const {
+Normal Shape::getNormal(const Point &p) const {
 	NotImplementedError("getNormal");
 }
+
 
 MTS_IMPLEMENT_CLASS(Shape, true, ConfigurableObject)
 MTS_NAMESPACE_END

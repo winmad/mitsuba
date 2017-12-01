@@ -172,7 +172,7 @@ public:
                 Point itsPShell = m_worldToObject(_ray(t));
                 Point tex;
                 /*
-                Vector norm;
+                Normal norm;
                 TangentSpace tang;
                 */
                 if (!m_shell.lookupPoint(itsPShell, tex)) {
@@ -252,7 +252,7 @@ public:
         Vector dpdvShell = dpdvTex.x * tang.dpdu + dpdvTex.y * tang.dpdv + dpdvTex.z * norm;
         Normal normShell = normTex.x * tang.dpdu + normTex.y * tang.dpdv + normTex.z * norm;
 
-        Vector normWorld = normalize(m_objectToWorld(normShell));
+        //Vector normWorld = normalize(m_objectToWorld(normShell));
 
         its.dpdu = m_objectToWorld(dpduShell);
         its.dpdv = m_objectToWorld(dpdvShell);

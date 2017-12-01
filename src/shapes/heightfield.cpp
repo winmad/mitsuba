@@ -761,7 +761,7 @@ public:
 		return res;
 	}
 
-	Vector getNormal(const Point &_p) const {
+	Normal getNormal(const Point &_p) const {
 		Point p = m_objectToWorld.inverse().transformAffine(_p);
 		int x = math::floorToInt(p.x), y = math::floorToInt(p.y);
 		int width = m_dataSize.x;
@@ -773,7 +773,7 @@ public:
 			f10 = m_data[y     * width + x + 1],
 			f11 = m_data[(y + 1) * width + x + 1];
 
-		Vector normal = m_objectToWorld(
+		Normal normal = m_objectToWorld(
 			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
 			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
 
@@ -784,6 +784,37 @@ public:
 
 		normal = normalize(normal);
 		return normal;
+	}
+
+	void getPosAndNormal(const Point2 &uv, Point *pos, Normal *normal) const {
+		Point p;
+		p.x = uv.x * m_levelSize0f.x;
+		p.y = uv.y * m_levelSize0f.y;
+		int x = math::floorToInt(p.x), y = math::floorToInt(p.y);
+		int width = m_dataSize.x;
+		Float u = p.x - x, v = p.y - y;
+
+		Float
+			f00 = m_data[y     * width + x],
+			f01 = m_data[(y + 1) * width + x],
+			f10 = m_data[y     * width + x + 1],
+			f11 = m_data[(y + 1) * width + x + 1];
+
+		p.z = (1.0f - u) * (1.0f - v) * f00 + (1.0f - u) * v * f01 +
+			u * (1.0f - v) * f10 + u * v * f11;
+		p = m_objectToWorld.transformAffine(p);
+		
+		Normal norm = m_objectToWorld(
+			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
+			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
+		norm = normalize(norm);
+		
+		if (pos != NULL) {
+			*pos = p;
+		}
+		if (normal != NULL) {
+			*normal = norm;
+		}
 	}
 
 	std::string toString() const {

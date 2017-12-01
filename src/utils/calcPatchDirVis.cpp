@@ -18,18 +18,25 @@ public:
 	int run(int argc, char **argv) {
 		m_wi = Vector(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]));
 		m_sqrtSpp = std::atoi(argv[5]);
-		Float xmin = std::atof(argv[6]);
-		Float xmax = std::atof(argv[7]);
-		Float ymin = std::atof(argv[8]);
-		Float ymax = std::atof(argv[9]);
+		Float umin = std::atof(argv[6]);
+		Float umax = std::atof(argv[7]);
+		Float vmin = std::atof(argv[8]);
+		Float vmax = std::atof(argv[9]);
+		//m_shadowOption = std::atoi(argv[10]);
+		
 		ParameterMap params;
-		if (argc > 10) {
-			params["height"] = std::string(argv[10]);
-			params["xyscale"] = "16";
-		}
+		params["heightFilename"] = std::string(argv[10]);
+		params["wix"] = argv[2];
+		params["wiy"] = argv[3];
+		params["wiz"] = argv[4];
+		params["xscale"] = "1";
+		params["yscale"] = "1";
+		params["xoffset"] = "0";
+		params["yoffset"] = "0";
+
 		m_scene = loadScene(argv[1], params);
 
-		m_aabb = AABB2(Point2(xmin, ymin), Point2(xmax, ymax));
+		m_aabb = AABB2(Point2(umin, vmin), Point2(umax, vmax));
 		m_scene->initialize();
 		m_wi = normalize(m_wi);
 		m_spp = m_sqrtSpp * m_sqrtSpp;
@@ -40,12 +47,17 @@ public:
 			createObject(MTS_CLASS(Sampler), props));
 		m_sampler->configure();
 
-		std::vector<std::vector<double> > vis(m_sqrtSpp, std::vector<double>(m_sqrtSpp));
-		std::vector<std::vector<Vector> > normals(m_sqrtSpp, std::vector<Vector>(m_sqrtSpp));
+		//std::vector<std::vector<double> > vis(m_sqrtSpp, std::vector<double>(m_sqrtSpp));
+		std::vector<std::vector<std::vector<double> > > vis(
+			m_sqrtSpp, std::vector<std::vector<double> >(m_sqrtSpp, std::vector<double>(3)));
+		std::vector<std::vector<Normal> > normals(m_sqrtSpp, std::vector<Normal>(m_sqrtSpp));
 		std::vector<std::vector<double> > weights(m_sqrtSpp, std::vector<double>(m_sqrtSpp));
+		
 		m_hmap = m_scene->getShapes()[0];
 		bool useHeightfield = true;
-		if (m_hmap->getClass()->getName() != "heightfield") {
+		if (m_hmap->getClass()->getName() != "Heightfield" &&
+			m_hmap->getClass()->getName() != "TiledHeightfield" &&
+			m_hmap->getClass()->getName() != "ShellmapHeightfield") {
 			Log(EInfo, "%s", m_hmap->getClass()->getName().c_str());
 			useHeightfield = false;
 		}
@@ -53,126 +65,131 @@ public:
 #pragma omp parallel for
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
-				Point o = sampleRayOrigin(i, j, m_sampler, useHeightfield);
-				Ray ray(o + m_wi * Epsilon, m_wi, 0);
-				double tmp = 0.0f;
+				Ray ray;
+				bool frontFaced = true;
+				
+				if (useHeightfield)
+					frontFaced = sampleRayUV(i, j, m_sampler, ray, normals[i][j]);
 
-				// verify ray.o is above the heightfield
-				bool isInside = false;
-
-				if (useHeightfield) {
-					Float h = m_hmap->getHeight(ray.o);
-					if (h > ray.o.z) {
-						isInside = true;
-						//Log(EInfo, "ray origin is inside, %.6f, %.6f", ray.o.z, its.p.z);
-					}
-				}
-				else {
-					Intersection its;
-					Ray vRay(Point(ray.o.x, ray.o.y, 1e2), Vector(0, 0, -1), 0);
-					m_scene->rayIntersect(vRay, its);
-					if (its.p.z > ray.o.z) {
-						isInside = true;
-					}
-				}
-
-				Vector normal;
-				//normal = m_hmap->getNormal(o);
-				Ray vRay(Point(o.x, o.y, 1e2), Vector(0, 0, -1), 0);
-				Intersection vIts;
-				m_scene->rayIntersect(vRay, vIts);
-				normal = vIts.shFrame.n;
-				//normal = vIts.geoFrame.n;
-				normals[i][j] = normal;
-				if (normal.z > 0) {
-					weights[i][j] = 1.0 / normal.z / (double)m_spp;
+				if (normals[i][j].z > 0) {
+					weights[i][j] = 1.0 / normals[i][j].z;
 				}
 				else {
 					weights[i][j] = 0.0;
 				}
 
-				// local visibility
-				Intersection its;
-				bool flag = m_scene->rayIntersect(ray, its);
-				if (!isInside && dot(m_wi, normal) > 0 &&
-					(!flag || (its.isValid() && !m_aabb.contains(Point2(its.p.x, its.p.y))))) {
-					tmp = 1.0; //std::max(0.f, dot(m_wi, normal));
+				if (!frontFaced) {
+					for (int k = 0; k < 3; k++) {
+						vis[i][j][k] = 0.0;
+					}
+					continue;
 				}
 
-				vis[i][j] = tmp;
+				Intersection its;
+				bool flag = m_scene->rayIntersect(ray, its);
+				if (!flag) {
+					for (int k = 0; k < 3; k++) {
+						vis[i][j][k] = 1.0;
+					}
+					continue;
+				}
+
+				vis[i][j][2] = 0.0;
+				Assert(its.isValid());
+				if (!m_aabb.contains(its.uv)) {
+					vis[i][j][0] = 1.0;
+					vis[i][j][1] = 0.0;
+					continue;
+				}
+
+				vis[i][j][0] = 0.0;
+				bool distantVisible = true;
+				while (flag) {
+					if (!m_aabb.contains(its.uv)) {
+						distantVisible = false;
+						break;
+					}
+					ray.o = its.p + ray.d * ShadowEpsilon;
+					flag = m_scene->rayIntersect(ray, its);
+				}
+				vis[i][j][1] = (distantVisible ? 1.0 : 0.0);
 			}
 		}
 		Log(EInfo, "Finish sampling.");
 
-		double avgVis = 0.0;
-		double totWeight = 0.0;
-
-		double avgVisCos = 0.0;
 		Vector avgNormal(0.0);
 		double avgProjArea = 0.0;
 
-		double totVisPosProjArea = 0.0;
+		std::vector<double> totVisPosProjArea(3, 0.0);
 		double totPosProjArea = 0.0;
+		std::vector<double> G(3, 0.0);
 
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
-				double cosM = dot(m_wi, normals[i][j]);
-				if (cosM > 0) {
-					avgVis += vis[i][j] * cosM;
-					totWeight += cosM;
-				}
-
-				avgVisCos += vis[i][j] * std::max(0.0, dot(m_wi, normals[i][j])) / (double)m_spp;
 				avgNormal += normals[i][j] * weights[i][j];
-// 				if (normals[i][j].z < 0) {
-// 					Log(EInfo, "n = (%.6f, %.6f, %.6f)", normals[i][j].x, normals[i][j].y, normals[i][j].z);
-// 				}
 				avgProjArea += std::max(0.0, normals[i][j].z) * weights[i][j];
-
-				totVisPosProjArea += vis[i][j] * std::max(0.0, dot(m_wi, normals[i][j])) * weights[i][j];
+				
 				totPosProjArea += std::max(0.0, dot(m_wi, normals[i][j])) * weights[i][j];
+				for (int k = 0; k < 3; k++) {
+					totVisPosProjArea[k] += vis[i][j][k] * std::max(0.0, dot(m_wi, normals[i][j])) * weights[i][j];
+				}
 			}
 		}
-		avgVis /= totWeight;
 		avgNormal = normalize(avgNormal);
+		avgProjArea /= (double)m_spp;
+		totPosProjArea /= (double)m_spp;
+		for (int k = 0; k < 3; k++) {
+			totVisPosProjArea[k] /= (double)m_spp;
+			G[k] = totVisPosProjArea[k] / totPosProjArea;
+		}
 		
 		Log(EInfo, "Average normal (%.6f, %.6f, %.6f), cos_wo = %.6f, cos_wn = %.6f", 
 			avgNormal.x, avgNormal.y, avgNormal.z, 
 			dot(avgNormal, m_wi), avgProjArea);
-		Log(EInfo, "Average cosine visibility: %.8f", avgVisCos);
-		Log(EInfo, "Average visibility: %.8f", avgVis);
-		Log(EInfo, "G1 = visArea / totPosArea: %.8f / %.8f = %.8f", totVisPosProjArea, totPosProjArea,
-			totVisPosProjArea / totPosProjArea);
+		Log(EInfo, "G_local = visArea / totPosArea: %.8f / %.8f = %.8f", 
+			totVisPosProjArea[0], totPosProjArea, G[0]);
+		Log(EInfo, "G_distant = visArea / totPosArea: %.8f / %.8f = %.8f", 
+			totVisPosProjArea[1], totPosProjArea, G[1]);
+		Log(EInfo, "G_total = visArea / totPosArea: %.8f / %.8f = %.8f", 
+			totVisPosProjArea[2], totPosProjArea, G[2]);
+		Log(EInfo, "Correlation: %.8f", G[0] * G[1] - G[2]);
 
 		FILE *fp = fopen("tmp_result.txt", "w");
-		fprintf(fp, "%.8f\n", dot(avgNormal, m_wi) / totPosProjArea);
+		for (int k = 0; k < 3; k++) {
+			fprintf(fp, "%.8f ", G[k]);
+		}
+		fprintf(fp, "\n");
 		fclose(fp);
-
+		
 		return 0;
 	}
 
-	Point sampleRayOrigin(int i, int j, Sampler *sampler, bool useHeightfield) {
-		double x = m_aabb.min.x + (j + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
-		double y = m_aabb.min.y + (i + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.y - m_aabb.min.y);
-		double z;
-		Point o(x, y, 0);
-		if (useHeightfield) {
-			z = m_hmap->getHeight(o);
-		}
-		else {
-			o.z = 1e2;
-			Ray ray(o, Vector(0, 0, -1.0f), 0);
-			Intersection its;
-			m_scene->rayIntersect(ray, its);
-			z = its.p.z;
-		}
-		return Point(x, y, z);
+	bool sampleRayUV(int i, int j, Sampler *sampler, Ray &ray, Normal &normal) {
+		Point2 uv;
+		//uv.x = m_aabb.min.x + (j + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
+		//uv.y = m_aabb.min.y + (i + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.y - m_aabb.min.y);
+
+		uv.x = m_aabb.min.x + (j + 0.5) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
+		uv.y = m_aabb.min.y + (i + 0.5) / (double)m_sqrtSpp * (m_aabb.max.y - m_aabb.min.y);
+
+		Point pos;
+		Normal norm;
+		m_hmap->getPosAndNormal(uv, &pos, &norm);
+		
+		normal = norm;
+		ray = Ray(pos + m_wi * ShadowEpsilon, m_wi, 0);
+
+		if (dot(m_wi, normal) < Epsilon)
+			return false;
+		else
+			return true;
 	}
 
 	ref<Scene> m_scene;
 	Shape *m_hmap;
 	ref<Sampler> m_sampler;
 	int m_sqrtSpp, m_spp;
+	int m_shadowOption;
 	Vector m_wi;
 	AABB2 m_aabb;
 
