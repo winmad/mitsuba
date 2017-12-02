@@ -16,6 +16,7 @@ MTS_NAMESPACE_BEGIN
 class CalcPatchDirVis : public Utility {
 public:
 	int run(int argc, char **argv) {
+		m_wo = Vector(0, 0, 1);
 		m_wi = Vector(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]));
 		m_sqrtSpp = std::atoi(argv[5]);
 		Float umin = std::atof(argv[6]);
@@ -124,6 +125,9 @@ public:
 		double totPosProjArea = 0.0;
 		std::vector<double> G(3, 0.0);
 
+		std::vector<double> totVisWoProjArea(3, 0.0);
+		std::vector<double> G2(3, 0.0);
+
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
 				avgNormal += normals[i][j] * weights[i][j];
@@ -132,6 +136,10 @@ public:
 				totPosProjArea += std::max(0.0, dot(m_wi, normals[i][j])) * weights[i][j];
 				for (int k = 0; k < 3; k++) {
 					totVisPosProjArea[k] += vis[i][j][k] * std::max(0.0, dot(m_wi, normals[i][j])) * weights[i][j];
+
+					double visWoProjArea = 1.0; // 1.0 * std::max(0.0, dot(m_wo, normals[i][j])) * weight
+					totVisWoProjArea[k] += visWoProjArea; 
+					G2[k] += vis[i][j][k] * std::max(0.0, dot(m_wi, normals[i][j])) * visWoProjArea;
 				}
 			}
 		}
@@ -141,8 +149,10 @@ public:
 		for (int k = 0; k < 3; k++) {
 			totVisPosProjArea[k] /= (double)m_spp;
 			G[k] = totVisPosProjArea[k] / totPosProjArea;
+			G2[k] /= totVisWoProjArea[k];
 		}
 		
+		Log(EInfo, "===========================================");
 		Log(EInfo, "Average normal (%.6f, %.6f, %.6f), cos_wo = %.6f, cos_wn = %.6f", 
 			avgNormal.x, avgNormal.y, avgNormal.z, 
 			dot(avgNormal, m_wi), avgProjArea);
@@ -152,11 +162,19 @@ public:
 			totVisPosProjArea[1], totPosProjArea, G[1]);
 		Log(EInfo, "G_total = visArea / totPosArea: %.8f / %.8f = %.8f", 
 			totVisPosProjArea[2], totPosProjArea, G[2]);
-		Log(EInfo, "Correlation: %.8f", G[0] * G[1] - G[2]);
+		Log(EInfo, "Correlation of G_local and G_distant: %.8f", G[2] - G[0] * G[1]);
+		Log(EInfo, "------------------------------------------");
+		Log(EInfo, "G2_local = %.8f", G2[0]);
+		Log(EInfo, "G2_distant = %.8f", G2[1]);
+		Log(EInfo, "G2_total = %.8f", G2[2]);
+		Log(EInfo, "Correlation of G2_local and G2_distant: %.8f", G2[2] - G2[0] * G2[1]);
 
 		FILE *fp = fopen("tmp_result.txt", "w");
 		for (int k = 0; k < 3; k++) {
 			fprintf(fp, "%.8f ", G[k]);
+		}
+		for (int k = 0; k < 3; k++) {
+			fprintf(fp, "%.8f ", G2[k]);
 		}
 		fprintf(fp, "\n");
 		fclose(fp);
@@ -190,7 +208,7 @@ public:
 	ref<Sampler> m_sampler;
 	int m_sqrtSpp, m_spp;
 	int m_shadowOption;
-	Vector m_wi;
+	Vector m_wi, m_wo;
 	AABB2 m_aabb;
 
 	MTS_DECLARE_UTILITY()
