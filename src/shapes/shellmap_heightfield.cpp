@@ -14,6 +14,8 @@
 #include <mitsuba/core/timer.h>
 #include "../volume/tetra.h"
 
+//#define SHELLMAP_HEIGHTFIELD_DEBUG
+
 MTS_NAMESPACE_BEGIN
 
 namespace {
@@ -230,6 +232,15 @@ public:
         TangentSpace tang;
         bool flag = m_shell.lookupPoint(posShell, tex, norm, tang);
 
+#ifdef SHELLMAP_HEIGHTFIELD_DEBUG
+        Log(EInfo, "===== shellmap frame =====");
+        Log(EInfo, "n = (%.6f, %.6f, %.6f)", norm.x, norm.y, norm.z);
+        Log(EInfo, "s = (%.6f, %.6f, %.6f)", tang.dpdu.x, tang.dpdu.y, tang.dpdu.z);
+        Log(EInfo, "t = (%.6f, %.6f, %.6f)", tang.dpdv.x, tang.dpdv.y, tang.dpdv.z);
+        Log(EInfo, "===== heightmap space =====");
+        
+#endif
+
         if (!flag) {
             Log(EInfo, "p = (%.6f, %.6f, %.6f), dist = %.6f", its.p.x, its.p.y, its.p.z, its.t);
             Log(EError, "Not inside tetrahedra!");
@@ -244,18 +255,26 @@ public:
 
         its.uv = Point2(tex.x, tex.y);
 
-        Vector dpduTex = m_dataToTexture(temp.dpduBlock);
-        Vector dpdvTex = m_dataToTexture(temp.dpdvBlock);
-        Normal normTex = normalize(m_dataToTexture(temp.geoFrameBlock.n));
+        Vector dpduTex = temp.dpduBlock; //m_dataToTexture(temp.dpduBlock);
+        Vector dpdvTex = temp.dpdvBlock; //m_dataToTexture(temp.dpdvBlock);
+        Normal normTex = temp.geoFrameBlock.n; //normalize(m_dataToTexture(temp.geoFrameBlock.n));
        
         Vector dpduShell = dpduTex.x * tang.dpdu + dpduTex.y * tang.dpdv + dpduTex.z * norm;
         Vector dpdvShell = dpdvTex.x * tang.dpdu + dpdvTex.y * tang.dpdv + dpdvTex.z * norm;
         Normal normShell = normTex.x * tang.dpdu + normTex.y * tang.dpdv + normTex.z * norm;
 
-        //Vector normWorld = normalize(m_objectToWorld(normShell));
+        Normal normWorld = normalize(m_objectToWorld(normShell));
 
         its.dpdu = m_objectToWorld(dpduShell);
         its.dpdv = m_objectToWorld(dpdvShell);
+        
+#ifdef SHELLMAP_HEIGHTFIELD_DEBUG
+        Log(EInfo, "===== normal transform =====");
+        Log(EInfo, "nBlock = (%.6f, %.6f, %.6f)", temp.geoFrameBlock.n.x, temp.geoFrameBlock.n.y, temp.geoFrameBlock.n.z);
+        Log(EInfo, "nTex = (%.6f, %.6f, %.6f)", normTex.x, normTex.y, normTex.z);
+        Log(EInfo, "nShell = (%.6f, %.6f, %.6f)", normShell.x, normShell.y, normShell.z);
+        Log(EInfo, "nWorld = (%.6f, %.6f, %.6f)", normWorld.x, normWorld.y, normWorld.z);
+#endif
 
         /*
         its.geoFrame.n = normWorld;
@@ -263,9 +282,11 @@ public:
         its.geoFrame.t = cross(its.geoFrame.n, its.geoFrame.s);
         */
 
+        
         its.geoFrame.s = normalize(its.dpdu);
         its.geoFrame.t = normalize(its.dpdv - dot(its.dpdv, its.geoFrame.s) * its.geoFrame.s);
         its.geoFrame.n = cross(its.geoFrame.s, its.geoFrame.t);
+        
 
         its.shFrame.n = its.geoFrame.n;
 
@@ -288,7 +309,7 @@ public:
         m_worldToObject = m_objectToWorld.inverse();
         
         AABB blockAABB = m_block->getAABB();
-        Float maxz = m_maxHeight;
+        Float maxz = std::max(blockAABB.max.z, m_maxHeight);
         /*
         if (blockAABB.max.z - blockAABB.min.z > Epsilon) {
             maxz = blockAABB.max.z + blockAABB.getExtents().z * 0.01;
