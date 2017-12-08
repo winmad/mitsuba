@@ -166,6 +166,9 @@ public:
 
 	/// Primitive index, e.g. the triangle ID (if applicable)
 	uint32_t primIndex : 31;
+	
+	/// Block index
+	uint32_t blockIndex;
 
 	/// Stores a pointer to the parent instance, if applicable
 	const Shape *instance;
@@ -229,9 +232,11 @@ public:
 	 */
 	virtual ref<TriMesh> createTriMesh();
 
+	virtual void getPosAndNormal(const Point2 &uv, Point *pos, Normal *normal) const;
+
 	// Utility for heightfield
-	virtual Float getHeight(const Point &p);
-	virtual Vector getNormal(const Point &p);
+	virtual Float getHeight(const Point &p) const;
+	virtual Normal getNormal(const Point &p) const;
 
 	//! @}
 	// =============================================================

@@ -36,7 +36,7 @@ public:
 			createObject(MTS_CLASS(Sampler), props));
 		m_sampler->configure();
 
-		m_res = new Bitmap(Bitmap::EPixelFormat::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
+		m_res = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
 		m_res->clear();
 		float *data = m_res->getFloat32Data();
 
@@ -45,7 +45,7 @@ public:
 		double normFactor = (double)m_size * m_size / (double)m_spp;
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
-				Vector normal = sampleNormal(i, j, m_sampler);
+				Normal normal = sampleNormal(i, j, m_sampler);
 				normal /= m_normal_stLim;
 
 				int c = (normal.x > 0.9999f ? m_size - 1 : math::floorToInt((normal.x + 1.0) * 0.5 * m_size));
@@ -80,7 +80,7 @@ public:
 		return 0;
 	}
 
-	Vector sampleNormal(int i, int j, Sampler *sampler) {
+	Normal sampleNormal(int i, int j, Sampler *sampler) {
 		double x = m_aabb.min.x + (j + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
 		double y = m_aabb.min.y + (i + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.y - m_aabb.min.y);
 // 		Point o(x, y, 0);

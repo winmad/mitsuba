@@ -15,6 +15,8 @@
 #define MTS_QTREE_MAXDEPTH  50
 #define MTS_QTREE_FASTSTART 1
 
+//#define TILED_HEIGHTFIELD_DEBUG
+
 MTS_NAMESPACE_BEGIN
 
 static StatsCounter numTraversals("Height field", "Traversal operations per query", EAverage);
@@ -140,7 +142,8 @@ public:
 			return 0;
 	}
 
-	bool rayIntersectLocal(const Ray &_ray, Float mint, Float maxt, Float &t, Float blockX, Float blockY, void *tmp) const {
+	bool rayIntersectLocal(const Ray &_ray, Float mint, Float maxt, Float &t, 
+		Float blockX, Float blockY, void *tmp) const {
 		StackEntry stack[MTS_QTREE_MAXDEPTH];
 
 		Ray ray(_ray);
@@ -314,8 +317,9 @@ public:
 			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
 			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
 
-		Point pLocal(temp.p.x + temp.x + temp.blockX * m_dataSize.x, temp.p.y + temp.y + temp.blockY * m_dataSize.y, temp.p.z);
-		//Point pLocalBlock(temp.p.x + temp.p.x, temp.p.y + temp.y, temp.p.z);
+		Point pLocal(temp.p.x + temp.x + temp.blockX * m_dataSize.x, 
+			temp.p.y + temp.y + temp.blockY * m_dataSize.y, temp.p.z);
+		
 		its.uv = Point2(pLocal.x * m_invTotSize.x, pLocal.y * m_invTotSize.y);
 		its.p = m_objectToWorld(pLocal);
 		its.dpdu = m_objectToWorld(Vector(1, 0,
@@ -351,28 +355,40 @@ public:
 		its.hasUVPartials = false;
 		its.instance = NULL;
 		its.time = ray.time;
-		its.primIndex = (x + m_dataSize.x * temp.blockX) + (y + m_dataSize.y * temp.blockY) * (width * m_tileX);
+		its.primIndex = x + y * width;
+		its.blockIndex = temp.blockX + temp.blockY * m_tileX;
 	}
 
 	bool rayIntersect(const Ray &_ray, Float mint, Float maxt, Float &t, void *temp) const {
-		t = 0;
 		Ray ray;
 		Point posWorld = _ray.o;
 		m_worldToObject(_ray, ray);
 
-// 		Log(EInfo, "------------------------------------");
-// 		Log(EInfo, "ray world: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
-// 			_ray.o.x, _ray.o.y, _ray.o.z, _ray.d.x, _ray.d.y, _ray.d.z);
-// 		Log(EInfo, "ray local: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
-// 			ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
-// 		Log(EInfo, "mint = %.6f, maxt = %.6f", mint, maxt);
+		// check if the ray origin is below the heightfield
+		/*
+		if (m_basePlaneAABB.contains(Point2(ray.o.x, ray.o.y))) {
+			Float h = getHeight(_ray.o);
+			if (ray.o.z > -Epsilon && ray.o.z < h + Epsilon)
+				return false;
+		}
+		*/
+
+#ifdef TILED_HEIGHTFIELD_DEBUG
+ 		Log(EInfo, "------------------------------------");
+ 		Log(EInfo, "ray world: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
+ 			_ray.o.x, _ray.o.y, _ray.o.z, _ray.d.x, _ray.d.y, _ray.d.z);
+ 		Log(EInfo, "ray local: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
+ 			ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
+		Log(EInfo, "mint = %.6f, maxt = %.6f", mint, maxt);
+#endif
 
 		Point enterPt, exitPt;
 		Float nearT = mint, farT = maxt;
 		if (!m_totAABB.rayIntersect(ray, nearT, farT, enterPt, exitPt))
 			return false;
 
-		Float eps = Epsilon * 3.0f;
+		t = 0;
+		Float eps = Epsilon * 1.0f;
 		if (nearT > Epsilon) {
 			posWorld += _ray.d * (nearT + eps);
 			mint -= nearT + eps;
@@ -392,20 +408,24 @@ public:
 			ray.o.y = posLocal.y - m_dataSize.y * blockY;
 			ray.o.z = posLocal.z;
 
-// 			Log(EInfo, "===== local block intersect =====");
-// 			Log(EInfo, "block: (%d, %d)", blockX, blockY);
-// 			Log(EInfo, "ray in local block: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
-// 				ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
-// 			Log(EInfo, "mint = %.3f, maxt = %.3f", mint, maxt);
+#ifdef TILED_HEIGHTFIELD_DEBUG
+ 			Log(EInfo, "===== local block intersect =====");
+ 			Log(EInfo, "block: (%d, %d)", blockX, blockY);
+ 			Log(EInfo, "ray in local block: o = (%.3f, %.3f, %.3f), d = (%.3f, %.3f, %.3f)",
+ 				ray.o.x, ray.o.y, ray.o.z, ray.d.x, ray.d.y, ray.d.z);
+			Log(EInfo, "mint = %.3f, maxt = %.3f", mint, maxt);
+#endif 
 
 			bool flag = rayIntersectLocal(ray, mint, maxt, tLocal, blockX, blockY, temp);
 
 			if (flag) {
-// 				if (temp) {
-// 					PatchIntersectionRecord &tmp = *((PatchIntersectionRecord *)temp);
-// 					Log(EInfo, "texel = (%d, %d), uv = (%.3f, %.3f)",
-// 						tmp.x, tmp.y, tmp.p.x, tmp.p.y);
-// 	 			}
+#ifdef TILED_HEIGHTFIELD_DEBUG
+ 				if (temp) {
+ 					PatchIntersectionRecord &tmp = *((PatchIntersectionRecord *)temp);
+ 					Log(EInfo, "texel = (%d, %d), uv = (%.3f, %.3f)",
+ 						tmp.x, tmp.y, tmp.p.x, tmp.p.y);
+				}
+#endif
 				t += tLocal;
 				return true;
 			}
@@ -420,6 +440,8 @@ public:
 			maxt -= farT + eps;
 			t += farT + eps;
 		}
+		
+		t = std::numeric_limits<Float>::infinity();
 		return false;
 	}
 
@@ -431,11 +453,13 @@ public:
 	void getNormalDerivative(const Intersection &its,
 		Vector &dndu, Vector &dndv, bool shadingFrame) const {
 		int width = m_dataSize.x,
-			x = its.primIndex % (width * m_tileX),
-			y = its.primIndex / (width * m_tileX);
+			blockX = its.blockIndex % m_tileX,
+			blockY = its.blockIndex / m_tileX,
+			x = its.primIndex % width,
+			y = its.primIndex / width;
 
-		Float u = its.uv.x * (m_levelSize0f.x * m_tileX) - x;
-		Float v = its.uv.y * (m_levelSize0f.y * m_tileY) - y;
+		Float u = its.uv.x * (m_levelSize0f.x * m_tileX) - (blockX * m_levelSize0f.x + x);
+		Float v = its.uv.y * (m_levelSize0f.y * m_tileY) - (blockY * m_levelSize0f.y + y);
 
 		Normal normal;
 		if (shadingFrame && m_shadingNormals) {
@@ -539,12 +563,10 @@ public:
 		m_data = (Float *)allocAligned(size);
 		m_bitmap->convert(m_data, Bitmap::ELuminance, Bitmap::EFloat, 1.0f, m_scale);
 
-		m_objectToWorld = m_objectToWorld * Transform::translate(Vector(-1, -1, 0)) * Transform::scale(Vector(
-			(Float)2 / m_totDataSize.x,
-			(Float)2 / m_totDataSize.y, 1));
+		m_objectToWorld = m_objectToWorld * Transform::translate(Vector(-1, -1, 0)) * 
+			Transform::scale(Vector((Float)1 / m_dataSize.x, (Float)1 / m_dataSize.y, 1)) *
+			Transform::scale(Vector((Float)2 / m_tileX, (Float)2 / m_tileY, 1));
 		m_worldToObject = m_objectToWorld.inverse();
-
-		m_worldToBlock = Transform::scale(Vector(1.0f / m_dataSize.x, 1.0f / m_dataSize.y, 1.0f)) * m_worldToObject;
 
 		m_bitmap = NULL;
 
@@ -679,9 +701,13 @@ public:
 		m_totAABB = AABB(
 			Point3(0, 0, m_dataAABB.min.z),
 			Point3(m_levelSize0f.x * m_tileX, m_levelSize0f.y * m_tileY, m_dataAABB.max.z));
+
+		m_basePlaneAABB = AABB2(
+			Point2(0, 0),
+			Point2(m_levelSize0f.x * m_tileX, m_levelSize0f.y * m_tileY)
+		);
 	}
 
-	// Todo
 	ref<TriMesh> createTriMesh() {
 		Vector2i size = m_dataSize;
 
@@ -691,8 +717,8 @@ public:
 			size.y = std::max(size.y / 2, 2);
 		}
 
-		size_t numTris = 2 * (size_t)(size.x - 1) * (size_t)(size.y - 1);
-		size_t numVertices = (size_t)size.x * (size_t)size.y;
+		size_t numTris = 2 * (size_t)size.x * (size_t)size.y;
+		size_t numVertices = (size_t)(size.x + 1) * (size_t)(size.y + 1);
 
 		ref<TriMesh> mesh = new TriMesh("Height field approximation",
 			numTris, numVertices, false, true, false, false, !m_shadingNormals);
@@ -701,31 +727,32 @@ public:
 		Point2 *texcoords = mesh->getVertexTexcoords();
 		Triangle *triangles = mesh->getTriangles();
 
-		Float dx = (Float)1 / (size.x - 1);
-		Float dy = (Float)1 / (size.y - 1);
+		Float dx = (Float)1 / size.x;
+		Float dy = (Float)1 / size.y;
 		Float scaleX = (Float)m_dataSize.x / size.x;
 		Float scaleY = (Float)m_dataSize.y / size.y;
 
 		uint32_t vertexIdx = 0;
-		for (int y = 0; y<size.y; ++y) {
-			int py = std::min((int)(scaleY * y), m_dataSize.y - 1);
-			for (int x = 0; x<size.x; ++x) {
-				int px = std::min((int)(scaleX * x), m_dataSize.x - 1);
+		for (int y = 0; y<=size.y; ++y) {
+			int py = std::min((int)(scaleY * y), m_dataSize.y);
+			for (int x = 0; x<=size.x; ++x) {
+				int px = std::min((int)(scaleX * x), m_dataSize.x);
 				texcoords[vertexIdx] = Point2(x*dx, y*dy);
 				vertices[vertexIdx++] = m_objectToWorld(Point((Float)px, (Float)py,
-					m_data[px + py*m_dataSize.x]));
+					m_data[px % m_dataSize.x + (py % m_dataSize.y) * m_dataSize.x]));
 			}
 		}
 		Assert(vertexIdx == numVertices);
 
+		uint32_t width = size.x + 1;
 		uint32_t triangleIdx = 0;
-		for (int y = 1; y<size.y; ++y) {
-			for (int x = 0; x<size.x - 1; ++x) {
+		for (int y = 1; y<=size.y; ++y) {
+			for (int x = 0; x<=size.x - 1; ++x) {
 				uint32_t nextx = x + 1;
-				uint32_t idx0 = size.x*y + x;
-				uint32_t idx1 = size.x*y + nextx;
-				uint32_t idx2 = size.x*(y - 1) + x;
-				uint32_t idx3 = size.x*(y - 1) + nextx;
+				uint32_t idx0 = width*y + x;
+				uint32_t idx1 = width*y + nextx;
+				uint32_t idx2 = width*(y - 1) + x;
+				uint32_t idx3 = width*(y - 1) + nextx;
 
 				triangles[triangleIdx].idx[0] = idx0;
 				triangles[triangleIdx].idx[1] = idx2;
@@ -744,11 +771,17 @@ public:
 		return mesh.get();
 	}
 
-	Float getHeight(const Point &_p) {
-		Point p = m_objectToWorld.inverse().transformAffine(_p);
-		int x = math::floorToInt(p.x), y = math::floorToInt(p.y);
+	Float getHeight(const Point &_p) const {
+		Point p = m_worldToObject.transformAffine(_p);
+		int x = math::floorToInt(p.x);
+		int y = math::floorToInt(p.y);
+		Float u = p.x - x;
+		Float v = p.y - y;
+		int blockX = math::floorToInt((Float)x / m_dataSize.x);
+		int blockY = math::floorToInt((Float)y / m_dataSize.y);
+		x -= m_dataSize.x * blockX;
+		y -= m_dataSize.y * blockY;
 		int width = m_dataSize.x;
-		Float u = p.x - x, v = p.y - y;
 
 		//Log(EInfo, "World (%.6f, %.6f, %.6f)", _p.x, _p.y, _p.z);
 		//Log(EInfo, "Local (%.6f, %.6f, %.6f)", p.x, p.y, p.z);
@@ -767,11 +800,17 @@ public:
 		return res;
 	}
 
-	Vector getNormal(const Point &_p) {
-		Point p = m_objectToWorld.inverse().transformAffine(_p);
-		int x = math::floorToInt(p.x), y = math::floorToInt(p.y);
+	Normal getNormal(const Point &_p) const {
+		Point p = m_worldToObject.transformAffine(_p);
+		int x = math::floorToInt(p.x);
+		int y = math::floorToInt(p.y);
+		Float u = p.x - x;
+		Float v = p.y - y;
+		int blockX = math::floorToInt((Float)x / m_dataSize.x);
+		int blockY = math::floorToInt((Float)y / m_dataSize.y);
+		x -= m_dataSize.x * blockX;
+		y -= m_dataSize.y * blockY;
 		int width = m_dataSize.x;
-		Float u = p.x - x, v = p.y - y;
 
 		Float
 			f00 = m_data[y     * width + x],
@@ -779,17 +818,54 @@ public:
 			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
 			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
 
-		Vector normal = m_objectToWorld(
+		Normal normal = m_objectToWorld(
 			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
 			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
 
-		// 		Log(EInfo, "World (%.6f, %.6f, %.6f)", _p.x, _p.y, _p.z);
-		// 		Log(EInfo, "Local (%.6f, %.6f, %.6f)", p.x, p.y, p.z);
-		// 		Log(EInfo, "(%.6f, %.6f)", u, v);
-		// 		Log(EInfo, "%.6f, %.6f, %.6f, %.6f", f00, f01, f10, f11);
+// 		Log(EInfo, "World (%.6f, %.6f, %.6f)", _p.x, _p.y, _p.z);
+// 		Log(EInfo, "Local (%.6f, %.6f, %.6f)", p.x, p.y, p.z);
+// 		Log(EInfo, "(%.6f, %.6f)", u, v);
+// 		Log(EInfo, "%.6f, %.6f, %.6f, %.6f", f00, f01, f10, f11);
 
 		normal = normalize(normal);
 		return normal;
+	}
+
+	void getPosAndNormal(const Point2 &uv, Point *pos, Normal *normal) const {
+		Point p;
+		p.x = uv.x * (m_levelSize0f.x * m_tileX);
+		p.y = uv.y * (m_levelSize0f.y * m_tileY);
+		int x = math::floorToInt(p.x);
+		int y = math::floorToInt(p.y);
+		Float u = p.x - x;
+		Float v = p.y - y;
+		int blockX = math::floorToInt((Float)x / m_dataSize.x);
+		int blockY = math::floorToInt((Float)y / m_dataSize.y);
+		x -= m_dataSize.x * blockX;
+		y -= m_dataSize.y * blockY;
+		int width = m_dataSize.x;
+
+		Float
+			f00 = m_data[y     * width + x],
+			f01 = m_data[((y + 1) % m_dataSize.y) * width + x],
+			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
+			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
+
+		p.z = (1.0f - u) * (1.0f - v) * f00 + (1.0f - u) * v * f01 +
+			u * (1.0f - v) * f10 + u * v * f11;
+		p = m_objectToWorld(p);
+
+		Normal norm = m_objectToWorld(
+			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
+			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
+		norm = normalize(norm);
+
+		if (pos != NULL) {
+			*pos = p;
+		}
+		if (normal != NULL) {
+			*normal = norm;
+		}
 	}
 
 	std::string toString() const {
@@ -845,7 +921,7 @@ private:
 	Vector2i m_totDataSize;
 	Vector2 m_invTotSize;
 	AABB m_totAABB;
-	Transform m_worldToBlock;
+	AABB2 m_basePlaneAABB;
 };
 
 MTS_IMPLEMENT_CLASS_S(TiledHeightfield, false, Shape)

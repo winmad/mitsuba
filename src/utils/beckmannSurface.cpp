@@ -65,7 +65,7 @@ public:
 	}
 
 	void genHeightmap() {
-		ref<Bitmap> bitmap = new Bitmap(Bitmap::EPixelFormat::ELuminance, Bitmap::EFloat32,
+		ref<Bitmap> bitmap = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32,
 			Vector2i(m_size), -1);
 		float *data = bitmap->getFloat32Data();
 		float min_height = 1e4f;
@@ -96,9 +96,9 @@ public:
 	}
 
 	void genNormalmap() {
-		ref<Bitmap> slope = new Bitmap(Bitmap::EPixelFormat::ERGB, Bitmap::EFloat32,
+		ref<Bitmap> slope = new Bitmap(Bitmap::ERGB, Bitmap::EFloat32,
 			Vector2i(m_size), -1);
-		ref<Bitmap> normal = new Bitmap(Bitmap::EPixelFormat::ERGB, Bitmap::EFloat32,
+		ref<Bitmap> normal = new Bitmap(Bitmap::ERGB, Bitmap::EFloat32,
 			Vector2i(m_size), -1);
 		float *slopeData = slope->getFloat32Data();
 		float *normalData = normal->getFloat32Data();

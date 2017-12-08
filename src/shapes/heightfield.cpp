@@ -215,6 +215,15 @@ public:
 		Ray ray;
 		m_objectToWorld.inverse()(_ray, ray);
 
+		// check if the ray origin is below the heightfield
+		/*
+		if (m_basePlaneAABB.contains(Point2(ray.o.x, ray.o.y))) {
+			Float h = getHeight(_ray.o);
+			if (ray.o.z > -Epsilon && ray.o.z < h + Epsilon)
+				return false;
+		}
+		*/
+
 		/* Ray length to cross a single cell along the X or Y axis */
 		Float tDeltaXSingle = std::abs(ray.dRcp.x),
 		      tDeltaYSingle = std::abs(ray.dRcp.y);
@@ -660,6 +669,11 @@ public:
 			Point3(0, 0, m_minmax[m_levelCount-1][0].min),
 			Point3(m_levelSize0f.x, m_levelSize0f.y, m_minmax[m_levelCount-1][0].max)
 		);
+
+		m_basePlaneAABB = AABB2(
+			Point2(0, 0),
+			Point2(m_levelSize0f.x, m_levelSize0f.y)
+		);
 	}
 
 	ref<TriMesh> createTriMesh() {
@@ -724,7 +738,7 @@ public:
 		return mesh.get();
 	}
 
-	Float getHeight(const Point &_p) {
+	Float getHeight(const Point &_p) const {
 		Point p = m_objectToWorld.inverse().transformAffine(_p);
 		int x = math::floorToInt(p.x), y = math::floorToInt(p.y);
 		int width = m_dataSize.x;
@@ -747,7 +761,7 @@ public:
 		return res;
 	}
 
-	Vector getNormal(const Point &_p) {
+	Normal getNormal(const Point &_p) const {
 		Point p = m_objectToWorld.inverse().transformAffine(_p);
 		int x = math::floorToInt(p.x), y = math::floorToInt(p.y);
 		int width = m_dataSize.x;
@@ -759,7 +773,7 @@ public:
 			f10 = m_data[y     * width + x + 1],
 			f11 = m_data[(y + 1) * width + x + 1];
 
-		Vector normal = m_objectToWorld(
+		Normal normal = m_objectToWorld(
 			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
 			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
 
@@ -770,6 +784,37 @@ public:
 
 		normal = normalize(normal);
 		return normal;
+	}
+
+	void getPosAndNormal(const Point2 &uv, Point *pos, Normal *normal) const {
+		Point p;
+		p.x = uv.x * m_levelSize0f.x;
+		p.y = uv.y * m_levelSize0f.y;
+		int x = math::floorToInt(p.x), y = math::floorToInt(p.y);
+		int width = m_dataSize.x;
+		Float u = p.x - x, v = p.y - y;
+
+		Float
+			f00 = m_data[y     * width + x],
+			f01 = m_data[(y + 1) * width + x],
+			f10 = m_data[y     * width + x + 1],
+			f11 = m_data[(y + 1) * width + x + 1];
+
+		p.z = (1.0f - u) * (1.0f - v) * f00 + (1.0f - u) * v * f01 +
+			u * (1.0f - v) * f10 + u * v * f11;
+		p = m_objectToWorld.transformAffine(p);
+		
+		Normal norm = m_objectToWorld(
+			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
+			f00 - f01 + (f01 + f10 - f00 - f11)*u, 1));
+		norm = normalize(norm);
+		
+		if (pos != NULL) {
+			*pos = p;
+		}
+		if (normal != NULL) {
+			*normal = norm;
+		}
 	}
 
 	std::string toString() const {
@@ -798,6 +843,7 @@ private:
 	Transform m_objectToWorld;
 	Vector2i m_sizeHint;
 	AABB m_dataAABB;
+	AABB2 m_basePlaneAABB;
 	bool m_shadingNormals;
 	bool m_flipNormals;
 	Float m_scale;

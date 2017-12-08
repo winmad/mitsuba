@@ -297,7 +297,7 @@ public:
 			}
 		}
 
-		Float *data = new Float[(int)points.size() * 3];
+		float *data = new float[(int)points.size() * 3];
 
 		for (int k = 0; k < numClusters; k++) {
 			std::string outfile = prefix + formatString("LdA_s%02i_%03i_%03i.pfm", k, 

@@ -220,7 +220,7 @@ public:
 			}
 		}
 
-		Float *data = new Float[(int)points.size() * 3]; 		
+		float *data = new float[(int)points.size() * 3]; 		
 		
 		std::string outfile = prefix + formatString("LdA_%03i_%03i.pfm", block->getOffset().x, block->getOffset().y);
 		for (int i = 0; i < points.size(); i++) {

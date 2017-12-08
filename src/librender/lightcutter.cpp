@@ -207,12 +207,12 @@ Spectrum Lightcutter::evalErrorBound(const LightNode *node, Vector &wi,
 						cosTheta = M.z / sqrt(minx2 + miny2 + maxz2);
 					}
 
-					cosTheta = math::clamp(cosTheta, 0.f, 1.f);
+					cosTheta = math::clamp(cosTheta, 0.0, 1.0);
 
 					if (cosTheta <= cosHalfAngle) {
 						Float sinHalfAngle = sqrt(1.f - cosHalfAngle * cosHalfAngle);
 						Float sinTheta = sqrt(1.f - cosTheta * cosTheta);
-						cosBound = math::clamp(cosTheta * cosHalfAngle + sinTheta * sinHalfAngle, 0.f, 1.f);
+						cosBound = math::clamp(cosTheta * cosHalfAngle + sinTheta * sinHalfAngle, 0.0, 1.0);
 					}
 				}
 			}
@@ -292,7 +292,7 @@ Spectrum Lightcutter::evalMaterialErrorBound(const AABB &bbox, Vector &wi,
 		Float maxz2 = M.z * M.z;
 		cosTheta = M.z / sqrt(minx2 + miny2 + maxz2);
 	}
-	cosTheta = math::clamp(cosTheta, 0.f, 1.f);
+	cosTheta = math::clamp(cosTheta, 0.0, 1.0);
 
 	return diffuse * cosTheta;
 }

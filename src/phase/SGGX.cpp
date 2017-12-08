@@ -31,8 +31,8 @@ public:
 			m_sampleType = EDiffuse;
 		else if (typeStr == "mixed") {
 			m_sampleType = EMixed;
-			m_mixedWeight = props.getFloat("mixedWeight", 1.f);
-			m_mixedWeight = math::clamp(m_mixedWeight, 0.f, 1.f);
+			m_mixedWeight = props.getFloat("mixedWeight", 1.0f);
+			m_mixedWeight = math::clamp(m_mixedWeight, 0.0, 1.0);
 		}
 		else
 			Log(EError, "Unknown SGGX phase function type. Support specular and diffuse.");
@@ -111,7 +111,7 @@ public:
 		}
 		else if (m_sampleType == EDiffuse) {
 			Vector wm = sampleVNormal(wi, m_sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
-			res *= 1.f * INV_PI * std::max(0.f, dot(wo, wm));
+			res *= 1.f * INV_PI * std::max(0.0, dot(wo, wm));
 		}
 		else if (m_sampleType == EMixed) {
 			Vector H = wi + wo;
@@ -124,7 +124,7 @@ public:
 			Float p1 = 0.25f * ndf(H, Sxx, Syy, Szz, Sxy, Sxz, Syz) / sigma(wi, Sxx, Syy, Szz, Sxy, Sxz, Syz);
 
 			Vector wm = sampleVNormal(wi, m_sampler, Sxx, Syy, Szz, Sxy, Sxz, Syz);
-			Float p2 = 1.f * INV_PI * std::max(0.f, dot(wo, wm));
+			Float p2 = 1.f * INV_PI * std::max(0.0, dot(wo, wm));
 
 			res *= p1 * m_mixedWeight + p2 * (1.f - m_mixedWeight);
 		}
