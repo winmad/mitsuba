@@ -143,6 +143,7 @@ public:
 				}
 			}
 		}
+		//avgNormal /= (double)m_spp;
 		avgNormal = normalize(avgNormal);
 		avgProjArea /= (double)m_spp;
 		totPosProjArea /= (double)m_spp;
@@ -155,7 +156,7 @@ public:
 		Log(EInfo, "===========================================");
 		Log(EInfo, "Average normal (%.6f, %.6f, %.6f), cos_wo = %.6f, cos_wn = %.6f", 
 			avgNormal.x, avgNormal.y, avgNormal.z, 
-			dot(avgNormal, m_wi), avgProjArea);
+			dot(avgNormal, m_wi) / avgNormal.z, avgProjArea);
 		Log(EInfo, "G_local = visArea / totPosArea: %.8f / %.8f = %.8f", 
 			totVisPosProjArea[0], totPosProjArea, G[0]);
 		Log(EInfo, "G_distant = visArea / totPosArea: %.8f / %.8f = %.8f", 
