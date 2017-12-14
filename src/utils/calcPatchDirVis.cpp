@@ -118,6 +118,8 @@ public:
 		}
 		Log(EInfo, "Finish sampling.");
 
+
+		// unseparated
 		Vector avgNormal(0.0);
 		double avgProjArea = 0.0;
 
@@ -178,6 +180,40 @@ public:
 			fprintf(fp, "%.8f ", G2[k]);
 		}
 		fprintf(fp, "\n");
+		fclose(fp);
+
+		// separated
+		double avgR = 0.0;
+		std::vector<double> avgV(3, 0.0);
+		std::vector<double> avgRV(3, 0.0);
+
+		for (int i = 0; i < m_sqrtSpp; i++) {
+			for (int j = 0; j < m_sqrtSpp; j++) {
+				double R = std::max(0.0, dot(normals[i][j], m_wi)) * std::max(0.0, dot(normals[i][j], m_wo)) /
+					std::max(Epsilon, normals[i][j].z);
+				avgR += R;
+				for (int k = 0; k < 3; k++) {
+					avgV[k] += vis[i][j][k];
+					avgRV[k] += R * vis[i][j][k];
+				}
+			}
+		}
+
+		avgR /= (double)m_spp;
+		for (int k = 0; k < 3; k++) {
+			avgV[k] /= (double)m_spp;
+			avgRV[k] /= (double)m_spp;
+		}
+		Log(EInfo, "===========================================");
+		Log(EInfo, "Local: RV = %.8f, RxV = %.8f, corr = %.8f", avgRV[0], avgR * avgV[0], 
+			avgRV[0] - avgR * avgV[0]);
+		Log(EInfo, "Distant: RV = %.8f, RxV = %.8f, corr = %.8f", avgRV[1], avgR * avgV[1], 
+			avgRV[1] - avgR * avgV[1]);
+		Log(EInfo, "Total: RV = %.8f, RxV = %.8f, corr = %.8f", avgRV[2], avgR * avgV[2], 
+			avgRV[2] - avgR * avgV[2]);
+
+		fp = fopen("tmp_separate_result.txt", "w");
+		fprintf(fp, "%.8f %.8f %.8f\n", avgRV[2], avgR, avgV[2]);
 		fclose(fp);
 		
 		return 0;
