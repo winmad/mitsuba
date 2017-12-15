@@ -326,6 +326,7 @@ public:
             ++tot;
         }
         m_bmesh->configure();
+        m_surfaceArea = m_bmesh->getSurfaceArea();
 
         m_btree = new ShapeKDTree();
         m_btree->addShape(m_bmesh);
@@ -335,6 +336,11 @@ public:
     inline AABB getAABB() const
     {
         return m_aabb;
+    }
+
+    inline Float getSurfaceArea() const
+    {
+        return m_surfaceArea;
     }
 
     bool lookupPoint_BruteForce(const Point &p, Point &tex) const
@@ -554,6 +560,7 @@ protected:
 
 public:
     AABB m_aabb;
+    Float m_surfaceArea;
 
     uint32_t m_vertexCount, m_tetrahedronCount;
     Point *m_vtxPosition, *m_vtxTexcoord;

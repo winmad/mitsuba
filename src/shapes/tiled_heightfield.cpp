@@ -433,7 +433,9 @@ public:
 			AABB xyAABB(m_dataAABB);
 			nearT = Epsilon; farT = std::numeric_limits<Float>::infinity();
 			xyAABB.rayIntersect(ray, nearT, farT);
-			//Log(EInfo, "%.6f, %.6f", nearT, farT);
+#ifdef TILED_HEIGHTFIELD_DEBUG
+			Log(EInfo, "%.6f, %.6f", nearT, farT);
+#endif
 			Assert(nearT < Epsilon);
 			posWorld += _ray.d * (farT + eps);
 			mint -= farT + eps;
