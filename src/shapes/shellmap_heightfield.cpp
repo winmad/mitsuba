@@ -131,27 +131,34 @@ public:
 #ifdef SHELLMAP_HEIGHTFIELD_DEBUG
             Log(EInfo, "-----------------------");
             Log(EInfo, "tetra id = %d, t = %.8f", id, tTemp);
+            Log(EInfo, "intersect tetra %d: minT = %.8f, maxT = %.8f", id, minT, maxT);
 #endif
 
+            minT = std::max(minT, _mint);
+            maxT = std::min(maxT, _maxt);
+            
+            if (minT >= maxT)
+                break;
+
             Point texNear, texFar;
-            m_shell.lookupPoint(_ray(minT + Epsilon), texNear);
-            m_shell.lookupPoint(_ray(maxT - Epsilon), texFar);
+            m_shell.lookupPointGivenId(_ray(minT), id, &texNear);
+            m_shell.lookupPointGivenId(_ray(maxT), id, &texFar);
             
             Point blockNear, blockFar;
             blockNear = m_textureToData.transformAffine(texNear);
             blockFar = m_textureToData.transformAffine(texFar);
             Float blockLength = (blockFar - blockNear).length();
             Ray rayBlock = Ray(blockNear, normalize(blockFar - blockNear), 
-                0.0, blockLength, 0);
+                Epsilon, blockLength, 0);
 
 #ifdef SHELLMAP_HEIGHTFIELD_DEBUG
-            Log(EInfo, "intersection length in tetra = %.8f", itsLength);
             Log(EInfo, "World: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
                 _ray(minT).x, _ray(minT).y, _ray(minT).z,
                 _ray(maxT).x, _ray(maxT).y, _ray(maxT).z);
             Log(EInfo, "Tex: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
                 texNear.x, texNear.y, texNear.z,
                 texFar.x, texFar.y, texFar.z);
+            Log(EInfo, "intersection length in block = %.8f", blockLength);
             Log(EInfo, "Block: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
                 rayBlock.o.x, rayBlock.o.y, rayBlock.o.z,
                 rayBlock(blockLength).x, rayBlock(blockLength).y, rayBlock(blockLength).z);
@@ -168,7 +175,8 @@ public:
                 Intersection itsBlock;
                 m_block->fillIntersectionRecord(rayBlock, (void*)(&tempBlock), itsBlock);
 
-                Float tWorld = Epsilon + (maxT - minT - 2.0 * Epsilon) * tBlock / blockLength;
+                //Float tWorld = Epsilon + (maxT - minT - 2.0 * Epsilon) * tBlock / blockLength;
+                Float tWorld = tBlock / blockLength * (maxT - minT);
                 tTemp += tWorld;
 
                 t = tTemp;
@@ -176,6 +184,7 @@ public:
                 Point4 bb;
                 
                 if (!m_shell.m_tetra[id].inside(m_shell.m_vtxPosition, itsPWorld, bb)) {
+                    //Log(EError, "should not happen!");
                     break;
                 }
 
@@ -199,10 +208,24 @@ public:
                 return true;
             }
             else {
+                if (maxT >= _maxt)
+                    break;
+
                 // move to the next tetrahedron
                 id = m_shell.m_link[4 * id + maxF];
-                if (id < 0)
-                    break;
+                
+                if (id < 0) {
+                    // ray goes out of shellmap, but could intersect with it again
+                    Intersection its;
+                    Ray rayTemp(ray, maxT + Epsilon, std::numeric_limits<Float>::infinity());
+                    if (!m_shell.m_btree->rayIntersect(rayTemp, its) || its.t > _maxt)
+                        break;
+            
+                    if (!m_shell.lookupPoint(ray(its.t + Epsilon), id0))
+                        break;
+                    id = static_cast<int>(id0);
+                }
+                
                 if (!m_shell.m_tetra[id].rayIntersect(m_shell.m_vtxPosition, _ray, minT, minF, maxT, maxF))
                     break;
                 tTemp = minT;
@@ -271,21 +294,22 @@ public:
         
 #ifdef SHELLMAP_HEIGHTFIELD_DEBUG
         Log(EInfo, "===== normal transform =====");
-        Log(EInfo, "nBlock = (%.6f, %.6f, %.6f)", temp.geoFrameBlock.n.x, temp.geoFrameBlock.n.y, temp.geoFrameBlock.n.z);
+        Log(EInfo, "nBlock = (%.6f, %.6f, %.6f)", temp.normBlock.x, temp.normBlock.y, temp.normBlock.z);
         Log(EInfo, "nTex = (%.6f, %.6f, %.6f)", normTex.x, normTex.y, normTex.z);
         Log(EInfo, "nWorld = (%.6f, %.6f, %.6f)", normWorld.x, normWorld.y, normWorld.z);
 #endif
 
-        /*
+        
         its.geoFrame.n = normWorld;
         its.geoFrame.s = normalize(its.dpdu);
         its.geoFrame.t = cross(its.geoFrame.n, its.geoFrame.s);
-        */
+        
 
+        /*
         its.geoFrame.s = normalize(its.dpdu);
         its.geoFrame.t = normalize(its.dpdv - dot(its.dpdv, its.geoFrame.s) * its.geoFrame.s);
         its.geoFrame.n = cross(its.geoFrame.s, its.geoFrame.t);
-        
+        */
 
         its.shFrame.n = its.geoFrame.n;
 

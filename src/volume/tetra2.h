@@ -408,6 +408,33 @@ public:
         return true;
     }
 
+    bool lookupPointGivenId(const Point &p, uint32_t id, Point *tex = NULL,
+        Vector *normal = NULL, TangentSpace *tangent = NULL) const {
+        Point4 bb;
+
+        if (!m_tetra[id].inside(m_vtxPosition, p, bb)) 
+            return false;
+        const uint32_t *idx = m_tetra[id].idx;
+
+        if (tex != NULL) {
+            *tex = m_vtxTexcoord[idx[0]]*bb.x + m_vtxTexcoord[idx[1]]*bb.y
+                + m_vtxTexcoord[idx[2]]*bb.z + m_vtxTexcoord[idx[3]]*bb.w;
+        }
+
+        if (normal != NULL) {
+            *normal = m_vtxNormal[idx[0]]*bb.x + m_vtxNormal[idx[1]]*bb.y
+                + m_vtxNormal[idx[2]]*bb.z + m_vtxNormal[idx[3]]*bb.w;
+        }
+            
+        if (tangent != NULL) {
+            tangent->dpdu = m_vtxTangent[idx[0]].dpdu*bb.x + m_vtxTangent[idx[1]].dpdu*bb.y
+                + m_vtxTangent[idx[2]].dpdu*bb.z + m_vtxTangent[idx[3]].dpdu*bb.w;
+            tangent->dpdv = m_vtxTangent[idx[0]].dpdv*bb.x + m_vtxTangent[idx[1]].dpdv*bb.y
+                + m_vtxTangent[idx[2]].dpdv*bb.z + m_vtxTangent[idx[3]].dpdv*bb.w;
+        }
+        return true;
+    }
+
     inline uint32_t getTetrahedronCount() const { return m_tetrahedronCount; }
 
     inline uint32_t getTreeSize() const         { return m_treeSize; }
