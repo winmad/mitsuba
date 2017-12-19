@@ -9,6 +9,7 @@ plugins += env.SharedLibrary('calcPatchNDF', ['calcPatchNDF.cpp'])
 plugins += env.SharedLibrary('calcPatchDirVisSimple', ['calcPatchDirVis_simple.cpp'])
 plugins += env.SharedLibrary('calcPatchDirVis', ['calcPatchDirVis.cpp'])
 plugins += env.SharedLibrary('testTiledHeightfield', ['testTiledHeightfield.cpp'])
+plugins += env.SharedLibrary('samplePatchVis', ['samplePatchVis.cpp'])
 
 plugins += env.SharedLibrary('upSampleVolume', ['upSampleVolume.cpp'])
 plugins += env.SharedLibrary('albedoRemapping', ['albedoRemapping.cpp'])
