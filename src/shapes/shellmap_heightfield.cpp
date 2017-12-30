@@ -43,8 +43,6 @@ public:
 
         // correspond to z=1 in texture space
         m_maxHeight = props.getFloat("maxHeight", -1.0);
-
-        m_debug = false;
     }
 
     ShellmapHeightfield(Stream *stream, InstanceManager *manager) 
@@ -124,9 +122,16 @@ public:
         Log(EInfo, "intersect tetra %d: minT = %.8f, maxT = %.8f", id, minT, maxT);
 #endif
 
+		int cnt = 0;
+
         while (true) {
             if (tTemp >= _maxt)
                 break;
+
+			if (++cnt > m_tetrahedronCount) {
+				Log(EInfo, "Loop forever when intersecting...");
+				break;
+			}
 
 #ifdef SHELLMAP_HEIGHTFIELD_DEBUG
             Log(EInfo, "-----------------------");
@@ -137,99 +142,101 @@ public:
             minT = std::max(minT, _mint);
             maxT = std::min(maxT, _maxt);
             
-            if (minT >= maxT)
+			if (minT < maxT) {
+				Point texNear, texFar;
+				m_shell.lookupPointGivenId(_ray(minT + Epsilon), id, &texNear);
+				m_shell.lookupPointGivenId(_ray(maxT - Epsilon), id, &texFar);
+
+				Point blockNear, blockFar;
+				blockNear = m_textureToData.transformAffine(texNear);
+				blockFar = m_textureToData.transformAffine(texFar);
+				Float blockLength = (blockFar - blockNear).length();
+				Ray rayBlock = Ray(blockNear, normalize(blockFar - blockNear),
+					Epsilon, blockLength, 0);
+
+#ifdef SHELLMAP_HEIGHTFIELD_DEBUG
+				Log(EInfo, "World: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
+					_ray(minT).x, _ray(minT).y, _ray(minT).z,
+					_ray(maxT).x, _ray(maxT).y, _ray(maxT).z);
+				Log(EInfo, "Tex: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
+					texNear.x, texNear.y, texNear.z,
+					texFar.x, texFar.y, texFar.z);
+				Log(EInfo, "intersection length in block = %.8f", blockLength);
+				Log(EInfo, "Block: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
+					rayBlock.o.x, rayBlock.o.y, rayBlock.o.z,
+					rayBlock(blockLength).x, rayBlock(blockLength).y, rayBlock(blockLength).z);
+				Log(EInfo, "rayBlockDir = (%.6f, %.6f, %.6f)", 
+					rayBlock.d.x, rayBlock.d.y, rayBlock.d.z);
+#endif
+
+				Float tBlock;
+				PatchIntersectionRecord tempBlock;
+
+				if (m_block->rayIntersect(rayBlock, rayBlock.mint, rayBlock.maxt,
+					tBlock, (void*)(&tempBlock))) {
+					// intersection in block space
+					Intersection itsBlock;
+					m_block->fillIntersectionRecord(rayBlock, (void*)(&tempBlock), itsBlock);
+
+					Float tWorld = Epsilon + (maxT - minT - 2.0 * Epsilon) * (tBlock / blockLength);
+					//Float tWorld = tBlock / blockLength * (maxT - minT);
+					tTemp += tWorld;
+
+					t = tTemp;
+					Point itsPWorld = ray(t);
+					Point4 bb;
+
+					if (!m_shell.m_tetra[id].inside(m_shell.m_vtxPosition, itsPWorld, bb)) {
+						//Log(EError, "should not happen!");
+						break;
+					}
+
+					if (tmp) {
+						ShellmapIntersectionRecord &temp = *((ShellmapIntersectionRecord*)tmp);
+						temp.normBlock = itsBlock.geoFrame.n;
+						temp.dpduBlock = itsBlock.dpdu;
+						temp.dpdvBlock = itsBlock.dpdv;
+						temp.bb = bb;
+						temp.tetraId = id;
+					}
+
+#ifdef SHELLMAP_HEIGHTFIELD_DEBUG
+					Log(EInfo, "*** found intersection ***");
+					Log(EInfo, "blockT = %.8f", tBlock);
+					Log(EInfo, "block.p = (%.6f, %.6f, %.6f)", itsBlock.p.x, itsBlock.p.y, itsBlock.p.z);
+					Log(EInfo, "final dist = %.8f", t);
+					Log(EInfo, "its.p = (%.6f, %.6f, %.6f)", itsPWorld.x, itsPWorld.y, itsPWorld.z);
+#endif
+
+					return true;
+				}
+			}
+            
+            if (maxT >= _maxt)
                 break;
 
-            Point texNear, texFar;
-            m_shell.lookupPointGivenId(_ray(minT), id, &texNear);
-            m_shell.lookupPointGivenId(_ray(maxT), id, &texFar);
-            
-            Point blockNear, blockFar;
-            blockNear = m_textureToData.transformAffine(texNear);
-            blockFar = m_textureToData.transformAffine(texFar);
-            Float blockLength = (blockFar - blockNear).length();
-            Ray rayBlock = Ray(blockNear, normalize(blockFar - blockNear), 
-                Epsilon, blockLength, 0);
-
+            // move to the next tetrahedron
+            id = m_shell.m_link[4 * id + maxF];
+                
+            if (id < 0) {
+                // ray goes out of shellmap, but could intersect with it again
+                Intersection its;
+                Ray rayTemp(ray, maxT + 2.0 * Epsilon, std::numeric_limits<Float>::infinity());
+				if (!m_shell.m_btree->rayIntersect(rayTemp, its) || its.t > _maxt) {
 #ifdef SHELLMAP_HEIGHTFIELD_DEBUG
-            Log(EInfo, "World: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
-                _ray(minT).x, _ray(minT).y, _ray(minT).z,
-                _ray(maxT).x, _ray(maxT).y, _ray(maxT).z);
-            Log(EInfo, "Tex: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
-                texNear.x, texNear.y, texNear.z,
-                texFar.x, texFar.y, texFar.z);
-            Log(EInfo, "intersection length in block = %.8f", blockLength);
-            Log(EInfo, "Block: near = (%.6f, %.6f, %.6f), far = (%.6f, %.6f, %.6f)",
-                rayBlock.o.x, rayBlock.o.y, rayBlock.o.z,
-                rayBlock(blockLength).x, rayBlock(blockLength).y, rayBlock(blockLength).z);
-            Log(EInfo, "rayBlockDir = (%.6f, %.6f, %.6f)", 
-                rayBlock.d.x, rayBlock.d.y, rayBlock.d.z);
+					Log(EInfo, "Will not intersect the shellmap again.");
 #endif
-
-            Float tBlock;
-            PatchIntersectionRecord tempBlock;
-
-            if (m_block->rayIntersect(rayBlock, rayBlock.mint, rayBlock.maxt, 
-                tBlock, (void*)(&tempBlock))) {
-                // intersection in block space
-                Intersection itsBlock;
-                m_block->fillIntersectionRecord(rayBlock, (void*)(&tempBlock), itsBlock);
-
-                //Float tWorld = Epsilon + (maxT - minT - 2.0 * Epsilon) * tBlock / blockLength;
-                Float tWorld = tBlock / blockLength * (maxT - minT);
-                tTemp += tWorld;
-
-                t = tTemp;
-                Point itsPWorld = ray(t);
-                Point4 bb;
-                
-                if (!m_shell.m_tetra[id].inside(m_shell.m_vtxPosition, itsPWorld, bb)) {
-                    //Log(EError, "should not happen!");
-                    break;
-                }
-
-                if (tmp) {
-                    ShellmapIntersectionRecord &temp = *((ShellmapIntersectionRecord*)tmp);             
-                    temp.normBlock = itsBlock.geoFrame.n;
-                    temp.dpduBlock = itsBlock.dpdu;
-                    temp.dpdvBlock = itsBlock.dpdv;
-                    temp.bb = bb;
-                    temp.tetraId = id;
-                }
-                
-#ifdef SHELLMAP_HEIGHTFIELD_DEBUG
-                Log(EInfo, "*** found intersection ***");
-                Log(EInfo, "blockT = %.8f", tBlock);
-                Log(EInfo, "block.p = (%.6f, %.6f, %.6f)", itsBlock.p.x, itsBlock.p.y, itsBlock.p.z);
-                Log(EInfo, "final dist = %.8f", t);
-                Log(EInfo, "its.p = (%.6f, %.6f, %.6f)", itsPWorld.x, itsPWorld.y, itsPWorld.z);
-#endif
-
-                return true;
-            }
-            else {
-                if (maxT >= _maxt)
-                    break;
-
-                // move to the next tetrahedron
-                id = m_shell.m_link[4 * id + maxF];
-                
-                if (id < 0) {
-                    // ray goes out of shellmap, but could intersect with it again
-                    Intersection its;
-                    Ray rayTemp(ray, maxT + Epsilon, std::numeric_limits<Float>::infinity());
-                    if (!m_shell.m_btree->rayIntersect(rayTemp, its) || its.t > _maxt)
-                        break;
+					break;
+				}
             
-                    if (!m_shell.lookupPoint(ray(its.t + Epsilon), id0))
-                        break;
-                    id = static_cast<int>(id0);
-                }
-                
-                if (!m_shell.m_tetra[id].rayIntersect(m_shell.m_vtxPosition, _ray, minT, minF, maxT, maxF))
+                if (!m_shell.lookupPoint(ray(its.t + Epsilon), id0))
                     break;
-                tTemp = minT;
+                id = static_cast<int>(id0);
             }
+                
+            if (!m_shell.m_tetra[id].rayIntersect(m_shell.m_vtxPosition, _ray, minT, minF, maxT, maxF))
+                break;
+            tTemp = minT;
         }
 
         t = std::numeric_limits<Float>::infinity();
@@ -275,7 +282,6 @@ public:
         Log(EInfo, "s = (%.6f, %.6f, %.6f)", tang.dpdu.x, tang.dpdu.y, tang.dpdu.z);
         Log(EInfo, "t = (%.6f, %.6f, %.6f)", tang.dpdv.x, tang.dpdv.y, tang.dpdv.z);
         Log(EInfo, "===== heightmap space =====");
-        
 #endif
 
         its.uv = Point2(tex.x, tex.y);
@@ -299,17 +305,15 @@ public:
         Log(EInfo, "nWorld = (%.6f, %.6f, %.6f)", normWorld.x, normWorld.y, normWorld.z);
 #endif
 
-        
+		/*
         its.geoFrame.n = normWorld;
         its.geoFrame.s = normalize(its.dpdu);
         its.geoFrame.t = cross(its.geoFrame.n, its.geoFrame.s);
-        
+        */
 
-        /*
         its.geoFrame.s = normalize(its.dpdu);
         its.geoFrame.t = normalize(its.dpdv - dot(its.dpdv, its.geoFrame.s) * its.geoFrame.s);
         its.geoFrame.n = cross(its.geoFrame.s, its.geoFrame.t);
-        */
 
         its.shFrame.n = its.geoFrame.n;
 
@@ -361,6 +365,7 @@ public:
                 m_shell.getTetrahedronCount(), m_shell.getTreeDepth());
 
             m_aabb = m_shell.getAABB();
+			m_tetrahedronCount = m_shell.getTetrahedronCount();
                 
             m_ready = true;
 
@@ -409,9 +414,9 @@ protected:
     Float m_maxHeight;
     Transform m_worldToObject, m_objectToWorld;
     Transform m_textureToData, m_dataToTexture;
-    AABB m_aabb;
-
-    bool m_debug;
+    
+	AABB m_aabb;
+	int m_tetrahedronCount;
 };
 
 MTS_IMPLEMENT_CLASS_S(ShellmapHeightfield, false, Shape)

@@ -10,6 +10,9 @@ plugins += env.SharedLibrary('roughdielectric', ['roughdielectric.cpp'])
 plugins += env.SharedLibrary('roughconductor', ['roughconductor.cpp'])
 plugins += env.SharedLibrary('roughplastic', ['roughplastic.cpp'])
 
+plugins += env.SharedLibrary('aniso_roughdiffuse', ['aniso_roughdiffuse.cpp'])
+plugins += env.SharedLibrary('aniso_roughdiffuse_simple', ['aniso_roughdiffuse_simple.cpp'])
+
 # Materials that act as modifiers
 plugins += env.SharedLibrary('twosided', ['twosided.cpp'])
 plugins += env.SharedLibrary('mask', ['mask.cpp'])

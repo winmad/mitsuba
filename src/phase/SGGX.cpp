@@ -58,6 +58,7 @@ public:
 		PhaseFunction::configure();
 		m_type = EAnisotropic | ENonSymmetric;
 
+		// Note: Sampler is not thread-safe... need to be fixed
 		Properties props("independent");
 		m_sampler = static_cast<Sampler*>(PluginManager::getInstance()->createObject(MTS_CLASS(Sampler), props));
 		m_sampler->configure();

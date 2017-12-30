@@ -17,8 +17,6 @@ MTS_NAMESPACE_BEGIN
 class samplePatchVis : public Utility {
 public:
 	int run(int argc, char **argv) {
-		m_wo = Vector(0, 0, 1);
-		//m_wi = Vector(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]));
 		m_sqrtSpp = std::atoi(argv[2]);
 		Float umin = std::atof(argv[3]);
 		Float umax = std::atof(argv[4]);
@@ -38,7 +36,7 @@ public:
 		m_aabb = AABB2(Point2(umin, vmin), Point2(umax, vmax));
 		m_scene->initialize();
 		//m_wi = normalize(m_wi);
-		m_wo = normalize(m_wo);
+		//m_wo = normalize(m_wo);
 		m_spp = m_sqrtSpp * m_sqrtSpp;
 
 		Properties props = Properties("independent");
@@ -58,7 +56,9 @@ public:
 		}
 
 		std::vector<std::vector<Vector> > wi(m_sqrtSpp, std::vector<Vector>(m_sqrtSpp));
-		std::vector<std::vector<double> > pdfs(m_sqrtSpp, std::vector<double>(m_sqrtSpp));
+		std::vector<std::vector<double> > pdfWi(m_sqrtSpp, std::vector<double>(m_sqrtSpp));
+		std::vector<std::vector<Vector> > wo(m_sqrtSpp, std::vector<Vector>(m_sqrtSpp));
+		std::vector<std::vector<double> > pdfWo(m_sqrtSpp, std::vector<double>(m_sqrtSpp));
 
 		std::vector<std::vector<std::vector<double> > > vis(
 			m_sqrtSpp, std::vector<std::vector<double> >(m_sqrtSpp, std::vector<double>(3)));
@@ -79,7 +79,7 @@ public:
 			for (int j = 0; j < m_sqrtSpp; j++) {
 				// sample incoming direction wi
 				Vector wiLocal = warp::squareToCosineHemisphere(directionSamples[i][j]);
-				pdfs[i][j] = warp::squareToCosineHemispherePdf(wiLocal);
+				pdfWi[i][j] = warp::squareToCosineHemispherePdf(wiLocal);
 
 				Ray ray;
 				bool frontFaced = true;
@@ -139,7 +139,7 @@ public:
 
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
-				avgShadowingMasking += vis[i][j][2] * std::max(0.0, dot(wi[i][j], normals[i][j])) / pdfs[i][j];
+				avgShadowingMasking += vis[i][j][2] * std::max(0.0, dot(wi[i][j], normals[i][j])) / pdfWi[i][j];
 			}
 		}
 		avgShadowingMasking /= (double)m_spp;

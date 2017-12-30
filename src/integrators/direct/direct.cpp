@@ -273,8 +273,17 @@ public:
 			/* Trace a ray in this direction */
 			Ray bsdfRay(its.p, wo, ray.time);
 
+// 			Log(EInfo, "********************");
+// 			Log(EInfo, "BSDF Ray: o = (%.6f, %.6f, %.6f), d = (%.6f, %.6f, %.6f)",
+// 				bsdfRay.o.x, bsdfRay.o.y, bsdfRay.o.z,
+// 				bsdfRay.d.x, bsdfRay.d.y, bsdfRay.d.z);
+
 			Spectrum value;
 			if (scene->rayIntersect(bsdfRay, bsdfIts)) {
+// 				Log(EInfo, "intersect!");
+// 				Log(EInfo, "t = %.6f", bsdfIts.t);
+// 				Log(EInfo, "pos = (%.6f, %.6f, %.6f)", bsdfIts.p.x, bsdfIts.p.y, bsdfIts.p.z);
+// 				Log(EInfo, "shape = %s", bsdfIts.shape->toString().c_str());
 				/* Intersected something - check if it was an emitter */
 				if (!bsdfIts.isEmitter())
 					continue;
@@ -282,6 +291,8 @@ public:
 				value = bsdfIts.Le(-bsdfRay.d);
 				dRec.setQuery(bsdfRay, bsdfIts);
 			} else {
+// 				Log(EInfo, "not intersect!");
+
 				/* Intersected nothing -- perhaps there is an environment map? */
 				const Emitter *env = scene->getEnvironmentEmitter();
 
@@ -292,6 +303,9 @@ public:
 				if (!env->fillDirectSamplingRecord(dRec, bsdfRay))
 					continue;
 			}
+
+// 			Log(EInfo, "Le = (%.6f, %.6f, %.6f)", value[0], value[1], value[2]);
+// 			Log(EInfo, "bsdf = (%.6f, %.6f, %.6f)", bsdfVal[0], bsdfVal[1], bsdfVal[2]);
 
 			/* Compute the prob. of generating that direction using the
 			   implemented direct illumination sampling technique */

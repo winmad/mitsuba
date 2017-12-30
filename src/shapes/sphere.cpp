@@ -413,8 +413,14 @@ public:
 		Triangle *triangles = mesh->getTriangles();
 		uint32_t vertexIdx = 0;
 		for (uint32_t theta=0; theta<thetaSteps; ++theta) {
-			Float sinTheta = std::sin(theta * dTheta);
-			Float cosTheta = std::cos(theta * dTheta);
+			// modified by Lifan
+			Float thetaNow = theta * dTheta;
+			if (thetaNow < Epsilon)
+				thetaNow += 1e-3;
+			else if (thetaNow > M_PI - Epsilon)
+				thetaNow -= 1e-3;
+			Float sinTheta = std::sin(thetaNow);
+			Float cosTheta = std::cos(thetaNow);
 
 			for (uint32_t phi=0; phi<phiSteps; ++phi) {
 				Vector v(
@@ -422,7 +428,7 @@ public:
 					sinTheta * sinPhi[phi],
 					cosTheta
 				);
-				texcoords[vertexIdx] = Point2(phi * dPhi * INV_TWOPI, theta * dTheta * INV_PI);
+				texcoords[vertexIdx] = Point2(phi * dPhi * INV_TWOPI, thetaNow * INV_PI);
 				vertices[vertexIdx] = m_objectToWorld(Point(v*m_radius));
 				normals[vertexIdx++] = m_objectToWorld(Normal(v));
 			}

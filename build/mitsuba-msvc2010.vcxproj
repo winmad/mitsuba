@@ -93,7 +93,7 @@
     <NMakeReBuildCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config.py -c &amp;&amp; scons --parallelize --cfg=build\config.py</NMakeReBuildCommandLine>
     <NMakeCleanCommandLine Condition="'$(Configuration)|$(Platform)'=='Release|x64'">cd .. &amp;&amp; scons --parallelize --cfg=build\config.py -c</NMakeCleanCommandLine>
     <NMakeOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\dist\mtsgui.exe</NMakeOutput>
-    <NMakePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">WIN32;NDEBUG;DOUBLE_PRECISION;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
+    <NMakePreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">WIN32;NDEBUG;DOUBLE_PRECISION;MTS_DEBUG;$(NMakePreprocessorDefinitions)</NMakePreprocessorDefinitions>
     <NMakeIncludeSearchPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">..\include;$(NMakeIncludeSearchPath)</NMakeIncludeSearchPath>
     <NMakeForcedIncludes Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(NMakeForcedIncludes)</NMakeForcedIncludes>
     <NMakeAssemblySearchPath Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(NMakeAssemblySearchPath)</NMakeAssemblySearchPath>
@@ -581,6 +581,8 @@
     <ClInclude Include="..\src\volume\tetra2.h" />
   </ItemGroup>
   <ItemGroup Label="Source Files">
+    <ClCompile Include="..\src\bsdfs\aniso_roughdiffuse.cpp" />
+    <ClCompile Include="..\src\bsdfs\aniso_roughdiffuse_simple.cpp" />
     <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
     <ClCompile Include="..\src\converter\mtsimport.cpp">
@@ -897,6 +899,7 @@
     <ClCompile Include="..\src\libcore\sched.cpp">
     </ClCompile>
     <ClCompile Include="..\src\shapes\heightfield.cpp" />
+    <ClCompile Include="..\src\shapes\shellmap_heightfield.cpp" />
     <ClCompile Include="..\src\shapes\tiled_heightfield.cpp" />
     <ClCompile Include="..\src\tests\test_spectrum.cpp">
     </ClCompile>
@@ -975,6 +978,7 @@
     <ClCompile Include="..\src\utils\calcPatchDirVis_simple.cpp" />
     <ClCompile Include="..\src\utils\calcPatchNDF.cpp" />
     <ClCompile Include="..\src\utils\calcPatchVisibility.cpp" />
+    <ClCompile Include="..\src\utils\checkMesoNormals.cpp" />
     <ClCompile Include="..\src\utils\clampVolume.cpp" />
     <ClCompile Include="..\src\utils\cmp.cpp" />
     <ClCompile Include="..\src\utils\createGridVolume.cpp" />
@@ -983,11 +987,17 @@
     <ClCompile Include="..\src\utils\downSampleVolume.cpp" />
     <ClCompile Include="..\src\utils\fillEmptyVoxels.cpp" />
     <ClCompile Include="..\src\utils\heightfield2Trimesh.cpp" />
+    <ClCompile Include="..\src\utils\LEADR_plane.cpp" />
     <ClCompile Include="..\src\utils\microfacet.cpp" />
     <ClCompile Include="..\src\utils\microflake2SGGX.cpp" />
     <ClCompile Include="..\src\utils\orientation2Albedo.cpp" />
+    <ClCompile Include="..\src\utils\samplePatchVis.cpp" />
+    <ClCompile Include="..\src\utils\samplePatchVis_fixWo.cpp" />
+    <ClCompile Include="..\src\utils\sphere2Trimesh.cpp" />
     <ClCompile Include="..\src\utils\splitGridVolume.cpp" />
+    <ClCompile Include="..\src\utils\testTextureBitmap.cpp" />
     <ClCompile Include="..\src\utils\upSampleVolume.cpp" />
+    <ClCompile Include="..\src\utils\validateEvalBSDF.cpp" />
     <ClCompile Include="..\src\volume\gridvol2_simple.cpp" />
     <ClCompile Include="..\src\volume\gridvol_simple.cpp" />
     <ClCompile Include="..\src\volume\instancedvol.cpp" />
