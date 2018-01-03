@@ -20,15 +20,18 @@ public:
 		m_scene = loadScene(argv[1]);		
 		m_wi = Vector(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]));
 		m_sqrtNumParticles = std::atoi(argv[5]);
-		m_size = std::atoi(argv[6]);
-		m_maxDepth = std::atoi(argv[7]);
+		m_size = std::atoi(argv[6]);	
 		
-		m_xmin = std::atof(argv[8]);
-		m_xmax = std::atof(argv[9]);
-		m_ymin = std::atof(argv[10]);
-		m_ymax = std::atof(argv[11]);
+		m_xmin = std::atof(argv[7]);
+		m_xmax = std::atof(argv[8]);
+		m_ymin = std::atof(argv[9]);
+		m_ymax = std::atof(argv[10]);
 
-		m_shadowOption = std::atoi(argv[12]);
+		// Example: minDepth = 2, it will create 3 lobes:
+		// 1st-order, 2nd-order, and (3 to maxDepth)-th order
+		m_minDepth = std::atoi(argv[11]);
+		m_maxDepth = std::atoi(argv[12]);
+		m_shadowOption = std::atoi(argv[13]);
 		
 		// init
 		m_scene->initialize();
@@ -57,7 +60,8 @@ public:
 			samplers[i]->decRef();
 
 		ref<BSDFSimulatorProcess> proc = new BSDFSimulatorProcess(m_wi,
-			m_sqrtNumParticles, m_size, m_maxDepth, AABB2(Point2(m_xmin, m_ymin), Point2(m_xmax, m_ymax)), m_shadowOption);
+			m_sqrtNumParticles, m_size, AABB2(Point2(m_xmin, m_ymin), Point2(m_xmax, m_ymax)), 
+			m_minDepth, m_maxDepth, m_shadowOption);
 		proc->bindResource("scene", sceneResID);
 		proc->bindResource("sampler", samplerResID);
 		m_scene->bindUsedResources(proc);
@@ -65,22 +69,37 @@ public:
 		sched->schedule(proc);
 		sched->wait(proc);
 
-		std::cout << std::endl;
-		std::cout << "Finish rendering." << std::endl;
+		Log(EInfo, "Finish rendering.");
+
+		char txtFilename[256];
+		memcpy(txtFilename, argv[14], sizeof(char) * strlen(argv[14]));
+		strcat(txtFilename, ".txt");
+		FILE *fp = fopen(txtFilename, "w");
+
+		double totValidParticles = 0.0;
+		for (int i = 0; i <= m_minDepth; i++)
+			totValidParticles += (double)proc->m_res->getLobe(i)->m_totValidParticles;
+
+		for (int i = 0; i <= m_minDepth; i++) {
+			char filename[256];
+			sprintf(filename, "%s_order_%d.exr", argv[14], i + 1);
+			proc->m_res->getLobe(i)->saveExr(fs::path(filename));
+
+			proc->m_res->getLobe(i)->m_totValue /= totValidParticles;
+			Vector3d &totalThroughput = proc->m_res->getLobe(i)->m_totValue;
+			Log(EInfo, "Total valid particles = %d / (%.0f, %d)", proc->m_res->getLobe(i)->m_totValidParticles, 
+				totValidParticles, m_numParticles);
+			Log(EInfo, "Total thr = (%.6f, %.6f, %.6f)", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
+			
+			fprintf(fp, "%.6f %.6f %.6f\n", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
+		}		
+		fclose(fp);
 		
-		fs::path filename(argv[1]);
-		proc->m_res->saveExr(filename);
-
-		proc->m_res->m_totValue /= (double)proc->m_res->m_totValidParticles;
-		Vector3d &totalThroughput = proc->m_res->m_totValue;
-		Log(EInfo, "Total valid particles = %d / %d", proc->m_res->m_totValidParticles, m_numParticles);
-		Log(EInfo, "Total thr = (%.6f, %.6f, %.6f)", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
-
-		validate();
-
+		//validate();
 		return 0;
 	}
 
+	// not sync with the multi-thread version
 	void runSingleThread(char **argv) {
 		std::vector<std::vector<Vector3d> > bsdfValues(m_size, std::vector<Vector3d>(m_size));
 		for (int i = 0; i < m_size; i++)
@@ -196,8 +215,11 @@ public:
 				if (rRec.medium)
 					throughput *= mRec.transmittance / mRec.pdfFailure;
 
-				if (!its.isValid())
+				if (!its.isValid()) {
+					if (rRec.depth < m_minDepth)
+						throughput = Spectrum(0.0f);
 					return throughput;
+				}
 
 				//Log(EInfo, "=== depth %d ===", rRec.depth);
 				//Log(EInfo, "(%.6f, %.6f, %.6f)", its.p.x, its.p.y, its.p.z);
@@ -316,6 +338,7 @@ public:
 	Vector m_wi;
 	int m_numParticles, m_sqrtNumParticles;
 	int m_size;
+	int m_minDepth;
 	int m_maxDepth;
 	double m_xmin, m_xmax, m_ymin, m_ymax;
 	int m_shadowOption;

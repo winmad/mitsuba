@@ -34,10 +34,30 @@ public:
 	ref<Bitmap> m_values;
 };
 
+class MultiLobeDistribution : public WorkResult {
+public:
+	MultiLobeDistribution(int numLobes, int size);
+	SphericalDistribution *getLobe(int lobeIdx);
+	const SphericalDistribution *getLobe(int lobeIdx) const;
+	void clear();
+	void put(const MultiLobeDistribution *dist);
+
+	void load(Stream *stream);
+	void save(Stream *stream) const;
+	std::string toString() const;
+
+	MTS_DECLARE_CLASS()
+protected:
+	virtual ~MultiLobeDistribution() {}
+public:
+	int m_numLobes;
+	std::vector<ref<SphericalDistribution> > m_lobes;
+};
+
 class BSDFRayTracer : public WorkProcessor {
 public:
-	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, int maxDepth, 
-		const AABB2 &aabb, int shadowOption);
+	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb,
+		int minDepth, int maxDepth, int shadowOption);
 	Point sampleRayOrigin(int idx, bool &success);
 	Spectrum sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts);
 
@@ -59,6 +79,7 @@ public:
 	Vector m_wi;
 	int m_sqrtNumParticles;
 	int m_size;
+	int m_minDepth;
 	int m_maxDepth;
 	AABB2 m_aabb;
 	int m_shadowOption;
@@ -66,8 +87,8 @@ public:
 
 class BSDFSimulatorProcess : public ParallelProcess {
 public:
-	BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles, int size, int maxDepth, 
-		const AABB2 &aabb, int shadowOption);
+	BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb, 
+		int minDepth, int maxDepth, int shadowOption);
 	void setGranularity(int granularity);
 
 	EStatus generateWork(WorkUnit *unit, int worker);
@@ -88,10 +109,11 @@ public:
 	Vector m_wi;
 	int m_sqrtNumParticles;
 	int m_size;
+	int m_minDepth;
 	int m_maxDepth;
 	AABB2 m_aabb;
 	int m_shadowOption;
-	ref<SphericalDistribution> m_res;
+	ref<MultiLobeDistribution> m_res;
 };
 
 MTS_NAMESPACE_END

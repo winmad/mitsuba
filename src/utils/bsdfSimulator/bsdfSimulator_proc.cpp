@@ -83,10 +83,60 @@ std::string SphericalDistribution::toString() const {
 	return oss.str();
 }
 
+MultiLobeDistribution::MultiLobeDistribution(int numLobes, int size) : m_numLobes(numLobes) {
+	m_lobes.resize(numLobes);
+	for (int i = 0; i < numLobes; i++) {
+		m_lobes[i] = new SphericalDistribution(size);
+	}
+}
+
+SphericalDistribution* MultiLobeDistribution::getLobe(int lobeIdx) {
+	return m_lobes[lobeIdx].get();
+}
+
+const SphericalDistribution* MultiLobeDistribution::getLobe(int lobeIdx) const {
+	return m_lobes[lobeIdx].get();
+}
+
+void MultiLobeDistribution::clear() {
+	for (int i = 0; i < m_numLobes; i++) {
+		m_lobes[i]->clear();
+	}
+}
+
+void MultiLobeDistribution::put(const MultiLobeDistribution *dist) {
+	for (int i = 0; i < m_numLobes; i++) {
+		m_lobes[i]->put(dist->getLobe(i));
+	}
+}
+
+void MultiLobeDistribution::load(Stream *stream) {
+	m_numLobes = stream->readInt();
+	m_lobes.resize(m_numLobes);
+	for (int i = 0; i < m_numLobes; i++) {
+		m_lobes[i]->load(stream);
+	}
+}
+
+void MultiLobeDistribution::save(Stream *stream) const {
+	stream->writeInt(m_numLobes);
+	for (int i = 0; i < m_numLobes; i++) {
+		m_lobes[i]->save(stream);
+	}
+}
+
+std::string MultiLobeDistribution::toString() const {
+	std::ostringstream oss;
+	oss << "MultiLobeDistribution[" << endl
+		<< "  numLobes = " << m_numLobes << endl
+		<< "]";
+	return oss.str();
+}
+
 // WorkProcessor
 BSDFRayTracer::BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, 
-		int maxDepth, const AABB2 &aabb, int shadowOption)
-	: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), m_maxDepth(maxDepth), 
+		const AABB2 &aabb, int minDepth, int maxDepth, int shadowOption)
+	: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), m_minDepth(minDepth), m_maxDepth(maxDepth), 
 	m_aabb(aabb), m_shadowOption(shadowOption) { }
 
 ref<WorkUnit> BSDFRayTracer::createWorkUnit() const {
@@ -94,11 +144,11 @@ ref<WorkUnit> BSDFRayTracer::createWorkUnit() const {
 }
 
 ref<WorkResult> BSDFRayTracer::createWorkResult() const {
-	return new SphericalDistribution(m_size);
+	return new MultiLobeDistribution(m_minDepth + 1, m_size);
 }
 
 ref<WorkProcessor> BSDFRayTracer::clone() const {
-	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_maxDepth, m_aabb, m_shadowOption);
+	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_aabb, m_minDepth, m_maxDepth, m_shadowOption);
 }
 
 void BSDFRayTracer::prepare() {
@@ -108,7 +158,7 @@ void BSDFRayTracer::prepare() {
 
 void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, const bool &stop) {
 	const RangeWorkUnit *range = static_cast<const RangeWorkUnit *>(workUnit);
-	SphericalDistribution *res = static_cast<SphericalDistribution *>(workResult);
+	MultiLobeDistribution *res = static_cast<MultiLobeDistribution *>(workResult);
 
 	double normFactor = (double)m_size * m_size / ((double)m_sqrtNumParticles * (double)m_sqrtNumParticles) * 0.25;
 	//m_sampler->generate(Point2i(0));
@@ -145,7 +195,10 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			}
 		}
 
-		res->put(ray.d, throughput, normFactor);
+		if (rRec.depth <= m_minDepth)
+			res->getLobe(rRec.depth - 1)->put(ray.d, throughput, normFactor);
+		else
+			res->getLobe(m_minDepth)->put(ray.d, throughput, normFactor);
 	}
 }
 
@@ -172,6 +225,12 @@ Point BSDFRayTracer::sampleRayOrigin(int idx, bool &success) {
 	o += m_wi * 1e3;
 	Ray ray(o, -m_wi, 0);
 	success = m_scene->rayIntersect(ray);
+	
+	//Intersection its;
+	//success = m_scene->rayIntersect(ray, its);
+	//Log(EInfo, "%d", m_aabb.contains(Point2(x, y)));
+	//Log(EInfo, "(%.6f, %.6f), (%.6f, %.6f, %.6f)", x, y,
+	//	its.p.x, its.p.y, its.p.z);
 
 	return o;
 }
@@ -206,7 +265,10 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			if (rRec.medium)
 				throughput *= mRec.transmittance / mRec.pdfFailure;
 
-			if (!its.isValid()) {
+			if (!its.isValid() || !m_aabb.contains(Point2(its.p.x, its.p.y))) {
+			//if (!its.isValid()) {
+				//Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
+				//	m_aabb.contains(Point2(its.p.x, its.p.y)));
 				return throughput;
 			}
 
@@ -255,15 +317,15 @@ void BSDFRayTracer::serialize(Stream *stream, InstanceManager *manager) const {
 
 // ParallelProcess
 BSDFSimulatorProcess::BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles,
-		int size, int maxDepth, const AABB2 &aabb, int shadowOption)
-		: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), 
+		int size, const AABB2 &aabb, int minDepth, int maxDepth, int shadowOption)
+		: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), m_minDepth(minDepth),
 		m_maxDepth(maxDepth), m_aabb(aabb), m_shadowOption(shadowOption) {
 	m_numParticles = m_sqrtNumParticles * m_sqrtNumParticles;
 	m_start = 0;
 	m_granularity = std::max((size_t)1, m_numParticles 
 		/ (16 * Scheduler::getInstance()->getWorkerCount()));
 	
-	m_res = new SphericalDistribution(m_size);
+	m_res = new MultiLobeDistribution(m_minDepth + 1, m_size);
 	m_res->clear();
 
 	m_resultCount = 0;
@@ -297,7 +359,8 @@ void BSDFSimulatorProcess::processResult(const WorkResult *result, bool cancelle
 	if (cancelled)
 		return;
 
-	const SphericalDistribution *res = static_cast<const SphericalDistribution *>(result);
+	const MultiLobeDistribution *res = static_cast<const MultiLobeDistribution *>(result);
+
 	m_res->put(res);
 
 	m_progress->update(++m_resultCount);
@@ -306,10 +369,11 @@ void BSDFSimulatorProcess::processResult(const WorkResult *result, bool cancelle
 }
 
 ref<WorkProcessor> BSDFSimulatorProcess::createWorkProcessor() const {
-	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_maxDepth, m_aabb, m_shadowOption);
+	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_aabb, m_minDepth, m_maxDepth, m_shadowOption);
 }
 
 MTS_IMPLEMENT_CLASS(SphericalDistribution, false, WorkResult)
+MTS_IMPLEMENT_CLASS(MultiLobeDistribution, false, WorkResult)
 MTS_IMPLEMENT_CLASS(BSDFRayTracer, false, WorkProcessor)
 MTS_IMPLEMENT_CLASS(BSDFSimulatorProcess, false, ParallelProcess)
 MTS_NAMESPACE_END
