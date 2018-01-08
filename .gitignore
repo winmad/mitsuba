@@ -37,6 +37,7 @@ build/mitsuba-msvc2010.suo
 build/mitsuba-msvc2010.vcxproj.user
 data/windows/mitsuba_res.res
 dist
+dist_debug
 
 # Debugging history files
 \.gdb_history

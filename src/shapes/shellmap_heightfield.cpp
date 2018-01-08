@@ -146,6 +146,8 @@ public:
 				Point texNear, texFar;
 				m_shell.lookupPointGivenId(_ray(minT + Epsilon), id, &texNear);
 				m_shell.lookupPointGivenId(_ray(maxT - Epsilon), id, &texFar);
+				clampTexPoint(texNear);
+				clampTexPoint(texFar);
 
 				Point blockNear, blockFar;
 				blockNear = m_textureToData.transformAffine(texNear);
@@ -398,7 +400,7 @@ public:
 private:
     void clampTexPoint(Point &p) const {
         if (p.z < Epsilon || p.z > 1.0 - Epsilon) {
-            Log(EError, "bad z = %.8f", p.z);
+            //Log(EError, "bad z = %.8f", p.z);
             p.z = math::clamp(p.z, 0.0, 1.0);
         }
         p.x -= math::floorToInt(p.x);

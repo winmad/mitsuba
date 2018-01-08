@@ -1211,6 +1211,12 @@
     <ClCompile Include="..\src\utils\testTextureBitmap.cpp">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\utils\shProjection.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\normalMipmap.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
@@ -1919,6 +1925,9 @@
       <Filter>Source Files\volume</Filter>
     </ClInclude>
     <ClInclude Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.h">
+      <Filter>Source Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\multi_vmf.h">
       <Filter>Source Files\utils</Filter>
     </ClInclude>
   </ItemGroup>

@@ -144,7 +144,7 @@ ref<WorkUnit> BSDFRayTracer::createWorkUnit() const {
 }
 
 ref<WorkResult> BSDFRayTracer::createWorkResult() const {
-	return new MultiLobeDistribution(m_minDepth + 1, m_size);
+	return new MultiLobeDistribution(m_minDepth + 2, m_size);
 }
 
 ref<WorkProcessor> BSDFRayTracer::clone() const {
@@ -168,8 +168,10 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 	for (size_t i = range->getRangeStart(); i <= range->getRangeEnd() && !stop; i++) {
 		bool success;
 		Point o = sampleRayOrigin(i, success);
-		if (!success)
+		if (!success) {
+			//Log(EInfo, "sample origin fail...");
 			continue;
+		}
 
 		RayDifferential ray(o, -m_wi, 0);
 		RadianceQueryRecord rRec(m_scene, m_sampler);
@@ -195,10 +197,14 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			}
 		}
 
-		if (rRec.depth <= m_minDepth)
-			res->getLobe(rRec.depth - 1)->put(ray.d, throughput, normFactor);
-		else
-			res->getLobe(m_minDepth)->put(ray.d, throughput, normFactor);
+		if (rRec.depth > 0) {
+			if (rRec.depth <= m_minDepth)
+				res->getLobe(rRec.depth - 1)->put(ray.d, throughput, normFactor);
+			else
+				res->getLobe(m_minDepth)->put(ray.d, throughput, normFactor);
+
+			res->getLobe(m_minDepth + 1)->put(ray.d, throughput, normFactor);
+		}
 	}
 }
 
@@ -245,6 +251,8 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 
 	while (rRec.depth <= m_maxDepth) {
 		getIts = its;
+		if (throughput.isZero())
+			break;
 
 		if (rRec.medium && rRec.medium->sampleDistance(Ray(ray, 0, its.t), mRec, rRec.sampler)) {
 			const PhaseFunction *phase = rRec.medium->getPhaseFunction();
@@ -253,8 +261,8 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			PhaseFunctionSamplingRecord pRec(mRec, -ray.d);
 			Float phaseVal = phase->sample(pRec, rRec.sampler);
 			throughput *= phaseVal;
-			if (phaseVal == 0)
-				break;
+			//if (phaseVal == 0)
+			//	break;
 
 			// Trace a ray
 			ray = Ray(mRec.p, pRec.wo, ray.time);
@@ -267,8 +275,9 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 
 			if (!its.isValid() || !m_aabb.contains(Point2(its.p.x, its.p.y))) {
 			//if (!its.isValid()) {
-				//Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
-				//	m_aabb.contains(Point2(its.p.x, its.p.y)));
+				//if (rRec.depth == 0)
+				//	Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
+				//		m_aabb.contains(Point2(its.p.x, its.p.y)));
 				return throughput;
 			}
 
@@ -276,14 +285,14 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			BSDFSamplingRecord bRec(its, rRec.sampler);
 
 			// Mark back-faced intersection as invalid
-			if (Frame::cosTheta(bRec.wi) <= 0) {
-				return Spectrum(-1.0f);
-			}
+			//if (Frame::cosTheta(bRec.wi) <= 0) {
+			//	return Spectrum(-1.0f);
+			//}
 
 			Spectrum bsdfVal = bsdf->sample(bRec, rRec.nextSample2D());
 			throughput *= bsdfVal;
-			if (bsdfVal.isZero())
-				break;
+			//if (bsdfVal.isZero())
+			//	break;
 
 			const Vector wo = its.toWorld(bRec.wo);
 			if (its.isMediumTransition())
@@ -325,7 +334,7 @@ BSDFSimulatorProcess::BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticle
 	m_granularity = std::max((size_t)1, m_numParticles 
 		/ (16 * Scheduler::getInstance()->getWorkerCount()));
 	
-	m_res = new MultiLobeDistribution(m_minDepth + 1, m_size);
+	m_res = new MultiLobeDistribution(m_minDepth + 2, m_size);
 	m_res->clear();
 
 	m_resultCount = 0;

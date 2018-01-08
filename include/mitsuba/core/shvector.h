@@ -345,6 +345,60 @@ public:
 				operator()(l,m) *= hExt*hInt/9;
 	}
 
+	template<typename Functor> void projectLobe(const Functor &f, int res = 32) {
+		SAssert(res % 2 == 0);
+		/* Nested composite Simpson's rule */
+		Float dx = 2.0 / (Float)res,
+			dy = 2.0 / (Float)res;
+
+		for (int l = 0; l < m_bands; ++l)
+			for (int m = -l; m <= l; ++m)
+				operator()(l, m) = 0;
+
+		Float *sinPhi = (Float *)alloca(sizeof(Float)*m_bands),
+			*cosPhi = (Float *)alloca(sizeof(Float)*m_bands);
+
+		for (int i = 0; i < res; ++i) {
+			Float y = ((res - i - 1) + 0.5) / (double)res * 2.0 - 1.0;
+
+			for (int j = 0; j < res; ++j) {
+				Float x = (j + 0.5) / (double)res * 2.0 - 1.0;
+				
+				if (x * x + y * y > 0.9999)
+					continue;
+				Float z = std::sqrt(1.0 - x * x - y * y);
+				Vector w(x, y, z);
+				Float cosTheta = Frame::cosTheta(w);
+
+				Float phi;
+				if (x * x + y * y == 0)
+					phi = 0.0;
+				phi = std::atan2(y, x);
+
+				for (int m = 0; m < m_bands; ++m) {
+					sinPhi[m] = std::sin((m + 1)*phi);
+					cosPhi[m] = std::cos((m + 1)*phi);
+				}
+
+				Float value = f(i, j) / cosTheta;
+
+				for (int l = 0; l < m_bands; ++l) {
+					for (int m = 1; m <= l; ++m) {
+						Float L = legendreP(l, m, cosTheta) * normalization(l, m);
+						operator()(l, -m) += value * SQRT_TWO * sinPhi[m - 1] * L;
+						operator()(l, m) += value * SQRT_TWO * cosPhi[m - 1] * L;
+					}
+
+					operator()(l, 0) += value * legendreP(l, 0, cosTheta) * normalization(l, 0);
+				}
+			}
+		}
+
+		for (int l = 0; l < m_bands; ++l)
+			for (int m = -l; m <= l; ++m)
+				operator()(l, m) *= dx*dy;
+	}
+
 	/// Compute the relative L2 error
 	template<typename Functor> Float l2Error(const Functor &f, int res = 32) const {
 		SAssert(res % 2 == 0);

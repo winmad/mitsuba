@@ -18,6 +18,8 @@ plugins += env.SharedLibrary('checkMesoNormals', ['checkMesoNormals.cpp'])
 plugins += env.SharedLibrary('validateEvalBSDF', ['validateEvalBSDF.cpp'])
 plugins += env.SharedLibrary('testTextureBitmap', ['testTextureBitmap.cpp'])
 
+plugins += env.SharedLibrary('shProjection', ['shProjection.cpp'])
+
 plugins += env.SharedLibrary('upSampleVolume', ['upSampleVolume.cpp'])
 plugins += env.SharedLibrary('albedoRemapping', ['albedoRemapping.cpp'])
 plugins += env.SharedLibrary('albedoCluster', ['albedoCluster.cpp'])

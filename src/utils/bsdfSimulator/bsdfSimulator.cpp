@@ -27,8 +27,8 @@ public:
 		m_ymin = std::atof(argv[9]);
 		m_ymax = std::atof(argv[10]);
 
-		// Example: minDepth = 2, it will create 3 lobes:
-		// 1st-order, 2nd-order, and (3 to maxDepth)-th order
+		// Example: minDepth = 2, it will create 4 lobes:
+		// 1st-order, 2nd-order, (3 to maxDepth)-th order, and all orders
 		m_minDepth = std::atoi(argv[11]);
 		m_maxDepth = std::atoi(argv[12]);
 		m_shadowOption = std::atoi(argv[13]);
@@ -72,17 +72,20 @@ public:
 		Log(EInfo, "Finish rendering.");
 
 		char txtFilename[256];
-		memcpy(txtFilename, argv[14], sizeof(char) * strlen(argv[14]));
-		strcat(txtFilename, ".txt");
+		sprintf(txtFilename, "%s.txt", argv[14]);
 		FILE *fp = fopen(txtFilename, "w");
 
 		double totValidParticles = 0.0;
 		for (int i = 0; i <= m_minDepth; i++)
 			totValidParticles += (double)proc->m_res->getLobe(i)->m_totValidParticles;
 
-		for (int i = 0; i <= m_minDepth; i++) {
+		int numLobes = m_minDepth + 2;
+		for (int i = 0; i < numLobes; i++) {
 			char filename[256];
-			sprintf(filename, "%s_order_%d.exr", argv[14], i + 1);
+			if (i < numLobes - 1)
+				sprintf(filename, "%s_order_%d.exr", argv[14], i + 1);
+			else
+				sprintf(filename, "%s_order_all.exr", argv[14]);
 			proc->m_res->getLobe(i)->saveExr(fs::path(filename));
 
 			proc->m_res->getLobe(i)->m_totValue /= totValidParticles;
