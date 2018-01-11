@@ -37,9 +37,13 @@ public:
 
 		Properties props = Properties("independent");
 		props.setInteger("seed", 19931004);
-		m_sampler = static_cast<Sampler *> (PluginManager::getInstance()->
-			createObject(MTS_CLASS(Sampler), props));
-		m_sampler->configure();
+		m_samplers.resize(233);
+		m_samplers[0] = static_cast<Sampler *>(PluginManager::getInstance()->
+			createObject(MTS_CLASS(Sampler), Properties("independent")));
+		m_samplers[0]->configure();
+		for (int i = 1; i < 233; i++) {
+			m_samplers[i] = m_samplers[0]->clone();
+		}
 
 		// ground truth NDF
 		std::vector<std::vector<Vector> > normals(m_sqrtSpp, std::vector<Vector>(m_sqrtSpp));
@@ -84,6 +88,11 @@ public:
 				//int r = (normal.y > 0.9999f ? m_size - 1 : math::floorToInt((normal.y + 1.0) * 0.5 * m_size));
 				int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
 				int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
+
+// 				if (r == 64 && c == 64) {
+// 					Log(EInfo, "(%.6f, %.6f, %.6f), (%d, %d), %.6f", normal.x, normal.y, normal.z,
+// 						i, j, normFactor * (weights[i][j] / totWeight));
+// 				}
 
 				data[(m_size - r - 1) * m_size + c] += normFactor * (weights[i][j] / totWeight);
 			}
@@ -135,14 +144,10 @@ public:
 		return 0;
 	}
 
-	/// Helper function: creates 1D uniform random numbers
-	inline Float rand1D() const {
-		return std::min(0.9999, Float(rand()) / Float(RAND_MAX));
-	}
-
 	Normal sampleNormal(int i, int j, double &weight) {
-		double x = m_aabb.min.x + (j + rand1D()) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
-		double y = m_aabb.min.y + (i + rand1D()) / (double)m_sqrtSpp * (m_aabb.max.y - m_aabb.min.y);
+		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+		double x = m_aabb.min.x + (j + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
+		double y = m_aabb.min.y + (i + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.y - m_aabb.min.y);
 // 		Point o(x, y, 0);
 // 		return m_hmap->getNormal(o);
 
@@ -152,6 +157,11 @@ public:
 		m_scene->rayIntersect(ray, its);
 
 		Normal normal = its.shFrame.n;
+
+// 		if (normal.z >= 0.9999) {
+// 			Log(EInfo, "(%d, %d), h = %.6f", j, i, its.p.z);
+// 		}
+
 		weight = std::max(0.0, dot(normal, m_wi));
 		if (weight > 0.0) {
 			ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
@@ -178,13 +188,15 @@ public:
 		std::vector<Float> cnt(m_numLobes);
 		std::vector<Vector> centers[2];
 		
+		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+
 		// init
 		centers[0].resize(m_numLobes);
 		centers[1].resize(m_numLobes);
 		for (int i = 0; i < m_numLobes; i++) {
 			int k;
 			while (1) {
-				int u = math::floorToInt(rand1D() * m_spp);
+				int u = math::floorToInt(sampler->next1D() * m_spp);
 				int r = u / m_sqrtSpp;
 				int c = u % m_sqrtSpp;
 				if (weights[r][c] < Epsilon)
@@ -212,6 +224,8 @@ public:
 					Float minDist = 1e8;
 					int k = -1;
 					for (int l = 0; l < m_numLobes; l++) {
+						if (centers[now][l].length() < 1e-8)
+							continue;
 						double d = 1.0 - dot(normals[i][j], normalize(centers[now][l]));
 						if (d < minDist) {
 							minDist = d;
@@ -228,12 +242,21 @@ public:
 
 			now = 1 - now;
 			for (int l = 0; l < m_numLobes; l++) {
-				centers[now][l] /= cnt[l];
+				if (cnt[l] > 1e-8)
+					centers[now][l] /= cnt[l];
 			}
 
 			// converged?
 			bool converged = true;
 			for (int l = 0; l < m_numLobes; l++) {
+				if (centers[now][l].length() < 1e-8 || centers[1 - now][l].length() < 1e-8) {
+					if (std::abs(centers[now][l].length() - centers[1 - now][l].length()) > 1e-8) {
+						converged = false;
+						break;
+					}
+					continue;
+				}
+
 				if (dot(normalize(centers[now][l]), normalize(centers[1 - now][l])) < 0.9999) {
 					converged = false;
 					break;
@@ -255,8 +278,12 @@ public:
 			totWeights += cnt[l];
 		for (int l = 0; l < m_numLobes; l++) {
 			m_vmfs.m_alpha[l] = cnt[l] / totWeights;
+			if (m_vmfs.m_alpha[l] < 1e-8)
+				continue;
+
 			m_vmfs.m_mu[l] = normalize(centers[now][l]);
 			Float kappa = VonMisesFisherDistr::forMeanLength(centers[now][l].length());
+			kappa = std::min(kappa, 1e4);
 			m_vmfs.m_dist[l] = VonMisesFisherDistr(kappa);
 		}
 
@@ -280,13 +307,17 @@ public:
 
 				Float sumProb = 0.0;
 				for (int l = 0; l < m_numLobes; l++) {
+					if (m_vmfs.m_mu[l].length() < 1e-8)
+						continue;
 					Float cosTheta = dot(m_vmfs.m_mu[l], normals[i][j]);
 					prob[idx][l] = m_vmfs.m_dist[l].eval(cosTheta);
 					sumProb += prob[idx][l];
 				}
 
-				for (int l = 0; l < m_numLobes; l++)
-					prob[idx][l] /= sumProb;
+				if (sumProb > 1e-8) {
+					for (int l = 0; l < m_numLobes; l++)
+						prob[idx][l] /= sumProb;
+				}
 			}
 		}
 
@@ -311,13 +342,25 @@ public:
 				}
 			}
 
+			if (alpha < 1e-8) {
+				m_vmfs.m_mu[l] = Vector(0.0);
+				m_vmfs.m_dist[l] = VonMisesFisherDistr(0.0);
+				continue;
+			}
+
 			r /= alpha;
 			//r /= totProb;
 			//Log(EInfo, "lobe %d: (%.8f, %.8f, %.8f)", l, r.x, r.y, r.z);
 			alpha /= totW;
 		
-			Float kappa = VonMisesFisherDistr::forMeanLength(r.length());
-			kappa = std::min(kappa, 1e4);
+			Float kappa;
+			if (std::abs(r.length() - 1.0) < 1e-8) {
+				kappa = 1e4;
+			}
+			else {
+				kappa = VonMisesFisherDistr::forMeanLength(r.length());
+				kappa = std::min(kappa, 1e4);
+			}
 			m_vmfs.m_alpha[l] = alpha;
 			m_vmfs.m_mu[l] = normalize(r);
 			m_vmfs.m_dist[l] = VonMisesFisherDistr(kappa);
@@ -328,7 +371,7 @@ public:
 	int m_maskingOption;
 	ref<Scene> m_scene;
 	Shape *m_hmap;
-	ref<Sampler> m_sampler;
+	ref_vector<Sampler> m_samplers;
 	int m_sqrtSpp, m_spp;
 	int m_size;
 	AABB2 m_aabb;

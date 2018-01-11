@@ -21,6 +21,8 @@ struct MultiLobeVMF {
 	Float eval(const Vector &w) const {
 		Float res = 0.0;
 		for (int i = 0; i < m_numLobes; i++) {
+			if (m_alpha[i] < 1e-8)
+				continue;
 			Float cosTheta = dot(w, m_mu[i]);
 			res += m_dist[i].eval(cosTheta) * m_alpha[i];
 		}

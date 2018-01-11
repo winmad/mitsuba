@@ -31,8 +31,8 @@ void SphericalDistribution::put(const SphericalDistribution *dist) {
 }
 
 void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double normFactor) {
-	int c = (dir.x > 0.9999f ? m_size - 1 : floor((dir.x + 1.0) * 0.5 * m_size));
-	int r = (dir.y > 0.9999f ? m_size - 1 : floor((dir.y + 1.0) * 0.5 * m_size));
+	int c = math::clamp(math::floorToInt((dir.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
+	int r = math::clamp(math::floorToInt((dir.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
 
 	double *data = m_values->getFloat64Data();
 	int idx = (m_size - r - 1) * m_size + c;
@@ -152,8 +152,10 @@ ref<WorkProcessor> BSDFRayTracer::clone() const {
 }
 
 void BSDFRayTracer::prepare() {
-	m_scene = static_cast<Scene *>(getResource("scene"));
+	Scene *scene = static_cast<Scene *>(getResource("scene"));
+	m_scene = new Scene(scene);
 	m_sampler = static_cast<Sampler *>(getResource("sampler"));
+	m_scene->setSampler(m_sampler);
 }
 
 void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, const bool &stop) {
@@ -165,7 +167,10 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 
 	res->clear();
 	
+	Log(EInfo, "process start %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
 	for (size_t i = range->getRangeStart(); i <= range->getRangeEnd() && !stop; i++) {
+		Log(EInfo, "working on particle %d", i);
+
 		bool success;
 		Point o = sampleRayOrigin(i, success);
 		if (!success) {
@@ -173,12 +178,16 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			continue;
 		}
 
+		Log(EInfo, "finish sampling origin");
+
 		RayDifferential ray(o, -m_wi, 0);
 		RadianceQueryRecord rRec(m_scene, m_sampler);
 		rRec.type = RadianceQueryRecord::ERadiance;
 
 		Intersection its;
 		Spectrum throughput = sampleReflectance(ray, rRec, its);
+
+		Log(EInfo, "finish sampling reflectance");
 
 		if (throughput[0] < -Epsilon)
 			continue;
@@ -206,6 +215,7 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			res->getLobe(m_minDepth + 1)->put(ray.d, throughput, normFactor);
 		}
 	}
+	Log(EInfo, "process done %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
 }
 
 Point BSDFRayTracer::sampleRayOrigin(int idx, bool &success) {
@@ -289,7 +299,9 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			//	return Spectrum(-1.0f);
 			//}
 
+			Log(EInfo, "before bsdf sample");
 			Spectrum bsdfVal = bsdf->sample(bRec, rRec.nextSample2D());
+			Log(EInfo, "after bsdf sample");
 			throughput *= bsdfVal;
 			//if (bsdfVal.isZero())
 			//	break;
@@ -298,7 +310,11 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			if (its.isMediumTransition())
 				rRec.medium = its.getTargetMedium(wo);
 			ray = Ray(its.p, wo, ray.time);
+
+			Log(EInfo, "before ray intersect");
+			Log(EInfo, "ray_d = (%.6f, %.6f, %.6f)", ray.d.x, ray.d.y, ray.d.z);
 			scene->rayIntersect(ray, its);
+			Log(EInfo, "after ray intersect");
 		}
 		rRec.depth++;
 	}

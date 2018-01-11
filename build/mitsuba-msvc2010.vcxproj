@@ -585,6 +585,7 @@
     <ClCompile Include="..\src\bsdfs\aniso_roughdiffuse.cpp" />
     <ClCompile Include="..\src\bsdfs\aniso_roughdiffuse_simple.cpp" />
     <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
+    <ClCompile Include="..\src\bsdfs\multilobe_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
     <ClCompile Include="..\src\converter\mtsimport.cpp">
     </ClCompile>
@@ -1001,6 +1002,7 @@
     <ClCompile Include="..\src\utils\testTextureBitmap.cpp" />
     <ClCompile Include="..\src\utils\upSampleVolume.cpp" />
     <ClCompile Include="..\src\utils\validateEvalBSDF.cpp" />
+    <ClCompile Include="..\src\utils\validateSampleBSDF.cpp" />
     <ClCompile Include="..\src\volume\gridvol2_simple.cpp" />
     <ClCompile Include="..\src\volume\gridvol_simple.cpp" />
     <ClCompile Include="..\src\volume\instancedvol.cpp" />

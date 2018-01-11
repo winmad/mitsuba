@@ -70,6 +70,8 @@ public:
 		BSDF::configure();
 	}
 
+	// These rand() are not thread-safe!
+
 	/// Helper function: creates 1D uniform random numbers
 	inline Float rand1D() const {
 		return std::min(0.9999, Float(rand()) / Float(RAND_MAX));
@@ -194,7 +196,6 @@ public:
 			return Spectrum(0.0f);
 
 		bRec.wo = warp::squareToUniformHemisphere(sample);
-		bRec.eta = 1.0f;
 		bRec.sampledComponent = 0;
 		bRec.sampledType = EDiffuseReflection;
 

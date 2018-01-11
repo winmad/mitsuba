@@ -66,6 +66,8 @@ public:
 		proc->bindResource("sampler", samplerResID);
 		m_scene->bindUsedResources(proc);
 
+		Log(EInfo, "Start rendering.");
+
 		sched->schedule(proc);
 		sched->wait(proc);
 
