@@ -126,7 +126,11 @@ public:
 
 		if (totalWeight <= 0)
 			Log(EError, "The weights must sum to a value greater than zero!");
+		
+		m_totWeight = totalWeight;
 
+		// disable energy conservation
+		m_ensureEnergyConservation = false;
 		if (m_ensureEnergyConservation && totalWeight > 1) {
 			std::ostringstream oss;
 			Float scale = 1.0f / totalWeight;
@@ -316,6 +320,7 @@ public:
 	MTS_DECLARE_CLASS()
 private:
 	std::vector<Float> m_weights;
+	Float m_totWeight;
 	std::vector<std::pair<int, int> > m_indices;
 	std::vector<int> m_offsets;
 	std::vector<BSDF *> m_bsdfs;

@@ -106,8 +106,13 @@ public:
 		Point2 uv = transformUV(bRec.its.uv);
 		
 		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+		
 		Vector wiWorld = bRec.its.toWorld(bRec.wi);
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
+
+		// hack to avoid normal inconsistency
+		//Vector wiWorld = bRec.wi;
+		//Vector woWorld = bRec.wo;
 
 		//std::ostringstream oss;
 
@@ -127,24 +132,29 @@ public:
 			VonMisesFisherDistr vmf(kappa);
 			Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
 
-// 			oss << "===================" << std::endl
-// 				<< "lobe " << i << std::endl
-// 				<< "alpha = " << alpha << ", "
-// 				<< "kappa = " << kappa << std::endl
-// 				<< "mu = (" << mu.x << ", " << mu.y << ", " << mu.z << ")" << std::endl;
-
 			Frame lobeFrame(mu);
 			Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
 			Frame nFrame(norm);
 			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiWorld), nFrame.toLocal(woWorld));
 
 			Spectrum spec = m_bsdf->eval(bsdfRec);
-// 			oss << "wi_world = (" << wiWorld.x << ", " << wiWorld.y << ", " << wiWorld.z << ")" << std::endl
+
+// 			if (mu.length() < 1e-8 || wiWorld.length() < 1e-8 || woWorld.length() < 1e-8 ||
+// 				norm.length() < 1e-8 || bsdfRec.wi.length() < 1e-8 || bsdfRec.wo.length() < 1e-8)
+// 			oss << "===================" << std::endl
+// 				<< "uv = " << uv.x << ", " << uv.y << std::endl
+// 				<< "lobe " << i << std::endl
+// 				<< "alpha = " << alpha << ", "
+// 				<< "kappa = " << kappa << std::endl
+// 				<< "mu = (" << mu.x << ", " << mu.y << ", " << mu.z << ")" << std::endl
+// 				<< "len(mu) = " << mu.length() << std::endl
+// 				<< "wi_world = (" << wiWorld.x << ", " << wiWorld.y << ", " << wiWorld.z << ")" << std::endl
 // 				<< "wo_world = (" << woWorld.x << ", " << woWorld.y << ", " << woWorld.z << ")" << std::endl
 // 				<< "normal = (" << norm.x << ", " << norm.y << ", " << norm.z << ")" << std::endl
 // 				<< "wi_local = (" << bsdfRec.wi.x << ", " << bsdfRec.wi.y << ", " << bsdfRec.wi.z << ")" << std::endl
 // 				<< "wo_local = (" << bsdfRec.wo.x << ", " << bsdfRec.wo.y << ", " << bsdfRec.wo.z << ")" << std::endl
 // 				<< "value = (" << spec[0] << ", " << spec[1] << ", " << spec[2] << ")" << std::endl;
+
 			res += alpha * spec;
 		}
 
@@ -166,6 +176,7 @@ public:
 	Spectrum sample(BSDFSamplingRecord &bRec, Float &pdf, const Point2 &sample) const {
 		if (!(bRec.typeMask & EGlossyReflection) || Frame::cosTheta(bRec.wi) <= 0)
 			return Spectrum(0.0f);
+		
 		/*
 		bRec.wo = warp::squareToCosineHemisphere(sample);
 		bRec.sampledComponent = 0;
@@ -173,34 +184,42 @@ public:
 		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
 		return eval(bRec, ESolidAngle) / pdf;
 		*/
-		
+			
 		Spectrum res(0.0f);
 
 		Intersection its(bRec.its);
 		its.hasUVPartials = false;
 		Point2 uv = transformUV(bRec.its.uv);
 
-		std::vector<Float> cdf(m_numLobes);
+		std::vector<Float> cdf(0);
+		std::vector<int> lobeIndices(0);
 		for (int i = 0; i < m_numLobes; i++) {
 			its.uv.x = uv.x;
 			its.uv.y = uv.y * 0.5;
 			Spectrum param0 = m_lobes[i]->eval(its, false);
-			
-			if (i == 0)
-				cdf[i] = param0[0];
-			else
-				cdf[i] = cdf[i - 1] + param0[0];
-		}
-		if (cdf[m_numLobes - 1] < 1e-8)
-			return res;
 
-		Float normFactor = cdf[m_numLobes - 1];
-		for (int i = 0; i < m_numLobes; i++)
+			if (param0[0] < 1e-8)
+				continue;
+			
+			lobeIndices.push_back(i);
+			if (cdf.empty())
+				cdf.push_back(param0[0]);
+			else
+				cdf.push_back(cdf.back() + param0[0]);
+		}
+		if (cdf.size() == 0) {
+			Log(EError, "no lobes?!");
+		}
+		Assert(cdf.size() > 0);
+
+		Float normFactor = cdf.back();
+		for (int i = 0; i < cdf.size(); i++)
 			cdf[i] /= normFactor;
 
 		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
-		int lobeIdx = (int)(std::lower_bound(cdf.begin(), cdf.end(), sampler->next1D()) - cdf.begin());
-		Assert(lobeIdx < m_numLobes && lobeIdx >= 0);
+		int tmp = (int)(std::lower_bound(cdf.begin(), cdf.end(), sampler->next1D()) - cdf.begin());
+		Assert(tmp < cdf.size() && tmp >= 0);
+		int lobeIdx = lobeIndices[tmp];
 
 		// sample a single vMF lobe
 		Float alpha = cdf[lobeIdx];
@@ -219,6 +238,10 @@ public:
 		Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
 
 		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+
+		// hack to avoid normal inconsistency
+		//Vector wiWorld = bRec.wi;
+
 		Frame lobeFrame(mu);
 		Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
 		Frame nFrame(norm);
@@ -243,9 +266,10 @@ public:
 // 		oss << "wi_world = (" << wiWorld.x << ", " << wiWorld.y << ", " << wiWorld.z << ")" << std::endl
 // 			<< "wo_world = (" << woWorld.x << ", " << woWorld.y << ", " << woWorld.z << ")" << std::endl
 // 			<< "normal = (" << norm.x << ", " << norm.y << ", " << norm.z << ")" << std::endl
-// 			<< "wi_local = (" << bsdfRec.wi.x << ", " << bsdfRec.wi.y << ", " << bsdfRec.wi.z << ")" << std::endl
-// 			<< "wo_local = (" << bsdfRec.wo.x << ", " << bsdfRec.wo.y << ", " << bsdfRec.wo.z << ")" << std::endl
-// 			<< "value = (" << res[0] << ", " << res[1] << ", " << res[2] << ")" << std::endl;
+// 			<< "wi_local_micro = (" << bsdfRec.wi.x << ", " << bsdfRec.wi.y << ", " << bsdfRec.wi.z << ")" << std::endl
+// 			<< "wo_local_micro = (" << bsdfRec.wo.x << ", " << bsdfRec.wo.y << ", " << bsdfRec.wo.z << ")" << std::endl
+// 			<< "value = (" << res[0] << ", " << res[1] << ", " << res[2] << ")" << std::endl
+// 			<< "wo_local_macro = (" << bRec.wo.x << ", " << bRec.wo.y << ", " << bRec.wo.z << ")" << std::endl;
 // 		std::cout << oss.str() << std::endl;
 		
 		// hack..

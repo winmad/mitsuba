@@ -93,6 +93,14 @@ public:
 
 				putVMF(vmfs, bitmaps, j / step, i / step, m_resolution / scale,
 					m_resolution / scale);
+
+// 				if (i / step == 0 && j / step == 0) {
+// 					sprintf(fname, "vmf_%d_%d.exr", i / step, j / step);
+// 					vmfs.outputDistribution(128, fname);
+// 					 
+// 					sprintf(fname, "ndf_%d_%d.exr", i / step, j / step);
+// 					outputOriginalNDF(m_normals, i, step, j, step, fname);
+// 				}
 			}
 		}
 
@@ -250,6 +258,7 @@ public:
 			}
 
 			if (alpha < 1e-8) {
+				vmfs.m_alpha[l] = 0.0;
 				vmfs.m_mu[l] = Vector(0.0);
 				vmfs.m_dist[l] = VonMisesFisherDistr(0.0);
 				continue;
@@ -285,6 +294,12 @@ public:
 			data[3 * idx + 0] = 0.5 * (vmfs.m_mu[l].x + 1.0);
 			data[3 * idx + 1] = 0.5 * (vmfs.m_mu[l].y + 1.0);
 			data[3 * idx + 2] = 0.5 * (vmfs.m_mu[l].z + 1.0);
+
+			if (vmfs.m_alpha[l] > 1e-8 && vmfs.m_mu[l].length() < 1e-8) {
+				Log(EInfo, "%.8f, %.8f, (%.8f, %.8f, %.8f)",
+					vmfs.m_alpha[l], vmfs.m_dist[l].getKappa(),
+					vmfs.m_mu[l].x, vmfs.m_mu[l].y, vmfs.m_mu[l].z);
+			}
 		}
 	}
 

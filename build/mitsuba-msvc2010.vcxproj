@@ -587,6 +587,7 @@
     <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
     <ClCompile Include="..\src\bsdfs\multilobe_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
+    <ClCompile Include="..\src\bsdfs\tabulated_bsdf.cpp" />
     <ClCompile Include="..\src\converter\mtsimport.cpp">
     </ClCompile>
     <ClCompile Include="..\src\converter\obj.cpp">

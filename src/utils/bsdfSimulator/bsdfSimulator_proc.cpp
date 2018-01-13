@@ -167,9 +167,9 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 
 	res->clear();
 	
-	Log(EInfo, "process start %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
+	//Log(EInfo, "process start %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
 	for (size_t i = range->getRangeStart(); i <= range->getRangeEnd() && !stop; i++) {
-		Log(EInfo, "working on particle %d", i);
+		//Log(EInfo, "working on particle %d", i);
 
 		bool success;
 		Point o = sampleRayOrigin(i, success);
@@ -178,16 +178,12 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			continue;
 		}
 
-		Log(EInfo, "finish sampling origin");
-
 		RayDifferential ray(o, -m_wi, 0);
 		RadianceQueryRecord rRec(m_scene, m_sampler);
 		rRec.type = RadianceQueryRecord::ERadiance;
 
 		Intersection its;
 		Spectrum throughput = sampleReflectance(ray, rRec, its);
-
-		Log(EInfo, "finish sampling reflectance");
 
 		if (throughput[0] < -Epsilon)
 			continue;
@@ -215,7 +211,7 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			res->getLobe(m_minDepth + 1)->put(ray.d, throughput, normFactor);
 		}
 	}
-	Log(EInfo, "process done %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
+	//Log(EInfo, "process done %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
 }
 
 Point BSDFRayTracer::sampleRayOrigin(int idx, bool &success) {
@@ -271,8 +267,8 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			PhaseFunctionSamplingRecord pRec(mRec, -ray.d);
 			Float phaseVal = phase->sample(pRec, rRec.sampler);
 			throughput *= phaseVal;
-			//if (phaseVal == 0)
-			//	break;
+			if (phaseVal == 0)
+				break;
 
 			// Trace a ray
 			ray = Ray(mRec.p, pRec.wo, ray.time);
@@ -283,7 +279,8 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			if (rRec.medium)
 				throughput *= mRec.transmittance / mRec.pdfFailure;
 
-			if (!its.isValid() || !m_aabb.contains(Point2(its.p.x, its.p.y))) {
+			if (!its.isValid() || !m_aabb.contains(Point2(its.p.x, its.p.y)) ||
+				rRec.depth == m_maxDepth) {
 			//if (!its.isValid()) {
 				//if (rRec.depth == 0)
 				//	Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
@@ -299,22 +296,17 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			//	return Spectrum(-1.0f);
 			//}
 
-			Log(EInfo, "before bsdf sample");
 			Spectrum bsdfVal = bsdf->sample(bRec, rRec.nextSample2D());
-			Log(EInfo, "after bsdf sample");
 			throughput *= bsdfVal;
-			//if (bsdfVal.isZero())
-			//	break;
+			if (bsdfVal.isZero())
+				break;
 
 			const Vector wo = its.toWorld(bRec.wo);
 			if (its.isMediumTransition())
 				rRec.medium = its.getTargetMedium(wo);
 			ray = Ray(its.p, wo, ray.time);
 
-			Log(EInfo, "before ray intersect");
-			Log(EInfo, "ray_d = (%.6f, %.6f, %.6f)", ray.d.x, ray.d.y, ray.d.z);
 			scene->rayIntersect(ray, its);
-			Log(EInfo, "after ray intersect");
 		}
 		rRec.depth++;
 	}

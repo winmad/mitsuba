@@ -77,9 +77,10 @@ public:
 		sprintf(txtFilename, "%s.txt", argv[14]);
 		FILE *fp = fopen(txtFilename, "w");
 
-		double totValidParticles = 0.0;
-		for (int i = 0; i <= m_minDepth; i++)
-			totValidParticles += (double)proc->m_res->getLobe(i)->m_totValidParticles;
+		//double totValidParticles = 0.0;
+		//for (int i = 0; i <= m_minDepth; i++)
+		//	totValidParticles += (double)proc->m_res->getLobe(i)->m_totValidParticles;
+		double totValidParticles = m_numParticles;
 
 		int numLobes = m_minDepth + 2;
 		for (int i = 0; i < numLobes; i++) {
