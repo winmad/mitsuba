@@ -237,9 +237,11 @@ public:
 		m_components.clear();
 		m_components.push_back(EGlossyReflection | EFrontSide | extraFlags);
 
+		// disable energy conservation
+
 		/* Verify the input parameters and fix them if necessary */
-		m_specularReflectance = ensureEnergyConservation(
-			m_specularReflectance, "specularReflectance", 1.0f);
+		//m_specularReflectance = ensureEnergyConservation(
+		//	m_specularReflectance, "specularReflectance", 1.0f);
 
 		m_usesRayDifferentials =
 			m_alphaU->usesRayDifferentials() ||
