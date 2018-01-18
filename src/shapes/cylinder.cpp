@@ -227,6 +227,8 @@ public:
 		its.hasUVPartials = false;
 		its.instance = NULL;
 		its.time = ray.time;
+
+		its.baseFrame = its.geoFrame;
 	}
 
 	void samplePosition(PositionSamplingRecord &pRec, const Point2 &sample) const {

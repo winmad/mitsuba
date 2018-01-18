@@ -157,6 +157,8 @@ void Instance::fillIntersectionRecord(const Ray &_ray,
 	its.dpdv = trafo(its.dpdv);
 	its.p = trafo(its.p);
 	its.instance = this;
+
+	its.baseFrame = its.geoFrame;
 }
 
 void Instance::getNormalDerivative(const Intersection &its,

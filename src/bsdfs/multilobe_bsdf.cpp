@@ -9,8 +9,11 @@
 
 MTS_NAMESPACE_BEGIN
 
+// ************
 // to be update
 // default world frame with n=(0,0,1)
+// ************
+// UPDATE: use baseFrame
 
 class MultiLobeBSDF : public BSDF {
 public:
@@ -109,6 +112,9 @@ public:
 		
 		Vector wiWorld = bRec.its.toWorld(bRec.wi);
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
+		
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
 		// hack to avoid normal inconsistency
 		//Vector wiWorld = bRec.wi;
@@ -135,7 +141,7 @@ public:
 			Frame lobeFrame(mu);
 			Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
 			Frame nFrame(norm);
-			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiWorld), nFrame.toLocal(woWorld));
+			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
 
 			Spectrum spec = m_bsdf->eval(bsdfRec);
 
@@ -238,6 +244,7 @@ public:
 		Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
 
 		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
 
 		// hack to avoid normal inconsistency
 		//Vector wiWorld = bRec.wi;
@@ -247,15 +254,23 @@ public:
 		Frame nFrame(norm);
 		
 		its = bRec.its;
-		its.wi = nFrame.toLocal(wiWorld);
+		its.wi = nFrame.toLocal(wiMacro);
 		BSDFSamplingRecord bsdfRec(its, sampler);
 		res = m_bsdf->sample(bsdfRec, Point2(sampler->next1D(), sampler->next1D()));
 
-		Vector woWorld = nFrame.toWorld(bsdfRec.wo);
+		Vector woMacro = nFrame.toWorld(bsdfRec.wo);
+		Vector woWorld = bRec.its.baseFrame.toWorld(woMacro);
+
 		bRec.wo = bRec.its.toLocal(woWorld);
 		bRec.sampledComponent = bsdfRec.sampledComponent;
 		// diffuse or glossy
 		bRec.sampledType = bsdfRec.sampledType;
+		
+		// hardcode: base brdf has only one lobe
+		bRec.used[0] = true;
+		bRec.dAlbedo[0] = bsdfRec.dAlbedo[0];
+		bRec.dRoughness[0] = bsdfRec.dRoughness[0];
+		bRec.used[1] = false;
 
 // 		std::ostringstream oss;
 // 		oss << "===================" << std::endl
@@ -278,7 +293,7 @@ public:
 		// side check
 		if (Frame::cosTheta(bRec.wo) <= 0)
 			return Spectrum(0.0f);
-		
+
 		return res;
 	}
 
@@ -312,6 +327,14 @@ public:
 
 	Float getRoughness(const Intersection &its, int component) const {
 		return m_bsdf->getRoughness(its, component);
+	}
+
+	Spectrum getLobeAlbedo(const Intersection &its, int component) const {
+		return m_bsdf->getLobeAlbedo(its, component);
+	}
+
+	Float getLobeRoughness(const Intersection &its, int component) const {
+		return m_bsdf->getLobeRoughness(its, component);
 	}
 
 	std::string toString() const {

@@ -849,6 +849,8 @@ void HairShape::fillIntersectionRecord(const Ray &ray,
 	its.hasUVPartials = false;
 	its.instance = this;
 	its.time = ray.time;
+
+	its.baseFrame = its.geoFrame;
 }
 
 ref<TriMesh> HairShape::createTriMesh() {

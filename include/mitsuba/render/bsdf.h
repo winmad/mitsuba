@@ -190,8 +190,13 @@ public:
 	 * \brief Stores the component index that was sampled by \ref BSDF::sample()
 	 */
 	int sampledComponent;
-};
 
+	// Stores additional parameters for computing derivatives
+	// Hardcodes maximum of 2 lobe
+	bool used[2];
+	Spectrum dAlbedo[2];
+	Float dRoughness[2];
+};
 
 /**
  * \brief Abstract %BSDF base-class.
@@ -475,6 +480,10 @@ public:
 	 */
 	virtual void getFrameDerivative(const Intersection &its,
 			Frame &du, Frame &dv) const;
+
+	// For computing lobe derivatives
+	virtual Spectrum getLobeAlbedo(const Intersection &its, int component) const;
+	virtual Float getLobeRoughness(const Intersection &its, int component) const;
 
 	// =============================================================
 	//! @{ \name ConfigurableObject interface

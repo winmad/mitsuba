@@ -16,8 +16,7 @@ MTS_NAMESPACE_BEGIN
 
 class BSDFSimulator : public Utility {
 public:
-	int run(int argc, char **argv) {
-		m_scene = loadScene(argv[1]);		
+	int run(int argc, char **argv) {			
 		m_wi = Vector(std::atof(argv[2]), std::atof(argv[3]), std::atof(argv[4]));
 		m_sqrtNumParticles = std::atoi(argv[5]);
 		m_size = std::atoi(argv[6]);	
@@ -32,6 +31,23 @@ public:
 		m_minDepth = std::atoi(argv[11]);
 		m_maxDepth = std::atoi(argv[12]);
 		m_shadowOption = std::atoi(argv[13]);
+
+		ParameterMap params;
+		if (argc > 15) {
+			params["ssR"] = argv[15];
+			params["ssG"] = argv[16];
+			params["ssB"] = argv[17];
+		}
+		if (argc > 18) {
+			params["giR"] = argv[18];
+			params["giG"] = argv[19];
+			params["giB"] = argv[20];
+		}
+		if (argc > 21)
+			params["ssExp"] = argv[21];
+		if (argc > 22)
+			params["giExp"] = argv[22];
+		m_scene = loadScene(argv[1], params);
 		
 		// init
 		m_scene->initialize();
@@ -73,16 +89,17 @@ public:
 
 		Log(EInfo, "Finish rendering.");
 
-		char txtFilename[256];
-		sprintf(txtFilename, "%s.txt", argv[14]);
-		FILE *fp = fopen(txtFilename, "w");
-
 		//double totValidParticles = 0.0;
 		//for (int i = 0; i <= m_minDepth; i++)
 		//	totValidParticles += (double)proc->m_res->getLobe(i)->m_totValidParticles;
 		double totValidParticles = m_numParticles;
-
 		int numLobes = m_minDepth + 2;
+
+		char txtFilename[256];
+		FILE *fp;
+
+		sprintf(txtFilename, "%s.txt", argv[14]);
+		fp = fopen(txtFilename, "w");
 		for (int i = 0; i < numLobes; i++) {
 			char filename[256];
 			if (i < numLobes - 1)
@@ -99,6 +116,17 @@ public:
 			
 			fprintf(fp, "%.6f %.6f %.6f\n", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
 		}		
+		fclose(fp);
+
+		sprintf(txtFilename, "%s_moments.txt", argv[14]);
+		fp = fopen(txtFilename, "w");
+		for (int i = 0; i < 3; i++) {
+			Vector3d moment = proc->m_res->getLobe(numLobes - 1)->m_moments[i];
+			moment /= totValidParticles;
+			Log(EInfo, "%d-th moment = (%.6f, %.6f, %.6f)", i, moment[0], moment[1], moment[2]);
+
+			fprintf(fp, "%.6f %.6f %.6f\n", moment[0], moment[1], moment[2]);
+		}
 		fclose(fp);
 		
 		//validate();

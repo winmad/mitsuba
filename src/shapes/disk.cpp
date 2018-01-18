@@ -195,6 +195,8 @@ public:
  		its.hasUVPartials = false;
 		its.instance = NULL;
 		its.time = ray.time;
+
+		its.baseFrame = Frame(its.shFrame);
 	}
 
 	ref<TriMesh> createTriMesh() {

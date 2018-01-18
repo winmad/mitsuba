@@ -24,16 +24,31 @@ MTS_NAMESPACE_BEGIN
 inline BSDFSamplingRecord::BSDFSamplingRecord(const Intersection &its, Sampler *sampler, ETransportMode mode)
 	: its(its), sampler(sampler), wi(its.wi), mode(mode),
 	typeMask(BSDF::EAll), component(-1), sampledType(0), sampledComponent(-1) {
+	for (int i = 0; i < 2; i++) {
+		used[i] = false;
+		dAlbedo[i] = Spectrum(0.0f);
+		dRoughness[i] = 0.0f;
+	}
 }
 
 inline BSDFSamplingRecord::BSDFSamplingRecord(const Intersection &its, const Vector &wo, ETransportMode mode)
 	: its(its), sampler(NULL), wi(its.wi), wo(wo), mode(mode),
     typeMask(BSDF::EAll), component(-1), sampledType(0), sampledComponent(-1) {
+	for (int i = 0; i < 2; i++) {
+		used[i] = false;
+		dAlbedo[i] = Spectrum(0.0f);
+		dRoughness[i] = 0.0f;
+	}
 }
 
 inline BSDFSamplingRecord::BSDFSamplingRecord(const Intersection &its, const Vector &wi, const Vector &wo, ETransportMode mode)
   : its(its), sampler(NULL), wi(wi), wo(wo), mode(mode),
   typeMask(BSDF::EAll), component(-1), sampledType(0), sampledComponent(-1) {
+	for (int i = 0; i < 2; i++) {
+		used[i] = false;
+		dAlbedo[i] = Spectrum(0.0f);
+		dRoughness[i] = 0.0f;
+	}
 }
 
 void BSDFSamplingRecord::reverse() {

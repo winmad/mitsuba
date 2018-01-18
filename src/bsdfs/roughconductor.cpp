@@ -438,6 +438,14 @@ public:
 			+ m_alphaV->eval(its).average());
 	}
 
+	Spectrum getLobeAlbedo(const Intersection &its, int component) const {
+		return m_specularReflectance->eval(its);
+	}
+
+	Float getLobeRoughness(const Intersection &its, int component) const {
+		return getRoughness(its, component);
+	}
+
 	std::string toString() const {
 		std::ostringstream oss;
 		oss << "RoughConductor[" << endl

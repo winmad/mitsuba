@@ -143,6 +143,9 @@ public:
 	/// Shading frame
 	Frame shFrame;
 
+	/// Base frame, used in heightmaps
+	Frame baseFrame;
+
 	/// UV surface coordinates
 	Point2 uv;
 

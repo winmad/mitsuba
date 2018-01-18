@@ -418,6 +418,8 @@ protected:
 			its.primIndex = cache->primIndex;
 			its.instance = NULL;
 			its.time = ray.time;
+
+			its.baseFrame = its.geoFrame;
 		} else {
 			shape->fillIntersectionRecord(ray,
 				reinterpret_cast<const uint8_t*>(temp) + 2*sizeof(IndexType), its);

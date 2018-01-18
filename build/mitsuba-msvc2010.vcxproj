@@ -119,6 +119,7 @@
     <ClInclude Include="..\include\mitsuba\render\lightcutter.h" />
     <ClInclude Include="..\include\mitsuba\render\lightnode.h" />
     <ClInclude Include="..\include\mitsuba\render\lighttree.h" />
+    <ClInclude Include="..\include\mitsuba\render\spherical_distribution.h" />
     <ClInclude Include="..\include\mitsuba\render\volume2.h" />
     <ClInclude Include="..\src\converter\converter.h">
     </ClInclude>
@@ -577,6 +578,7 @@
     <ClInclude Include="..\include\mitsuba\mitsuba.h">
     </ClInclude>
     <ClInclude Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.h" />
+    <ClInclude Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.h" />
     <ClInclude Include="..\src\utils\multi_vmf.h" />
     <ClInclude Include="..\src\volume\tetra.h" />
     <ClInclude Include="..\src\volume\tetra2.h" />
@@ -651,6 +653,7 @@
     <ClCompile Include="..\src\integrators\path\volpath_simple_multi_lobe_hetero_diff.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_scale_diff.cpp" />
     <ClCompile Include="..\src\librender\lightcutter.cpp" />
+    <ClCompile Include="..\src\librender\spherical_distribution.cpp" />
     <ClCompile Include="..\src\librender\trimesh.cpp">
     </ClCompile>
     <ClCompile Include="..\src\librender\irrcache.cpp">
@@ -976,6 +979,8 @@
     <ClCompile Include="..\src\utils\beckmannSurface.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp" />
+    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative.cpp" />
+    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.cpp" />
     <ClCompile Include="..\src\utils\calcDownSampleError.cpp" />
     <ClCompile Include="..\src\utils\calcPatchDirVis.cpp" />
     <ClCompile Include="..\src\utils\calcPatchDirVis_simple.cpp" />

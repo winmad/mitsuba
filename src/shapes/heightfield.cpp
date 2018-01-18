@@ -425,6 +425,8 @@ public:
 		its.instance = NULL;
 		its.time = ray.time;
 		its.primIndex = x + y*width;
+
+		its.baseFrame = Frame(m_baseNormal);
 	}
 
 	bool rayIntersect(const Ray &ray, Float mint, Float maxt) const {
@@ -674,6 +676,9 @@ public:
 			Point2(0, 0),
 			Point2(m_levelSize0f.x, m_levelSize0f.y)
 		);
+
+		m_baseNormal = Normal(0.0, 0.0, 1.0);
+		m_baseNormal = m_objectToWorld(m_baseNormal);
 	}
 
 	ref<TriMesh> createTriMesh() {
@@ -864,6 +869,8 @@ private:
 	Vector2i *m_blockSize;
 	Vector2 *m_blockSizeF;
 	Interval **m_minmax;
+
+	Normal m_baseNormal;
 };
 
 MTS_IMPLEMENT_CLASS_S(Heightfield, false, Shape)

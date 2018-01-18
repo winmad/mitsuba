@@ -1,6 +1,6 @@
 #pragma once
-#if !defined(__BSDF_SIMULATOR_PROC_H_)
-#define __BSDF_SIMULATOR_PROC_H_
+#if !defined(__LOBE_DERIVATIVE_PROC_H_)
+#define __LOBE_DERIVATIVE_PROC_H_
 
 #include <mitsuba/core/sched.h>
 #include <mitsuba/core/statistics.h>
@@ -12,12 +12,15 @@
 
 MTS_NAMESPACE_BEGIN
 
-class BSDFRayTracer : public WorkProcessor {
+class BSDFDerivativeRayTracer : public WorkProcessor {
 public:
-	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb,
+	BSDFDerivativeRayTracer(int numVars, const Vector &wi,
+		int sqrtNumParticles, int size, const AABB2 &aabb,
 		int minDepth, int maxDepth, int shadowOption);
+	
 	Point sampleRayOrigin(int idx, bool &success);
-	Spectrum sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts);
+	void sampleDerivative(RayDifferential &ray, RadianceQueryRecord &rRec, 
+		Intersection &getIts, Float normFactor, MultiLobeDistribution *res);
 
 	ref<WorkUnit> createWorkUnit() const;
 	ref<WorkResult> createWorkResult() const;
@@ -25,13 +28,14 @@ public:
 	void prepare();
 	void process(const WorkUnit *workUnit, WorkResult *workResult, const bool &stop);
 
-	BSDFRayTracer(Stream *stream, InstanceManager *manager);
+	BSDFDerivativeRayTracer(Stream *stream, InstanceManager *manager);
 	void serialize(Stream *stream, InstanceManager *manager) const;
 
 	MTS_DECLARE_CLASS()
 protected:
-	virtual ~BSDFRayTracer() {}
+	virtual ~BSDFDerivativeRayTracer() {}
 public:
+	int m_numVars;
 	ref<Scene> m_scene;
 	ref<Sampler> m_sampler;
 	Vector m_wi;
@@ -43,9 +47,10 @@ public:
 	int m_shadowOption;
 };
 
-class BSDFSimulatorProcess : public ParallelProcess {
+class BSDFDerivativeProcess : public ParallelProcess {
 public:
-	BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb, 
+	BSDFDerivativeProcess(int numVars, const Vector &wi,
+		int sqrtNumParticles, int size, const AABB2 &aabb,
 		int minDepth, int maxDepth, int shadowOption);
 	void setGranularity(int granularity);
 
@@ -55,7 +60,7 @@ public:
 
 	MTS_DECLARE_CLASS()
 protected:
-	virtual ~BSDFSimulatorProcess();
+	virtual ~BSDFDerivativeProcess();
 public:
 	ref<Mutex> m_resultMutex;
 	ProgressReporter *m_progress;
@@ -64,6 +69,7 @@ public:
 	int m_granularity;
 	int m_resultCount;
 
+	int m_numVars;
 	Vector m_wi;
 	int m_sqrtNumParticles;
 	int m_size;
@@ -76,4 +82,4 @@ public:
 
 MTS_NAMESPACE_END
 
-#endif /* __BSDF_SIMULATOR_PROC_H_ */
+#endif

@@ -511,6 +511,8 @@ public:
 		its.other = cache->shapeIndex;
 		its.instance = this;
 		its.time = ray.time;
+
+		its.baseFrame = its.geoFrame;
 	}
 
 	void getNormalDerivative(const Intersection &its,

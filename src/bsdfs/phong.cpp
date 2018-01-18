@@ -224,6 +224,11 @@ public:
 
 			if (Frame::cosTheta(bRec.wo) <= 0)
 				return Spectrum(0.0f);
+
+			bRec.used[0] = true;
+			bRec.dAlbedo[0] = 1.0 / m_specularReflectance->eval(bRec.its);
+			bRec.dRoughness[0] = 1.0 / (exponent + 2.0) + math::fastlog(cosAlpha);
+			bRec.used[1] = false;
 		} else {
 			bRec.wo = warp::squareToCosineHemisphere(sample);
 			bRec.sampledComponent = 0;
@@ -274,6 +279,14 @@ public:
 			return std::sqrt(2 / (2+m_exponent->eval(its).average()));
 		else
 			return std::numeric_limits<Float>::infinity();
+	}
+
+	Spectrum getLobeAlbedo(const Intersection &its, int component) const {
+		return m_specularReflectance->eval(its);
+	}
+
+	Float getLobeRoughness(const Intersection &its, int component) const {
+		return m_exponent->eval(its).average();
 	}
 
 	std::string toString() const {

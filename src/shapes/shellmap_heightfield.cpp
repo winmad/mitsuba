@@ -323,6 +323,8 @@ public:
         its.hasUVPartials = false;
         its.instance = NULL;
         its.time = ray.time;
+
+		its.baseFrame = Frame(norm);
     }
 
     //void getNormalDerivative(const Intersection &its, Vector &dndu, Vector &dndv, 

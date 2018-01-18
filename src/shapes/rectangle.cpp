@@ -165,6 +165,8 @@ public:
  		its.hasUVPartials = false;
 		its.instance = NULL;
 		its.time = ray.time;
+		
+		its.baseFrame = its.geoFrame;
 	}
 
 	ref<TriMesh> createTriMesh() {

@@ -209,6 +209,11 @@ public:
 		return result;
 	}
 
+	/// Reflection in local coordinates
+	inline Vector reflect(const Vector &wi) const {
+		return Vector(-wi.x, -wi.y, wi.z);
+	}
+
 	Spectrum sample(BSDFSamplingRecord &bRec, const Point2 &_sample) const {
 		Point2 sample(_sample);
 		if (bRec.component == -1) {
@@ -229,6 +234,20 @@ public:
 					continue;
 				pdf += m_bsdfs[i]->pdf(bRec, measure) * m_pdf[i];
 				result += m_bsdfs[i]->eval(bRec, measure) * m_weights[i];
+			}
+
+			// hardcode
+			for (size_t i = 0; i < 2; ++i) {
+				bRec.used[i] = true;
+				bRec.dAlbedo[i] = m_weights[i] / getLobeAlbedo(bRec.its, m_offsets[i]);
+				if (m_bsdfs[i]->getClass()->getName() == "Phong") {
+					Float alpha = dot(bRec.wo, reflect(bRec.wi));
+					Float exponent = getLobeRoughness(bRec.its, m_offsets[i]);
+					bRec.dRoughness[i] = m_weights[i] / (exponent + 2.0) + math::fastlog(alpha);
+				}
+				else {
+					bRec.dRoughness[i] = 0.0;
+				}
 			}
 
 			bRec.sampledComponent += m_offsets[entry];
@@ -266,6 +285,20 @@ public:
 				result += m_bsdfs[i]->eval(bRec, measure) * m_weights[i];
 			}
 
+			// hardcode
+			for (size_t i = 0; i < 2; ++i) {
+				bRec.used[i] = true;
+				bRec.dAlbedo[i] = m_weights[i] / getLobeAlbedo(bRec.its, m_offsets[i]);
+				if (m_bsdfs[i]->getClass()->getName() == "Phong") {
+					Float alpha = dot(bRec.wo, reflect(bRec.wi));
+					Float exponent = getLobeRoughness(bRec.its, m_offsets[i]);
+					bRec.dRoughness[i] = m_weights[i] / (exponent + 2.0) + math::fastlog(alpha);
+				}
+				else {
+					bRec.dRoughness[i] = 0.0;
+				}
+			}
+
 			bRec.sampledComponent += m_offsets[entry];
 			return result/pdf;
 		} else {
@@ -294,6 +327,18 @@ public:
 		int bsdfIndex = m_indices[component].first;
 		component = m_indices[component].second;
 		return m_bsdfs[bsdfIndex]->getRoughness(its, component);
+	}
+
+	Spectrum getLobeAlbedo(const Intersection &its, int component) const {
+		int bsdfIndex = m_indices[component].first;
+		component = m_indices[component].second;
+		return m_bsdfs[bsdfIndex]->getLobeAlbedo(its, component);
+	}
+
+	Float getLobeRoughness(const Intersection &its, int component) const {
+		int bsdfIndex = m_indices[component].first;
+		component = m_indices[component].second;
+		return m_bsdfs[bsdfIndex]->getLobeRoughness(its, component);
 	}
 
 	std::string toString() const {

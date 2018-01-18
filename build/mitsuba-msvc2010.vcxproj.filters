@@ -1226,6 +1226,15 @@
     <ClCompile Include="..\src\bsdfs\tabulated_bsdf.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\librender\spherical_distribution.cpp">
+      <Filter>Source Files\librender</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
@@ -1938,6 +1947,12 @@
     </ClInclude>
     <ClInclude Include="..\src\utils\multi_vmf.h">
       <Filter>Source Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.h">
+      <Filter>Source Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\mitsuba\render\spherical_distribution.h">
+      <Filter>Header Files\mitsuba\render</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

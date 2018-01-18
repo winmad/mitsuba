@@ -134,7 +134,14 @@ public:
 		bRec.eta = 1.0f;
 		bRec.sampledComponent = 0;
 		bRec.sampledType = EDiffuseReflection;
-		return m_reflectance->eval(bRec.its);
+
+		Spectrum albedo = m_reflectance->eval(bRec.its);	
+		bRec.used[0] = true;
+		bRec.dAlbedo[0] = 1.0 / albedo;
+		bRec.dRoughness[0] = 0.0;
+		bRec.used[1] = false;
+
+		return albedo;
 	}
 
 	Spectrum sample(BSDFSamplingRecord &bRec, Float &pdf, const Point2 &sample) const {
@@ -146,7 +153,14 @@ public:
 		bRec.sampledComponent = 0;
 		bRec.sampledType = EDiffuseReflection;
 		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
-		return m_reflectance->eval(bRec.its);
+
+		Spectrum albedo = m_reflectance->eval(bRec.its);
+		bRec.used[0] = true;
+		bRec.dAlbedo[0] = 1.0 / albedo;
+		bRec.dRoughness[0] = 0.0;
+		bRec.used[1] = false;
+
+		return albedo;
 	}
 
 	void addChild(const std::string &name, ConfigurableObject *child) {
@@ -165,6 +179,14 @@ public:
 	}
 
 	Float getRoughness(const Intersection &its, int component) const {
+		return std::numeric_limits<Float>::infinity();
+	}
+
+	Spectrum getLobeAlbedo(const Intersection &its, int component) const {
+		return m_reflectance->eval(its);
+	}
+
+	Float getLobeRoughness(const Intersection &its, int component) const {
 		return std::numeric_limits<Float>::infinity();
 	}
 

@@ -85,6 +85,14 @@ Spectrum BSDF::getDiffuseReflectance(const Intersection &its) const {
 	return eval(bRec) * M_PI;
 }
 
+Spectrum BSDF::getLobeAlbedo(const Intersection &its, int component) const {
+	NotImplementedError("getLobeAlbedo");
+}
+
+Float BSDF::getLobeRoughness(const Intersection &its, int component) const {
+	NotImplementedError("getLobeRoughness");
+}
+
 Texture *BSDF::ensureEnergyConservation(Texture *texture,
 		const std::string &paramName, Float max) const {
 	if (!m_ensureEnergyConservation)
