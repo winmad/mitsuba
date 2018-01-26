@@ -358,7 +358,7 @@ public:
 		its.primIndex = x + y * width;
 		its.blockIndex = temp.blockX + temp.blockY * m_tileX;
 
-		its.baseFrame = Frame(m_baseNormal);
+		its.baseFrame = m_baseFrame;
 	}
 
 	bool rayIntersect(const Ray &_ray, Float mint, Float maxt, Float &t, void *temp) const {
@@ -711,8 +711,10 @@ public:
 			Point2(m_levelSize0f.x * m_tileX, m_levelSize0f.y * m_tileY)
 		);
 
-		m_baseNormal = Normal(0.0, 0.0, 1.0);
-		m_baseNormal = m_objectToWorld(m_baseNormal);
+		Vector baseX = normalize(m_objectToWorld(Vector(1.0, 0.0, 0.0)));
+		Normal baseN = normalize(m_objectToWorld(Normal(0.0, 0.0, 1.0)));
+		Vector baseY = cross(baseN, baseX);
+		m_baseFrame = Frame(baseX, baseY, baseN);
 	}
 
 	ref<TriMesh> createTriMesh() {
@@ -929,7 +931,7 @@ private:
 	Vector2 m_invTotSize;
 	AABB m_totAABB;
 	AABB2 m_basePlaneAABB;
-	Normal m_baseNormal;
+	Frame m_baseFrame;
 };
 
 MTS_IMPLEMENT_CLASS_S(TiledHeightfield, false, Shape)

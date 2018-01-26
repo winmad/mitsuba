@@ -121,6 +121,7 @@
     <ClInclude Include="..\include\mitsuba\render\lighttree.h" />
     <ClInclude Include="..\include\mitsuba\render\spherical_distribution.h" />
     <ClInclude Include="..\include\mitsuba\render\volume2.h" />
+    <ClInclude Include="..\src\bsdfs\microfacet_multi.h" />
     <ClInclude Include="..\src\converter\converter.h">
     </ClInclude>
     <ClInclude Include="..\src\bsdfs\irawan.h">
@@ -589,6 +590,8 @@
     <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
     <ClCompile Include="..\src\bsdfs\multilobe_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
+    <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp" />
+    <ClCompile Include="..\src\bsdfs\roughdiffuse_multi.cpp" />
     <ClCompile Include="..\src\bsdfs\tabulated_bsdf.cpp" />
     <ClCompile Include="..\src\converter\mtsimport.cpp">
     </ClCompile>

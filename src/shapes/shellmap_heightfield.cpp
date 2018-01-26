@@ -324,7 +324,7 @@ public:
         its.instance = NULL;
         its.time = ray.time;
 
-		its.baseFrame = Frame(norm);
+		its.baseFrame = Frame(tang.dpdu, tang.dpdv, norm);
     }
 
     //void getNormalDerivative(const Intersection &its, Vector &dndu, Vector &dndv, 

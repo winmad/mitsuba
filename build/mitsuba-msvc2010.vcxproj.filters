@@ -1235,6 +1235,12 @@
     <ClCompile Include="..\src\librender\spherical_distribution.cpp">
       <Filter>Source Files\librender</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\bsdfs\roughdiffuse_multi.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
@@ -1953,6 +1959,9 @@
     </ClInclude>
     <ClInclude Include="..\include\mitsuba\render\spherical_distribution.h">
       <Filter>Header Files\mitsuba\render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\bsdfs\microfacet_multi.h">
+      <Filter>Source Files\bsdfs</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

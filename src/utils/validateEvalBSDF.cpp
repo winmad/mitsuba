@@ -25,7 +25,8 @@ public:
 		m_sqrtSpp = std::atoi(argv[2]);
 		m_spp = m_sqrtSpp * m_sqrtSpp;
 
-		m_wi = normalize(Vector(0.3, 0.2, 1));
+		//m_wi = normalize(Vector(0.3, 0.2, 1));
+		m_wi = normalize(Vector(0, 0, 1));
 
 		Properties props;
 		props = Properties("independent");
@@ -44,6 +45,7 @@ public:
 
 		Vector2DArray bsdfValues(m_size, std::vector<Vector3d>(m_size));
 
+		/*
 		props = Properties("aniso_roughdiffuse_simple");
 		props.setSpectrum("reflectance", Spectrum(1.0f));
 		props.setFloat("alpha", 1.0);
@@ -63,6 +65,49 @@ public:
 
 		calcEvalBSDF(bsdf, m_wi, samples, bsdfValues);
 		outputBitmap(bsdfValues, "microfacet_LEADR_eval.exr");
+		*/
+
+		/*
+		props = Properties("roughdiffuse_multi");
+		props.setSpectrum("reflectance", Spectrum(0.9f));
+		props.setFloat("alphaU", 0.5);
+		props.setFloat("alphaV", 0.5);
+		props.setInteger("scatteringOrderMax", 1);
+		BSDF *bsdf = static_cast<BSDF *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(BSDF), props));
+		bsdf->configure();
+
+		calcEvalBSDF(bsdf, m_wi, samples, bsdfValues);
+		outputBitmap(bsdfValues, "microfacet_multi_diffuse.exr");
+		*/
+
+		props = Properties("diffuse");
+		props.setSpectrum("reflectance", Spectrum(0.9f));
+		BSDF *baseBSDF = static_cast<BSDF *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(BSDF), props));
+		baseBSDF->configure();
+
+		props = Properties("roughbsdf_multi");
+		props.setInteger("scatteringOrderMax", 10);
+		Spectrum moments1;
+		moments1[0] = 5.125; moments1[1] = 5.125; moments1[2] = 5.0;
+		props.setSpectrum("moments1", moments1);
+		BSDF *bsdf = static_cast<BSDF *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(BSDF), props));
+		bsdf->addChild("baseBSDF", baseBSDF);
+		bsdf->configure();
+
+		/*
+		Intersection its;
+		its.baseFrame = Frame(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1));
+		its.shFrame = its.baseFrame;
+		BSDFSamplingRecord bRec(its, m_wi, Vector(0, 0, 1));
+		Spectrum tmp = bsdf->eval(bRec);
+		Log(EInfo, "eval res = (%.6f, %.6f, %.6f)", tmp[0], tmp[1], tmp[2]);
+		*/
+
+		calcEvalBSDF(bsdf, m_wi, samples, bsdfValues);
+		outputBitmap(bsdfValues, "microfacet_multi_general.exr");
 
 		return 0;
 	}
@@ -85,6 +130,8 @@ public:
 						double dz = sqrt(1.0 - dx * dx - dy * dy);
 
 						Intersection its;
+						its.baseFrame = Frame(Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1));
+						its.shFrame = its.baseFrame;
 						BSDFSamplingRecord bRec(its, wi, Vector(dx, dy, dz));
 						Spectrum tmp = bsdf->eval(bRec);
 
