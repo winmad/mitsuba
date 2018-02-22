@@ -72,13 +72,10 @@ public:
 		props.setSpectrum("reflectance", Spectrum(0.9f));
 		props.setFloat("alphaU", 0.5);
 		props.setFloat("alphaV", 0.5);
-		props.setInteger("scatteringOrderMax", 1);
+		props.setInteger("scatteringOrderMax", 2);
 		BSDF *bsdf = static_cast<BSDF *> (PluginManager::getInstance()->
 			createObject(MTS_CLASS(BSDF), props));
 		bsdf->configure();
-
-		calcEvalBSDF(bsdf, m_wi, samples, bsdfValues);
-		outputBitmap(bsdfValues, "microfacet_multi_diffuse.exr");
 		*/
 
 		props = Properties("diffuse");

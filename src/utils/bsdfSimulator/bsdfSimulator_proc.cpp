@@ -45,9 +45,9 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 	for (size_t i = range->getRangeStart(); i <= range->getRangeEnd() && !stop; i++) {
 		//Log(EInfo, "working on particle %d", i);
 
-		bool success;
-		Point o = sampleRayOrigin(i, success);
-		if (!success) {
+		double weight;
+		Point o = sampleRayOrigin(i, weight);
+		if (weight < 1e-4) {
 			//Log(EInfo, "sample origin fail...");
 			continue;
 		}
@@ -88,29 +88,44 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 	//Log(EInfo, "process done %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
 }
 
-Point BSDFRayTracer::sampleRayOrigin(int idx, bool &success) {
+Point BSDFRayTracer::sampleRayOrigin(int idx, double &weight) {
 	int r = idx / m_sqrtNumParticles;
 	int c = idx % m_sqrtNumParticles;
 	double x = m_aabb.min.x + (c + m_sampler->next1D()) / (double)m_sqrtNumParticles * (m_aabb.max.x - m_aabb.min.x);
 	double y = m_aabb.min.y + (r + m_sampler->next1D()) / (double)m_sqrtNumParticles * (m_aabb.max.y - m_aabb.min.y);
 
-	/*
 	Point o(x, y, 1e2);
 	Ray ray(o, Vector(0, 0, -1.0f), 0);
 	Intersection its;
 	m_scene->rayIntersect(ray, its);
+	Normal normal = its.shFrame.n;
 
-	ray = Ray(its.p + m_wi * Epsilon, m_wi, 0);
-	success = !m_scene->rayIntersect(ray);
+	weight = std::max(0.0, dot(normal, m_wi));
+	if (weight > 0.0) {
+		ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
+		o = its.p + m_wi * 1e2;
 
-	Point res = its.p + m_wi * 1e3;
-	return res;
-	*/
+		if (m_shadowOption == 1) {
+			m_scene->rayIntersect(ray, its);
+			if (its.isValid() && m_aabb.contains(Point2(its.p.x, its.p.y))) {
+				weight = 0.0;
+				//Log(EInfo, "masked...");
+			}
+		}
+		else if (m_shadowOption == 2) {
+			if (m_scene->rayIntersect(ray)) {
+				weight = 0.0;
+				//Log(EInfo, "masked...");
+			}
+		}
+	}
 
-	Point o(x, y, 10.0f);
-	o += m_wi * 1e3;
-	Ray ray(o, -m_wi, 0);
-	success = m_scene->rayIntersect(ray);
+	return o;
+
+// 	Point o(x, y, 10.f);
+// 	o += m_wi * 1e3;
+// 	Ray ray(o, -m_wi, 0);
+// 	success = m_scene->rayIntersect(ray);
 	
 	//Intersection its;
 	//success = m_scene->rayIntersect(ray, its);

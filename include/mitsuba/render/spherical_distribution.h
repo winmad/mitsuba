@@ -15,7 +15,7 @@ public:
 	void clear();
 	void put(const SphericalDistribution *dist, bool putBitmap=true);
 	void put(const Vector &dir, const Spectrum &value, double normFactor, bool putBitmap=true);
-	//void scale(double scale);
+	void scale(double scale);
 	void saveExr(fs::path filename);
 
 	void load(Stream *stream);
@@ -30,6 +30,7 @@ public:
 	Vector3d m_totValue;
 	int m_totValidParticles;
 	ref<Bitmap> m_values;
+	double m_totWeight;
 	Vector3d m_moments[3];
 
 	Float cY[3];

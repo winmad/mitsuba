@@ -5,6 +5,7 @@
 #include <mitsuba/core/frame.h>
 #include <mitsuba/core/properties.h>
 #include <boost/algorithm/string.hpp>
+#include <Eigen/Dense>
 
 MTS_NAMESPACE_BEGIN
 
@@ -83,7 +84,9 @@ struct RayInfo {
 		const Float sinPhi2 = w.y * w.y * invSinTheta2;
 		const Float cosPhi = sqrt(cosPhi2);
 		const Float sinPhi = sqrt(sinPhi2);
+		// ignore covariance
 		alpha = cosPhi2 * sigmaX2 + sinPhi2 * sigmaY2 + 2.0 * cosPhi * sinPhi * cxy;
+		//alpha = cosPhi2 * sigmaX2 + sinPhi2 * sigmaY2;
 		alpha = sqrt(2.0 * alpha);
 		if (w.z > 0.9999f)
 			Lambda = 0.0f;
@@ -91,8 +94,12 @@ struct RayInfo {
 			Lambda = -1.0f;
 		else {
 			const Float muPhi = cosPhi * moments0[0] + sinPhi * moments0[1];
+			// ignore shear
 			const Float a = (1.0 / tanTheta - muPhi) / alpha;
-			Lambda = 0.5 * (math::erf(a) - 1.0f) + math::fastexp(-a * a) / a * 0.5 * sqrt(INV_PI);
+			//const Float a = 1.0 / tanTheta / alpha;
+
+			//Lambda = 0.5 * (math::erf(a) - 1.0f) + math::fastexp(-a * a) / a * 0.5 * sqrt(INV_PI);
+			Lambda = 0.5f*(-1.0f + ((a>0)?1.0f:-1.0f) * sqrt(1 + 1/(a*a)));
 		}
 	}
 
@@ -109,8 +116,11 @@ struct RayInfo {
 			G1 = 1.0f;
 		else if(this->w.z <= 0.0f)
 			G1 = 0.0f;
-		else
+		else {
 			G1 = pow(this->C1, this->Lambda / this->mesoN.z);
+			// hack
+			G1 = std::max(0.0, std::min(1.0, G1));
+		}
 	}
 };
 
@@ -235,6 +245,66 @@ vec3 sampleVNDF(const vec3& wi, const Float alpha_x, const Float alpha_y, Sample
 
 	// compute normal
 	const vec3 wm = normalize(vec3(-slope.x, -slope.y, 1.0f));
+
+	return wm;
+}
+
+Vector sampleVNDF(const Vector &wi, const Spectrum &moments0, Float sigmaX2, Float sigmaY2, Float cxy, Sampler *sampler) {
+	const Float U1 = sampler->next1D();
+	const Float U2 = sampler->next1D();
+
+	// shear
+	Vector centered_wi_11 = normalize(Vector(wi.x, wi.y, wi.z - wi.x * moments0[0] - wi.y * moments0[1]));
+
+	// rotate
+	Eigen::Matrix2d m;
+	m(0, 0) = sigmaX2; m(0, 1) = cxy;
+	m(1, 0) = cxy; m(1, 1) = sigmaY2;
+	Eigen::JacobiSVD<Eigen::Matrix2d> svd(m, Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+	Eigen::Matrix2d U = svd.matrixU();
+	Float cosAngle = U(0, 0);
+	Float sinAngle = U(1, 0);
+	Vector wi_11;
+	wi_11.x = centered_wi_11.x * cosAngle - centered_wi_11.y * sinAngle;
+	wi_11.y = centered_wi_11.x * sinAngle + centered_wi_11.y * cosAngle;
+	wi_11.z = centered_wi_11.z;
+
+	// stretch
+	Float alpha_x = std::sqrt(2.0 * svd.singularValues()(0));
+	Float alpha_y = std::sqrt(2.0 * svd.singularValues()(1));
+	wi_11.x *= alpha_x;
+	wi_11.y *= alpha_y;
+	wi_11 = normalize(wi_11);
+
+	// sample visible slope with alpha=1.0
+	Vector slope_11 = sampleP22_11(acos(wi_11.z), U1, U2, alpha_x, alpha_y);
+
+	// align with view direction
+	const Float phi = atan2(wi_11.y, wi_11.x);
+	Vector2 tmp_slope(cos(phi)*slope_11.x - sin(phi)*slope_11.y, sin(phi)*slope_11.x + cos(phi)*slope_11.y);
+	
+	// stretch back
+	tmp_slope.x *= alpha_x;
+	tmp_slope.y *= alpha_y;
+
+	// rotate back
+	Vector2 slope;
+	slope.x = tmp_slope.x * cosAngle + tmp_slope.y * sinAngle;
+	slope.y = -tmp_slope.x * sinAngle + tmp_slope.y * cosAngle;
+
+	// shear back
+	slope.x += moments0[0];
+	slope.y += moments0[1];
+
+	// if numerical instability
+	if ((slope.x != slope.x) || !std::isfinite(slope.x)) {
+		if (wi.z > 0) return Vector(0.0f,0.0f,1.0f);
+		else return normalize(Vector(wi.x, wi.y, 0.0f));
+	}
+
+	// compute normal
+	Vector wm = normalize(Vector(-slope.x, -slope.y, 1.0f));
 
 	return wm;
 }

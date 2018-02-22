@@ -18,13 +18,46 @@ Spectrum samplePhaseFunction(const Intersection &its, Vector &wo, BSDF *bsdf, Sa
 	return res;
 }
 
+Vector2 sampleSlopeGaussian(const Spectrum &moments0, Float sigmaX, Float sigmaY, Float rxy, Sampler *sampler) {
+	Point2 sample2 = sampler->next2D();
+	Point2 stdSample2 = warp::squareToStdNormal(sample2);
+	Vector2 slope;
+	slope.x = stdSample2[0] * sigmaX + moments0[0];
+	slope.y = (rxy * stdSample2[0] + std::sqrt(1.0 - rxy * rxy) * stdSample2[1]) * sigmaY + moments0[1];
+	return slope;
+}
+
+Vector2 sampleSlopeGGX(const Spectrum &moments0, Float sigmaX2, Float sigmaY2, Float cxy, Sampler *sampler) {
+	Eigen::Matrix2d m;
+	m(0, 0) = sigmaX2; m(0, 1) = cxy;
+	m(1, 0) = cxy; m(1, 1) = sigmaY2;
+	Eigen::JacobiSVD<Eigen::Matrix2d> svd(m, Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+	Point2 sample2 = sampler->next2D();
+	Float r = std::sqrt(sample2.x / (1.0 - sample2.x));
+	Float phi = 2.0 * M_PI * sample2.y;
+	Vector2 slope;
+	slope.x = std::sqrt(2.0 * svd.singularValues()(0)) * r * std::cos(phi);
+	slope.y = std::sqrt(2.0 * svd.singularValues()(1)) * r * std::sin(phi);
+
+	Eigen::Matrix2d U = svd.matrixU();
+	Float cosAngle = U(0, 0);
+	Float sinAngle = U(1, 0);
+	Vector2 res;
+	res.x = slope.x * cosAngle - slope.y * sinAngle + moments0[0];
+	res.y = slope.x * sinAngle + slope.y * cosAngle + moments0[1];
+	return res;
+}
+
 Spectrum evalMulti(const Intersection &its, const Vector &wi, const Vector &wo, const Spectrum &moments0,
 		Float sigmaX2, Float sigmaY2, Float cxy, BSDF *bsdf, int scatteringOrderMax, Sampler *sampler) {
 	RayInfo ray;
 	ray.updateDirection(-wi, moments0, sigmaX2, sigmaY2, cxy);
+	//ray.updateDirection(-wi, 0.5, 0.5);
 
 	RayInfo rayShadowing;
 	rayShadowing.updateDirection(wo, moments0, sigmaX2, sigmaY2, cxy);
+	//rayShadowing.updateDirection(wo, 0.5, 0.5);
 
 	Spectrum res(0.0);
 	
@@ -45,8 +78,11 @@ Spectrum evalMulti(const Intersection &its, const Vector &wi, const Vector &wo, 
 		else
 			currentScatteringOrder++;
 
-		// sample visible normal
-		Vector wm = sampleVNDF(-ray.w, moments0, sigmaX2, sigmaY2, cxy, sampler);
+		// sample slope
+		//Vector2 slope = sampleSlopeGaussian(moments0, sigmaX, sigmaY, rxy, sampler);
+		Vector2 slope = sampleSlopeGGX(moments0, sigmaX2, sigmaY2, cxy, sampler);
+		Normal wm(-slope.x, -slope.y, 1.0);
+		wm = normalize(wm);
 
 //		printf("=================\n");
 // 		printf("uv = (%.6f, %.6f)\n", (its.uv.x - 0.5) * 4, (its.uv.y - 0.5) * 4);
@@ -59,37 +95,32 @@ Spectrum evalMulti(const Intersection &its, const Vector &wi, const Vector &wo, 
 
 		// next event estimation
 		Frame nFrame(wm);
+		Float cosTerms = std::max(0.0, dot(-ray.w, wm)) / wm.z *
+			(ray.mesoN.z / (ray.cosTheta * ray.Lambda));
 		
+		rayShadowing.updateHeight(ray.h);
+		Float shadowingWo = rayShadowing.G1;
 		BSDFSamplingRecord bsdfRec(its, nFrame.toLocal(-ray.w), nFrame.toLocal(wo));
 		Spectrum spec = bsdf->eval(bsdfRec);
-		Spectrum tmp = energy * spec;
-		Float shadowingWo;
-		if (currentScatteringOrder == 1) {
-			shadowingWo = (1.0f + (-ray.Lambda-1.0f)) / (1.0f + (-ray.Lambda-1.0f) + rayShadowing.Lambda);
-		}
-		else {
-			rayShadowing.updateHeight(ray.h);
-			shadowingWo = rayShadowing.G1;
-		}
-		tmp *= shadowingWo;		
-		if (std::isfinite(tmp[0]) && std::isfinite(tmp[1]) && std::isfinite(tmp[2]) 
-			&& tmp[0] >= 0 && tmp[1] >= 0 && tmp[2] >= 0)
+		Spectrum tmp = energy * bsdf->eval(bsdfRec) * cosTerms * shadowingWo;
+		if (std::isfinite(tmp[0]) && std::isfinite(tmp[1]) && std::isfinite(tmp[2]))
 			res += tmp;
 
-// 		if (tmp[0] < 0) {
-// 		printf("=================\n");
-// 		printf("current order = %d\n", currentScatteringOrder);
-// 		printf("mesoN = (%.6f, %.6f, %.6f)\n", ray.mesoN.x, ray.mesoN.y, ray.mesoN.z);
-// 		printf("wi = (%.6f, %.6f, %.6f)\n", -ray.w.x, -ray.w.y, -ray.w.z);
-// 		printf("wo = (%.6f, %.6f, %.6f)\n", wo.x, wo.y, wo.z);
-// 		printf("wm = (%.6f, %.6f, %.6f)\n", wm.x, wm.y, wm.z);
-// 		printf("%.6f %.6f %.6f\n", dot(-ray.w, wm), ray.cosTheta, ray.Lambda);
-// 		printf("bsdf spec = %.6f, %.6f, %.6f\n", spec[0], spec[1], spec[2]);
-// 		printf("shadowing_wo = %.6f\n", shadowingWo);
-// 		printf("cov matrix = (%.6f, %.6f; %.6f, %.6f)\n", sigmaX2, cxy, cxy, sigmaY2);
-// 		printf("shadowing C1, Lambda = %.6f, %.6f\n", rayShadowing.C1, rayShadowing.Lambda);
-//  		printf("contrib = %.6f, %.6f, %.6f\n", tmp[0], tmp[1], tmp[2]);
-// 		}
+		//if (tmp[0] < 0) {
+		if (std::isinf(tmp[0])) {
+		printf("=================\n");
+		printf("mesoN = (%.6f, %.6f, %.6f)\n", ray.mesoN.x, ray.mesoN.y, ray.mesoN.z);
+		printf("wi = (%.6f, %.6f, %.6f)\n", ray.w.x, ray.w.y, ray.w.z);
+		printf("wo = (%.6f, %.6f, %.6f)\n", wo.x, wo.y, wo.z);
+		printf("wm = (%.6f, %.6f, %.6f)\n", wm.x, wm.y, wm.z);
+		printf("cosTerms = %.6f\n", cosTerms);
+		printf("%.6f %.6f %.6f\n", dot(-ray.w, wm), ray.cosTheta, ray.Lambda);
+		printf("bsdf spec = %.6f, %.6f, %.6f\n", spec[0], spec[1], spec[2]);
+		printf("shadowing_wo = %.6f\n", shadowingWo);
+		printf("cov matrix = (%.6f, %.6f; %.6f, %.6f)\n", sigmaX2, cxy, cxy, sigmaY2);
+		printf("shadowing C1, Lambda = %.6f, %.6f\n", rayShadowing.C1, rayShadowing.Lambda);
+ 		printf("contrib = %.6f, %.6f, %.6f\n", tmp[0], tmp[1], tmp[2]);
+		}
 
 		// next direction
 		Vector nextWr;
@@ -100,7 +131,8 @@ Spectrum evalMulti(const Intersection &its, const Vector &wi, const Vector &wo, 
 			break;
 		nextWr = nFrame.toWorld(nextWr);
 		ray.updateDirection(nextWr, moments0, sigmaX2, sigmaY2, cxy);
-		energy = energy * spec;
+		//ray.updateDirection(nextWr, 0.5, 0.5);
+		energy = energy * spec * cosTerms;
 		
 // 		printf("=================\n");
 // 		printf("weight = (%.6f, %.6f, %.6f)\n", spec[0], spec[1], spec[2]);
@@ -123,7 +155,7 @@ class RoughBSDFMulti : public BSDF {
 public:
 	RoughBSDFMulti(const Properties &props) : BSDF(props) {
 		// avoid negative value
-		m_offset = 1e4;
+		m_offset = 5.0f;
 
 		ref<FileResolver> fResolver = Thread::getThread()->getFileResolver();
 
@@ -147,7 +179,7 @@ public:
 	RoughBSDFMulti(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
 			// avoid negative value
-			m_offset = 1e4;
+			m_offset = 5.0f;
 
 			m_sampleVisibility = stream->readBool();
 			m_moments0 = static_cast<Texture *>(manager->getInstance(stream));
@@ -226,7 +258,7 @@ public:
 		}
 		else {
 			res = evalMulti(bRec.its, woMacro, wiMacro, moments0, sigmaX2, sigmaY2, cxy, bsdf, m_scatteringOrderMax, sampler) /
-				cosWiMeso * cosWoMeso;
+				Frame::cosTheta(wiMacro) * Frame::cosTheta(woMacro);
 		}
 
 		return res;

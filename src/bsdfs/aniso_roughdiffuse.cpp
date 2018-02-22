@@ -12,7 +12,7 @@ class AnisotropicRoughDiffuse : public BSDF {
 public:
 	AnisotropicRoughDiffuse(const Properties &props) : BSDF(props) {
 		// avoid negative value
-		m_offset = 5.0f;
+		m_offset = 1e4;
 
 		ref<FileResolver> fResolver = Thread::getThread()->getFileResolver();
 
@@ -38,7 +38,7 @@ public:
 	AnisotropicRoughDiffuse(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
 		// avoid negative value
-		m_offset = 5.0f;
+		m_offset = 1e4;
 
 		m_type = (MicrofacetDistribution::EType) stream->readUInt();
 		m_sampleVisibility = stream->readBool();
