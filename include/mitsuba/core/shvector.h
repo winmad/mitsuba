@@ -241,6 +241,7 @@ public:
 
 	/// Evaluate for a direction given in Cartesian coordinates
 	Float eval(const Vector &v) const;
+	Float evalXYZ(const Vector &v) const;
 
 	/**
 	 * \brief Evaluate for a direction given in spherical coordinates.

@@ -32,9 +32,13 @@ public:
 
 		Properties props = Properties("independent");
 		props.setInteger("seed", 19931004);
-		m_sampler = static_cast<Sampler *> (PluginManager::getInstance()->
-			createObject(MTS_CLASS(Sampler), props));
-		m_sampler->configure();
+		m_samplers.resize(233);
+		m_samplers[0] = static_cast<Sampler *>(PluginManager::getInstance()->
+			createObject(MTS_CLASS(Sampler), Properties("independent")));
+		m_samplers[0]->configure();
+		for (int i = 1; i < 233; i++) {
+			m_samplers[i] = m_samplers[0]->clone();
+		}
 
 		m_res = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
 		float *data = m_res->getFloat32Data();
@@ -82,8 +86,9 @@ public:
 						z = std::sqrt(z);
 						Vector wo(x, y, z);
 
-						Point o = sampleRayOrigin(i, j, m_sampler);
-						Ray ray(o + wo * Epsilon, wo, 0);
+						Sampler *sampler = m_samplers[Thread::getID() % 233];
+						Point o = sampleRayOrigin(i, j, sampler);
+						Ray ray(o + wo * ShadowEpsilon, wo, 0);
 						//Ray ray(o, wo, 0);
 						Ray invRay(o + wo * 1e3, -wo, 0);
 						//Log(EInfo, "%.6f, %.6f, %.6f", wo.x, wo.y, wo.z);
@@ -178,7 +183,7 @@ public:
 
 	ref<Scene> m_scene;
 	Shape *m_hmap;
-	ref<Sampler> m_sampler;
+	ref_vector<Sampler> m_samplers;
 	int m_sqrtSpp, m_spp;
 	int m_size;
 	AABB2 m_aabb;

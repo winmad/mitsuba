@@ -90,6 +90,7 @@ public:
 		Log(EInfo, "Finish rendering.");
 
 		double totValidParticles = (double)proc->m_res->getLobe(m_minDepth + 1)->m_totValidParticles;
+		//double totValidParticles = m_numParticles;
 		double totParticles = m_numParticles;
 		double pScale = totParticles / totValidParticles;
 

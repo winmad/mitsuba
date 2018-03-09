@@ -1241,6 +1241,9 @@
     <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\bsdfs\sh_scaled_bsdf.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

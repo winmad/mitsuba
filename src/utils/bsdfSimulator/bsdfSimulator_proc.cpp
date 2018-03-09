@@ -81,9 +81,9 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 				res->getLobe(rRec.depth - 1)->put(ray.d, throughput, normFactor);
 			else
 				res->getLobe(m_minDepth)->put(ray.d, throughput, normFactor);
-
-			res->getLobe(m_minDepth + 1)->put(ray.d, throughput, normFactor);
 		}
+		res->getLobe(m_minDepth + 1)->put(ray.d, throughput, normFactor);
+
 	}
 	//Log(EInfo, "process done %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
 }

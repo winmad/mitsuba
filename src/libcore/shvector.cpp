@@ -115,6 +115,29 @@ Float SHVector::eval(const Vector &v) const {
 	return result;
 }
 
+Float SHVector::evalXYZ(const Vector &v) const {
+	const Float SQRT_INV_PI = std::sqrt(INV_PI);
+	const Float SQRT_3_INV_PI = std::sqrt(3.0) * SQRT_INV_PI;
+	const Float SQRT_5_INV_PI = std::sqrt(5.0) * SQRT_INV_PI;
+	const Float SQRT_15_INV_PI = std::sqrt(15.0) * SQRT_INV_PI;
+	const Float c[9] = {0.5 * SQRT_INV_PI, 
+		0.5 * SQRT_3_INV_PI, 0.5 * SQRT_3_INV_PI, 0.5 * SQRT_3_INV_PI,
+		0.5 * SQRT_15_INV_PI, 0.5 * SQRT_15_INV_PI, 0.25 * SQRT_5_INV_PI,
+		0.5 * SQRT_15_INV_PI, 0.5 * SQRT_15_INV_PI
+	};
+	Float res = 0.0;
+	res += operator()(0, 0) * c[0];
+	res += operator()(1, -1) * c[1] * v.y;
+	res += operator()(1, 0) * c[2] * v.z;
+	res += operator()(1, 1) * c[3] * v.x;
+	res += operator()(2, -2) * c[4] * v.x * v.y;
+	res += operator()(2, -1) * c[5] * v.y * v.z;
+	res += operator()(2, 0) * c[6] * (3.0 * v.z * v.z - 1.0);
+	res += operator()(2, 1) * c[7] * v.z * v.x;
+	res += operator()(2, 2) * c[8] * 0.5 * (v.x * v.x - v.y * v.y);
+	return res;
+}
+
 Float SHVector::evalAzimuthallyInvariant(Float theta, Float phi) const {
 	Float result = 0, cosTheta = std::cos(theta);
 	for (int l=0; l<m_bands; ++l)
