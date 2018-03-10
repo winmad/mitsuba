@@ -226,7 +226,8 @@ public:
 				return Spectrum(0.0f);
 
 			bRec.used[0] = true;
-			bRec.dAlbedo[0] = 1.0 / m_specularReflectance->eval(bRec.its);
+			Spectrum albedo = m_specularReflectance->eval(bRec.its);
+			bRec.dAlbedo[0] = 1.0 / albedo;
 			bRec.dRoughness[0] = 1.0 / (exponent + 2.0) + math::fastlog(cosAlpha);
 			bRec.used[1] = false;
 		} else {

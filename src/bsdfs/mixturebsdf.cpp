@@ -239,7 +239,8 @@ public:
 			// hardcode
 			for (size_t i = 0; i < 2; ++i) {
 				bRec.used[i] = true;
-				bRec.dAlbedo[i] = m_weights[i] / getLobeAlbedo(bRec.its, m_offsets[i]);
+				Spectrum lobeAlbedo = getLobeAlbedo(bRec.its, m_offsets[i]);
+				bRec.dAlbedo[i] = m_weights[i] / lobeAlbedo;
 				if (m_bsdfs[i]->getClass()->getName() == "Phong") {
 					Float alpha = dot(bRec.wo, reflect(bRec.wi));
 					Float exponent = getLobeRoughness(bRec.its, m_offsets[i]);
@@ -288,7 +289,8 @@ public:
 			// hardcode
 			for (size_t i = 0; i < 2; ++i) {
 				bRec.used[i] = true;
-				bRec.dAlbedo[i] = m_weights[i] / getLobeAlbedo(bRec.its, m_offsets[i]);
+				Spectrum lobeAlbedo = getLobeAlbedo(bRec.its, m_offsets[i]);
+				bRec.dAlbedo[i] = m_weights[i] / lobeAlbedo;
 				if (m_bsdfs[i]->getClass()->getName() == "Phong") {
 					Float alpha = dot(bRec.wo, reflect(bRec.wi));
 					Float exponent = getLobeRoughness(bRec.its, m_offsets[i]);

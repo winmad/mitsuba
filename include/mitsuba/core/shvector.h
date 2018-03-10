@@ -22,6 +22,7 @@
 
 #include <mitsuba/mitsuba.h>
 #include <mitsuba/core/quad.h>
+#include <mitsuba/core/frame.h>
 #include <Eigen/Core>
 
 MTS_NAMESPACE_BEGIN
