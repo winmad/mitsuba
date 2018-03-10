@@ -13,6 +13,7 @@ SphericalDistribution::SphericalDistribution(int size) : m_size(size) {
 void SphericalDistribution::clear() {
 	m_totValue = Vector3d(0.0);
 	m_totValidParticles = 0;
+	m_totWeight = 0.0;
 	double *data = m_values->getFloat64Data();
 	for (int i = 0; i < m_size * m_size * SPECTRUM_SAMPLES; i++)
 		*data++ = 0.0;
@@ -69,13 +70,11 @@ void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double
 	}
 }
 
-/*
 void SphericalDistribution::scale(double scale) {
 	double *data = m_values->getFloat64Data();
 	for (int i = 0; i < m_size * m_size * SPECTRUM_SAMPLES; i++)
 		*data++ *= scale;
 }
-*/
 
 void SphericalDistribution::saveExr(fs::path filename) {
 	filename.replace_extension(".exr");
@@ -91,6 +90,7 @@ void SphericalDistribution::load(Stream *stream) {
 	m_totValue[1] = stream->readDouble();
 	m_totValue[2] = stream->readDouble();
 	m_totValidParticles = stream->readInt();
+	m_totWeight = stream->readDouble();
 	stream->readDoubleArray(m_values->getFloat64Data(), m_size * m_size * SPECTRUM_SAMPLES);
 	for (int i = 0; i < 3; i++)
 		for (int c = 0; c < 3; c++)
@@ -103,6 +103,7 @@ void SphericalDistribution::save(Stream *stream) const {
 	stream->writeDouble(m_totValue[1]);
 	stream->writeDouble(m_totValue[2]);
 	stream->writeInt(m_totValidParticles);
+	stream->writeDouble(m_totWeight);
 	stream->writeDoubleArray(m_values->getFloat64Data(), m_size * m_size * SPECTRUM_SAMPLES);
 	for (int i = 0; i < 3; i++)
 		for (int c = 0; c < 3; c++)

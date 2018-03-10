@@ -21,7 +21,7 @@ public:
 
 	int run(int argc, char **argv) {
 		// avoid negative value
-		m_offset = 5.0f;
+		m_offset = 1e4;
 
 		m_size = std::atoi(argv[2]);
 		m_sqrtSpp = std::atoi(argv[3]);

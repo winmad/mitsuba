@@ -16,7 +16,7 @@ class BSDFRayTracer : public WorkProcessor {
 public:
 	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb,
 		int minDepth, int maxDepth, int shadowOption);
-	Point sampleRayOrigin(int idx, bool &success);
+	Point sampleRayOrigin(int idx, double &weight);
 	Spectrum sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts);
 
 	ref<WorkUnit> createWorkUnit() const;

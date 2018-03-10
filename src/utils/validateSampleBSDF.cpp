@@ -44,33 +44,43 @@ public:
 
 		Vector2DArray bsdfValues(m_size, std::vector<Vector3d>(m_size));
 
+		/*
 		props = Properties("diffuse");
 		props.setSpectrum("reflectance", Spectrum(1.0f));
+		*/
 
-		/*
 		props = Properties("roughconductor");
 		props.setString("distribution", "GGX");
-		props.setFloat("alpha", 0.3);
+		props.setFloat("alpha", 0.1);
 		props.setString("material", "none");
-		*/
 
 		BSDF *baseBSDF = static_cast<BSDF *> (PluginManager::getInstance()->
 			createObject(MTS_CLASS(BSDF), props));
 		baseBSDF->configure();
 
 		props = Properties("multilobe_bsdf");
-		props.setInteger("numLobes", 4);
-		props.setString("prefix", "F:\\heightfield_prefiltering\\data\\downsample_beckmann\\glossy_env\\vmf_2x_lobe_");
+		props.setInteger("numLobes", 6);
+		props.setString("prefix", "F:\\heightfield_prefiltering\\data\\downsample_gabardine\\glossy_env\\vmf_8x_lobe_");
 		props.setFloat("uvscale", 4);
 		BSDF *bsdf = static_cast<BSDF *> (PluginManager::getInstance()->
 			createObject(MTS_CLASS(BSDF), props));
 		bsdf->addChild("baseBSDF", baseBSDF);
 		bsdf->configure();
 
+		props = Properties("sh_scaled_bsdf");
+		props.setInteger("numCoeffs", 9);
+		props.setString("prefix", "F:\\heightfield_prefiltering\\data\\downsample_gabardine\\glossy_env\\albedo_8x_direct_sh_");
+		props.setFloat("uvscale", 4);
+		BSDF *scaledBSDF = static_cast<BSDF *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(BSDF), props));
+		scaledBSDF->addChild(bsdf);
+		scaledBSDF->configure();
+
 		Intersection its;
 		its.shFrame = Frame(Vector(0, 0, 1));
 		its.geoFrame = its.shFrame;
-		its.uv = Point2(0.6, 0.7);
+		its.baseFrame = its.shFrame;
+		its.uv = Point2(0.5, 0.5);
 // 		BSDFSamplingRecord bRec(its, Vector(0, 0, 1), Vector(std::sqrt(0.5), 0.0, std::sqrt(0.5)));
 // 		Spectrum tmp = bsdf->eval(bRec);
 		
@@ -86,6 +96,12 @@ public:
 		calcSampleBSDF(bsdf, m_wi, bsdfValues);
 		outputBitmap(bsdfValues, "multilobe_bsdf_sample.exr");
 
+		calcEvalBSDF(scaledBSDF, m_wi, samples, bsdfValues);
+		outputBitmap(bsdfValues, "scaled_multilobe_bsdf_eval.exr");
+
+		calcSampleBSDF(scaledBSDF, m_wi, bsdfValues);
+		outputBitmap(bsdfValues, "scaled_multilobe_bsdf_sample.exr");
+		
 		return 0;
 	}
 
@@ -97,7 +113,8 @@ public:
 		Intersection its;
 		its.shFrame = Frame(Vector(0, 0, 1));
 		its.geoFrame = its.shFrame;
-		its.uv = Point2(0.6, 0.7);
+		its.baseFrame = its.shFrame;
+		its.uv = Point2(0.5, 0.5);
 
 #pragma omp parallel for
 		for (int i = 0; i < m_size; i++) {
@@ -138,7 +155,8 @@ public:
 		Intersection its;
 		its.shFrame = Frame(Vector(0, 0, 1));
 		its.geoFrame = its.shFrame;
-		its.uv = Point2(0.6, 0.7);
+		its.baseFrame = its.shFrame;
+		its.uv = Point2(0.5, 0.5);
 		its.wi = wi;
 
 		Float spp = m_size * m_size * m_sqrtSpp * m_sqrtSpp;

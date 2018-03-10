@@ -89,10 +89,11 @@ public:
 
 		Log(EInfo, "Finish rendering.");
 
-		//double totValidParticles = 0.0;
-		//for (int i = 0; i <= m_minDepth; i++)
-		//	totValidParticles += (double)proc->m_res->getLobe(i)->m_totValidParticles;
-		double totValidParticles = m_numParticles;
+		double totValidParticles = (double)proc->m_res->getLobe(m_minDepth + 1)->m_totValidParticles;
+		//double totValidParticles = m_numParticles;
+		double totParticles = m_numParticles;
+		double pScale = totParticles / totValidParticles;
+
 		int numLobes = m_minDepth + 2;
 
 		char txtFilename[256];
@@ -106,6 +107,8 @@ public:
 				sprintf(filename, "%s_order_%d.exr", argv[14], i + 1);
 			else
 				sprintf(filename, "%s_order_all.exr", argv[14]);
+
+			proc->m_res->getLobe(i)->scale(pScale);
 			proc->m_res->getLobe(i)->saveExr(fs::path(filename));
 
 			proc->m_res->getLobe(i)->m_totValue /= totValidParticles;

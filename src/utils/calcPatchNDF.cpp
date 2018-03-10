@@ -141,6 +141,25 @@ public:
 			m_vmfs.outputDistribution(m_size, fname);
 		}
 
+		// output slopes
+		char fname[256];
+		sprintf(fname, "slopes_%s", argv[13]);
+		int len = strlen(fname);
+		fname[len - 3] = 't';
+		fname[len - 2] = 'x';
+		fname[len - 1] = 't';
+		FILE *fp = fopen(fname, "w");
+		for (int i = 0; i < m_sqrtSpp; i++) {
+			for (int j = 0; j < m_sqrtSpp; j++) {
+				if (weights[i][j] < Epsilon)
+					continue;
+				Float sx = -normals[i][j].x / normals[i][j].z;
+				Float sy = -normals[i][j].y / normals[i][j].z;
+				fprintf(fp, "%.8f %.8f\n", sx, sy);
+			}
+		}
+		fclose(fp);
+
 		return 0;
 	}
 

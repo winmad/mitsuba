@@ -3,6 +3,7 @@
 #include <mitsuba/render/texture.h>
 #include <mitsuba/hw/basicshader.h>
 #include <mitsuba/core/warp.h>
+#include <mitsuba/core/plugin.h>
 #include "microfacet.h"
 
 MTS_NAMESPACE_BEGIN
@@ -11,7 +12,7 @@ class AnisotropicRoughDiffuse : public BSDF {
 public:
 	AnisotropicRoughDiffuse(const Properties &props) : BSDF(props) {
 		// avoid negative value
-		m_offset = 5.0f;
+		m_offset = 1e4;
 
 		ref<FileResolver> fResolver = Thread::getThread()->getFileResolver();
 
@@ -22,6 +23,8 @@ public:
 		m_moments0 = new ConstantSpectrumTexture(
 			props.getSpectrum("moments0", Spectrum(m_offset)));
 		
+		// alpha_x = sigma_x * sqrt(0.5)
+		// alpha_y = sigma_y * sqrt(0.5)
 		Spectrum defaultMoments1;
 		defaultMoments1[0] = m_offset + 0.5;
 		defaultMoments1[1] = m_offset + 0.5;
@@ -35,7 +38,7 @@ public:
 	AnisotropicRoughDiffuse(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
 		// avoid negative value
-		m_offset = 5.0f;
+		m_offset = 1e4;
 
 		m_type = (MicrofacetDistribution::EType) stream->readUInt();
 		m_sampleVisibility = stream->readBool();
@@ -67,19 +70,15 @@ public:
 		m_usesRayDifferentials = m_reflectance->usesRayDifferentials() ||
 			m_moments0->usesRayDifferentials() || m_moments1->usesRayDifferentials();
 
+		m_samplers.resize(233);
+		m_samplers[0] = static_cast<Sampler *>(PluginManager::getInstance()->
+			createObject(MTS_CLASS(Sampler), Properties("independent")));
+		m_samplers[0]->configure();
+		for (int i = 1; i < 233; i++) {
+			m_samplers[i] = m_samplers[0]->clone();
+		}
+
 		BSDF::configure();
-	}
-
-	// These rand() are not thread-safe!
-
-	/// Helper function: creates 1D uniform random numbers
-	inline Float rand1D() const {
-		return std::min(0.9999, Float(rand()) / Float(RAND_MAX));
-	}
-
-	/// Helper function: creates 2D uniform random numbers
-	inline Point2 rand2D() const {
-		return Point2(rand1D(), rand1D());
 	}
 
 	inline Float approxLambda(const Vector &w, const Spectrum &moments0,
@@ -111,6 +110,12 @@ public:
 			|| Frame::cosTheta(bRec.wi) <= 0
 			|| Frame::cosTheta(bRec.wo) <= 0)
 			return Spectrum(0.0f);
+
+		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+		Vector woWorld = bRec.its.toWorld(bRec.wo);
+
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 	
 		Spectrum moments0 = m_moments0->eval(bRec.its) - Spectrum(m_offset);
 		Spectrum moments1 = m_moments1->eval(bRec.its) - Spectrum(m_offset);
@@ -124,16 +129,22 @@ public:
 		Normal mesoN(-moments0[0], -moments0[1], 1.0);
 		mesoN = normalize(mesoN);
 
+		if (dot(wiMacro, mesoN) <= 0)
+			return Spectrum(0.0f);
 		Spectrum res = INV_PI * Frame::cosTheta(mesoN) /
-			std::max(0.0, dot(bRec.wi, mesoN)) *
+			std::max(0.0, dot(wiMacro, mesoN)) *
 			m_reflectance->eval(bRec.its);
+		if (res.isZero())
+			return Spectrum(0.0f);
 
 		// sample the slope
 		Float r = 0.0;
 		int sampleCnt = 1;
 
+		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+
 		for (int i = 0; i < sampleCnt; i++) {
-			Point2 sample2 = rand2D();
+			Point2 sample2 = sampler->next2D();
 			Point2 stdSample2 = warp::squareToStdNormal(sample2);		
 			Vector2 slope;
 			slope.x = stdSample2[0] * sigmaX + moments0[0];
@@ -154,7 +165,7 @@ public:
 // 			}
 			wm = normalize(wm);
 
-			Float tmpR = std::max(0.0, dot(wm, bRec.wi)) * std::max(0.0, dot(wm, bRec.wo)) /
+			Float tmpR = std::max(0.0, dot(wm, wiMacro)) * std::max(0.0, dot(wm, woMacro)) /
 				Frame::cosTheta(wm);
 
 			// height-correlated Smith masking-shadowing function
@@ -163,9 +174,9 @@ public:
 				//Float G1_wo = distr.smithG1(bRec.wo, wm);
 				//Float G2_G1 = G1_wo / (G1_wi + G1_wo - G1_wi*G1_wo);
 				Float G2_G1 = 0.0;
-				if (dot(wm, bRec.wi) > Epsilon && dot(wm, bRec.wo) > Epsilon) {
-					Float lambda_wi = approxLambda(bRec.wi, moments0, sigmaX2, sigmaY2, cxy);
-					Float lambda_wo = approxLambda(bRec.wo, moments0, sigmaX2, sigmaY2, cxy);
+				if (dot(wm, wiMacro) > Epsilon && dot(wm, woMacro) > Epsilon) {
+					Float lambda_wi = approxLambda(wiMacro, moments0, sigmaX2, sigmaY2, cxy);
+					Float lambda_wo = approxLambda(woMacro, moments0, sigmaX2, sigmaY2, cxy);
 					G2_G1 = 1.0 / (1.0 + lambda_wi + lambda_wo);
 				}
 
@@ -188,18 +199,18 @@ public:
 			|| Frame::cosTheta(bRec.wo) <= 0)
 			return 0.0f;
 
-		return warp::squareToUniformHemispherePdf();
+		return warp::squareToCosineHemispherePdf(bRec.wo);
 	}
 
 	Spectrum sample(BSDFSamplingRecord &bRec, Float &pdf, const Point2 &sample) const {
 		if (!(bRec.typeMask & EGlossyReflection) || Frame::cosTheta(bRec.wi) <= 0)
 			return Spectrum(0.0f);
 
-		bRec.wo = warp::squareToUniformHemisphere(sample);
+		bRec.wo = warp::squareToCosineHemisphere(sample);
 		bRec.sampledComponent = 0;
 		bRec.sampledType = EDiffuseReflection;
 
-		pdf = warp::squareToUniformHemispherePdf();
+		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
 		return eval(bRec, ESolidAngle) / pdf;
 	}
 
@@ -252,6 +263,7 @@ private:
 	ref<Texture> m_moments0, m_moments1;
 	Float m_offset;
 	bool m_sampleVisibility;
+	ref_vector<Sampler> m_samplers;
 };
 
 
