@@ -4,6 +4,7 @@
 #include <mitsuba/mitsuba.h>
 #include <mitsuba/core/frame.h>
 #include <mitsuba/core/properties.h>
+#include <mitsuba/render/scene.h>
 #include <boost/algorithm/string.hpp>
 #include <Eigen/Dense>
 
@@ -260,7 +261,7 @@ Vector sampleVNDF(const Vector &wi, const Spectrum &moments0, Float sigmaX2, Flo
 	Eigen::Matrix2d m;
 	m(0, 0) = sigmaX2; m(0, 1) = cxy;
 	m(1, 0) = cxy; m(1, 1) = sigmaY2;
-	Eigen::JacobiSVD<Eigen::Matrix2d> svd(m, Eigen::ComputeThinU | Eigen::ComputeThinV);
+	Eigen::JacobiSVD<Eigen::Matrix2d> svd(m, Eigen::ComputeFullU | Eigen::ComputeFullV);
 
 	Eigen::Matrix2d U = svd.matrixU();
 	Float cosAngle = U(0, 0);

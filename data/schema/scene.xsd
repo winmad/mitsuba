@@ -195,6 +195,7 @@
 					<xsd:element name="texture" type="texture"/>
 					<xsd:element name="bsdf" type="bsdf"/>
 					<xsd:element name="ref" type="reference"/>
+					<xsd:element name="shape" type="shape"/>
 				</xsd:choice>
 			</xsd:extension>
 		</xsd:complexContent>

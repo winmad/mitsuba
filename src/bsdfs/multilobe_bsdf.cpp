@@ -1,6 +1,7 @@
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/texture.h>
+#include <mitsuba/render/scene.h>
 #include <mitsuba/hw/basicshader.h>
 #include <mitsuba/core/warp.h>
 #include <mitsuba/core/plugin.h>
@@ -141,8 +142,8 @@ public:
 			Frame lobeFrame(mu);
 			Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
 			Frame nFrame(norm);
+			
 			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
-
 			Spectrum spec = m_bsdf->eval(bsdfRec);
 
 // 			if (mu.length() < 1e-8 || wiWorld.length() < 1e-8 || woWorld.length() < 1e-8 ||
@@ -256,6 +257,7 @@ public:
 		its = bRec.its;
 		its.wi = nFrame.toLocal(wiMacro);
 		BSDFSamplingRecord bsdfRec(its, sampler);
+
 		res = m_bsdf->sample(bsdfRec, Point2(sampler->next1D(), sampler->next1D()));
 
 		Vector woMacro = nFrame.toWorld(bsdfRec.wo);

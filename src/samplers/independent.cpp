@@ -56,8 +56,8 @@ public:
 		/* Number of samples per pixel when used with a sampling-based integrator */
 		m_sampleCount = props.getSize("sampleCount", 4);
 		m_seed = props.getInteger("seed", 1004);
-		//m_random = new Random(m_seed);
-		m_random = new Random();
+		m_random = new Random(m_seed);
+		//m_random = new Random();
 	}
 
 	IndependentSampler(Stream *stream, InstanceManager *manager)

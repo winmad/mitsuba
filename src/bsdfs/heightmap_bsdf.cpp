@@ -2,6 +2,7 @@
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/scene.h>
+#include <mitsuba/render/shape.h>
 #include <mitsuba/hw/basicshader.h>
 #include <mitsuba/core/warp.h>
 #include <mitsuba/core/plugin.h>
@@ -13,17 +14,23 @@ MTS_NAMESPACE_BEGIN
 // to be update
 // default world frame with n=(0,0,1)
 
-class TabulatedBSDF : public BSDF {
+class HeightmapBSDF : public BSDF {
 public:
-	TabulatedBSDF(const Properties &props) : BSDF(props) {
-		m_samplesPerEval = props.getInteger("samplersPerEval", 4);
-		m_ndfFilename = props.getString("ndfFilename", "");
+	HeightmapBSDF(const Properties &props) : BSDF(props) {
+		m_downsampleScale = props.getInteger("downsampleScale", 1);
+		m_texSize = props.getInteger("texSize", 1024);
+		m_tileX = props.getInteger("tileX", 1);
+		m_tileY = props.getInteger("tileY", 1);
 	}
 
-	TabulatedBSDF(Stream *stream, InstanceManager *manager)
+	HeightmapBSDF(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
-		m_samplesPerEval = stream->readInt();
-		m_ndfFilename = stream->readString();
+		m_downsampleScale = stream->readInt();
+		m_texSize = stream->readInt();
+		m_tileX = stream->readInt();
+		m_tileY = stream->readInt();
+
+		m_hmap = static_cast<Shape *>(manager->getInstance(stream));
 		m_bsdf = static_cast<BSDF *>(manager->getInstance(stream));
 
 		configure();
@@ -32,14 +39,18 @@ public:
 	void serialize(Stream *stream, InstanceManager *manager) const {
 		BSDF::serialize(stream, manager);
 
-		stream->writeInt(m_samplesPerEval);
-		stream->writeString(m_ndfFilename);
+		stream->writeInt(m_downsampleScale);
+		stream->writeInt(m_texSize);
+		stream->writeInt(m_tileX);
+		stream->writeInt(m_tileY);
+		
+		manager->serialize(stream, m_hmap.get());
 		manager->serialize(stream, m_bsdf.get());
 	}
 
 	void configure() {
 		m_components.clear();
-		m_components.push_back(EGlossyReflection | EFrontSide);
+		m_components.push_back(EGlossyReflection | EFrontSide | ESpatiallyVarying);
 
 		m_usesRayDifferentials = false;
 
@@ -51,39 +62,8 @@ public:
 			m_samplers[i] = m_samplers[0]->clone();
 		}
 
-		// load ndf
-		m_cdf.clear();
-		m_normals.clear();
-		int cnt = 0;
-		ref<Bitmap> ndf = new Bitmap(fs::path(m_ndfFilename));
-		Vector2i size = ndf->getSize();
-		for (int r = 0; r < size.y; r++) {
-			Float y = (r + 0.5) / (Float)size.y * 2.0 - 1.0;
-			for (int c = 0; c < size.x; c++) {
-				Float x = (c + 0.5) / (Float)size.x * 2.0 - 1.0;
-				if (x * x + y * y >= 1.0)
-					continue;
-				Float z = std::sqrt(1.0 - x * x - y * y);
-
-				Float value = ndf->getPixel(Point2i(c, size.y - r - 1)).average();
-				if (value < 1e-8)
-					continue;
-
-				value /= z;
-				m_normals.push_back(Normal(x, y, z));
-				if (cnt == 0) {
-					m_cdf.push_back(value);
-				}
-				else {
-					m_cdf.push_back(value + m_cdf[cnt - 1]);
-				}
-				cnt++;
-			}
-		}
-
-		Float normFactor = m_cdf[cnt - 1];
-		for (int i = 0; i < cnt; i++)
-			m_cdf[i] /= normFactor;
+		m_uvBlockSize.x = (Float)m_downsampleScale / ((Float)m_texSize * m_tileX);
+		m_uvBlockSize.y = (Float)m_downsampleScale / ((Float)m_texSize * m_tileY);
 
 		BSDF::configure();
 	}
@@ -101,20 +81,21 @@ public:
 		Vector wiWorld = bRec.its.toWorld(bRec.wi);
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
 
-		//std::ostringstream oss;
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
-		for (int i = 0; i < m_samplesPerEval; i++) {
-			int idx = (int)(std::lower_bound(m_cdf.begin(), m_cdf.end(), sampler->next1D()) - m_cdf.begin());
-			Assert(idx >= 0 && idx < m_cdf.size());
+		Point2 uv;
+		int bx = (int)std::floor(bRec.its.uv.x / m_uvBlockSize.x);
+		int by = (int)std::floor(bRec.its.uv.y / m_uvBlockSize.y);
+		uv.x = m_uvBlockSize.x * (bx + sampler->next1D());
+		uv.y = m_uvBlockSize.y * (by + sampler->next1D());
 
-			Vector norm = m_normals[idx];
-			Frame nFrame(norm);
-			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiWorld), nFrame.toLocal(woWorld));
-			
-			res += m_bsdf->eval(bsdfRec);
-		}
-
-		return res / (Float)m_samplesPerEval;
+		Normal norm;
+		m_hmap->getPosAndNormal(uv, NULL, &norm);
+		Frame nFrame(norm);
+		BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
+		res = m_bsdf->eval(bsdfRec);
+		return res;
 	}
 
 	Float pdf(const BSDFSamplingRecord &bRec, EMeasure measure) const {
@@ -147,10 +128,11 @@ public:
 
 	void addChild(const std::string &name, ConfigurableObject *child) {
 		if (child->getClass()->derivesFrom(MTS_CLASS(BSDF))) {
-			if (name == "baseBSDF")
-				m_bsdf = static_cast<BSDF *>(child);
-			else
-				BSDF::addChild(name, child);
+			m_bsdf = static_cast<BSDF *>(child);
+		}
+		else if (child->getClass()->derivesFrom(MTS_CLASS(Shape))) {
+			Log(EInfo, "load heightmap");
+			m_hmap = static_cast<Shape *>(child);
 		}
 		else {
 			BSDF::addChild(name, child);
@@ -163,9 +145,8 @@ public:
 
 	std::string toString() const {
 		std::ostringstream oss;
-		oss << "TabulatedBSDF[" << endl
+		oss << "HeightmapBSDF[" << endl
 			<< "  id = \"" << getID() << "\"," << endl
-			<< "  samplesPerEval = " << m_samplesPerEval << "," << endl
 			<< "  baseBSDF = " << m_bsdf->toString() << "," << endl
 			<< "]";
 		return oss.str();
@@ -173,15 +154,17 @@ public:
 
 	MTS_DECLARE_CLASS()
 private:
-	int m_samplesPerEval;
-	std::string m_ndfFilename;
+	int m_downsampleScale;
+	int m_texSize;
+	int m_tileX;
+	int m_tileY;
+
+	Vector2 m_uvBlockSize;
+	ref<Shape> m_hmap;
 	ref<BSDF> m_bsdf;
 	ref_vector<Sampler> m_samplers;
-
-	std::vector<Float> m_cdf;
-	std::vector<Normal> m_normals;
 };
 
-MTS_IMPLEMENT_CLASS_S(TabulatedBSDF, false, BSDF)
-MTS_EXPORT_PLUGIN(TabulatedBSDF, "Base BSDF convolve tabulated NDF");
+MTS_IMPLEMENT_CLASS_S(HeightmapBSDF, false, BSDF)
+MTS_EXPORT_PLUGIN(HeightmapBSDF, "Base BSDF convolve tabulated NDF (induced by a heightmap)");
 MTS_NAMESPACE_END
