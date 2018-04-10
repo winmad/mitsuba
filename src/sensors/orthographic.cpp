@@ -132,6 +132,17 @@ public:
 			trafo(m_sampleToCamera(Vector(0, 1, 0))).length());
 
 		m_scale = trafo(Vector(0, 0, 1)).length();
+
+// 		Point p = trafo(m_sampleToCamera(Point(0.f)));
+// 		Log(EInfo, "o = (%.6f, %.6f, %.6f)", p.x, p.y, p.z);
+// 		p = trafo(m_sampleToCamera(Point(0.f)) + m_dx);
+// 		Log(EInfo, "x_step = (%.6f, %.6f, %.6f)", p.x, p.y, p.z);
+// 		p = trafo(m_sampleToCamera(Point(1.0, 0, 0)));
+// 		Log(EInfo, "x_max = (%.6f, %.6f, %.6f)", p.x, p.y, p.z);
+// 		
+// 		Log(EInfo, "invRes = (%.6f, %.6f)", m_invResolution.x, m_invResolution.y);
+// 		Log(EInfo, "m_dx = (%.6f, %.6f, %.6f)", m_dx.x, m_dx.y, m_dx.z);
+// 		Log(EInfo, "area = %.6f", 1.0 / m_invSurfaceArea);
 	}
 
 	Spectrum sampleRay(Ray &ray, const Point2 &pixelSample,

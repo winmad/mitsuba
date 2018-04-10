@@ -68,6 +68,8 @@ void Intersection::computePartials(const RayDifferential &ray) {
 		dudx = 1; dvdx = 0;
 	}
 
+	//printf("%.6f, %.6f; %.6f, %.6f. %.6f; %.6f\n", A[0][0], A[0][1], A[1][0], A[1][1], Bx[0], Bx[1]);
+
 	if (EXPECT_TAKEN(solveLinearSystem2x2(A, By, x))) {
 		dudy = x[0]; dvdy = x[1];
 	} else {

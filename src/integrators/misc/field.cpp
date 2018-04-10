@@ -65,9 +65,9 @@ public:
 		EAlbedo,
 		EShapeIndex,
 		EPrimIndex,
+
 		// Added by Lifan Wu
-		// Oct 23, 2015
-		EDistancesForAAF
+		EFootprint
 	};
 
 	FieldIntegrator(const Properties &props) : SamplingIntegrator(props) {
@@ -93,8 +93,8 @@ public:
 			m_field = EShapeIndex;
 		} else if (field == "primIndex") {
 			m_field = EPrimIndex;
-		} else if (field == "distancesForAAF") {
-			m_field = EDistancesForAAF;
+		} else if (field == "footprint") {
+			m_field = EFootprint;
 		} else {
 			Log(EError, "Invalid 'field' parameter. Must be one of 'position', "
 				"'relPosition', 'distance', 'geoNormal', 'shNormal', "
@@ -184,8 +184,17 @@ public:
 			case EPrimIndex:
 				result = Spectrum((Float) its.primIndex);
 				break;
-			case EDistancesForAAF:
-				
+			case EFootprint:
+				its.computePartials(ray);
+// 				Log(EInfo, "o = (%.6f, %.6f, %.6f), ox = (%.6f, %.6f, %.6f), oy = (%.6f, %.6f, %.6f)",
+// 					ray.o.x, ray.o.y, ray.o.z,
+// 					ray.rxOrigin.x, ray.rxOrigin.y, ray.rxOrigin.z,
+// 					ray.ryOrigin.x, ray.ryOrigin.y, ray.ryOrigin.z);
+				//Log(EInfo, "%.6f, %.6f; %.6f, %.6f", its.dudx, its.dvdx, its.dudy, its.dvdy);
+				result[0] = sqrt(its.dudx * its.dudx + its.dvdx * its.dvdx) * 1024;
+				result[1] = sqrt(its.dudy * its.dudy + its.dvdy * its.dvdy) * 1024;
+				result[2] = result[0] * result[1];
+				break;
 			default:
 				Log(EError, "Internal error!");
 		}

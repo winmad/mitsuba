@@ -11,6 +11,7 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/sampler.h>
 #include <boost/filesystem/path.hpp>
+#include "../bsdfs/microfacet.h"
 #include "multi_vmf.h"
 
 MTS_NAMESPACE_BEGIN
@@ -48,8 +49,6 @@ public:
 		// ground truth NDF
 		std::vector<std::vector<Vector> > normals(m_sqrtSpp, std::vector<Vector>(m_sqrtSpp));
 		std::vector<std::vector<double> > weights(m_sqrtSpp, std::vector<double>(m_sqrtSpp));
-
-		double normFactor = (double)(m_size * m_size) / (4.0 * m_spp);
 		
 #pragma omp parallel for
 		for (int i = 0; i < m_sqrtSpp; i++) {
@@ -60,6 +59,7 @@ public:
 		}
 		Log(EInfo, "Finish binning.");
 
+		double normFactor = (double)(m_size * m_size) / (4.0 * m_spp);
 		Normal avgNormal(0.0);
 		double dp = 4.0 / (double)(m_size * m_size);
 		double totWeight = 0.0f;
@@ -116,6 +116,13 @@ public:
 		ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);
 		m_res->write(Bitmap::EOpenEXR, stream);
 
+		// output NDF derived by LEADR
+		if (true) {
+			char fname[256];
+			sprintf(fname, "LEADR_%s", argv[13]);
+			outputLeadrNDF(normals, fname);
+		}
+
 		// fitting with multi-lobe vMF
 		if (argc > 14) {
 			m_numLobes = std::atoi(argv[14]);
@@ -142,6 +149,7 @@ public:
 		}
 
 		// output slopes
+		/*
 		char fname[256];
 		sprintf(fname, "slopes_%s", argv[13]);
 		int len = strlen(fname);
@@ -159,6 +167,7 @@ public:
 			}
 		}
 		fclose(fp);
+		*/
 
 		return 0;
 	}
@@ -200,6 +209,108 @@ public:
 		}
 
 		return normal;
+	}
+
+	void outputLeadrNDF(const std::vector<std::vector<Vector> > &normals, char* fname) {
+		Vector moments0(0.0);
+		Vector moments1(0.0);
+		for (int i = 0; i < m_sqrtSpp; i++) {
+			for (int j = 0; j < m_sqrtSpp; j++) {
+				Vector slope;
+				const Vector &norm = normals[i][j];
+				if (std::abs(norm.z) < 1e-5)
+					continue;
+				slope.x = -norm.x / norm.z;
+				slope.y = -norm.y / norm.z;
+
+				moments0.x += slope.x;
+				moments0.y += slope.y;
+				moments1.x += slope.x * slope.x;
+				moments1.y += slope.y * slope.y;
+				moments1.z += slope.x * slope.y;
+			}
+		}
+		moments0 /= (double)m_spp;
+		moments1 /= (double)m_spp;
+
+		Float sigmaX2 = moments1[0] - moments0[0] * moments0[0];
+		Float sigmaY2 = moments1[1] - moments0[1] * moments0[1];
+		Float cxy = moments1[2] - moments0[0] * moments0[1];
+		Float sigmaX = std::sqrt(sigmaX2);
+		Float sigmaY = std::sqrt(sigmaY2);
+		Float rxy = cxy / (sigmaX * sigmaY);
+
+		Log(EInfo, "LEADR moments computed");
+		Log(EInfo, "x = %.6f, y = %.6f", moments0.x, moments0.y);
+		Log(EInfo, "x2 = %.6f, y2 = %.6f, xy = %.6f", moments1.x, moments1.y, moments1.z);
+		Log(EInfo, "sigma_x = %.6f, sigma_y = %.6f, corr = %.6f", sigmaX, sigmaY, rxy);
+
+		std::vector<std::vector<Vector> > sampledNormals(m_sqrtSpp, std::vector<Vector>(m_sqrtSpp));
+#pragma omp parallel for
+		for (int i = 0; i < m_sqrtSpp; i++) {
+			for (int j = 0; j < m_sqrtSpp; j++) {
+				Sampler *sampler = m_samplers[Thread::getID() % 233];
+				Point2 sample2 = sampler->next2D();
+				Point2 stdSample2 = warp::squareToStdNormal(sample2);		
+				Vector2 slope;
+				slope.x = stdSample2[0] * sigmaX + moments0[0];
+				slope.y = (rxy * stdSample2[0] + std::sqrt(1.0 - rxy * rxy) * stdSample2[1]) * sigmaY + moments0[1];
+
+				Normal wm(-slope.x, -slope.y, 1.0);
+				wm = normalize(wm);
+				wm /= m_normal_stLim;
+				sampledNormals[i][j] = wm;
+
+				//Log(EInfo, "sx = %.6f, sy = %.6f", slope.x, slope.y);
+				//Log(EInfo, "%.6f, %.6f, %.6f", wm.x, wm.y, wm.z);
+			}
+		}
+
+		m_resLEADR = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
+
+		Normal avgNormal(0.0);
+		for (int i = 0; i < m_sqrtSpp; i++) {
+			for (int j = 0; j < m_sqrtSpp; j++) {
+				avgNormal += sampledNormals[i][j];
+			}
+		}
+		avgNormal /= (double)m_spp;
+
+		m_resLEADR->clear();
+		float *data = m_resLEADR->getFloat32Data();
+
+		double normFactor = (double)(m_size * m_size) / (4.0 * m_spp);
+		double dp = 4.0 / (double)(m_size * m_size);
+		for (int i = 0; i < m_sqrtSpp; i++) {
+			for (int j = 0; j < m_sqrtSpp; j++) {
+				const Vector &normal = sampledNormals[i][j];
+
+				//int c = (normal.x > 0.9999f ? m_size - 1 : math::floorToInt((normal.x + 1.0) * 0.5 * m_size));
+				//int r = (normal.y > 0.9999f ? m_size - 1 : math::floorToInt((normal.y + 1.0) * 0.5 * m_size));
+				int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
+				int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
+
+				data[(m_size - r - 1) * m_size + c] += normFactor * normal.z;
+			}
+		}
+
+		// ensure \int D_{wi}(wm)dwm = 1
+		double totD = 0.0;
+		for (int r = 0; r < m_size; r++) {
+			double y = (r + 0.5) / (double)m_size * 2.0 - 1.0;
+			for (int c = 0; c < m_size; c++) {
+				double x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
+				double sinTheta2 = x * x + y * y;
+				if (sinTheta2 >= 1.0)
+					continue;
+				double jacobian = 1.0 / std::sqrt(1.0 - sinTheta2);
+				totD += data[r * m_size + c] * jacobian * dp;
+			}
+		}
+		Log(EInfo, "Validation: %.8f should equal to 1", totD);
+		
+		ref<FileStream> stream = new FileStream(fname, FileStream::ETruncWrite);
+		m_resLEADR->write(Bitmap::EOpenEXR, stream);
 	}
 
 	void initKMeans(const std::vector<std::vector<Vector> > &normals,
@@ -396,6 +507,7 @@ public:
 	AABB2 m_aabb;
 	double m_normal_stLim;
 	ref<Bitmap> m_res;
+	ref<Bitmap> m_resLEADR;
 
 	int m_numLobes;
 	MultiLobeVMF m_vmfs;

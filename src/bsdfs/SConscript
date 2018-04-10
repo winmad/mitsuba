@@ -18,6 +18,7 @@ plugins += env.SharedLibrary('tabulated_bsdf', ['tabulated_bsdf.cpp'])
 plugins += env.SharedLibrary('roughdiffuse_multi', ['roughdiffuse_multi.cpp'])
 plugins += env.SharedLibrary('roughbsdf_multi', ['roughbsdf_multi.cpp'])
 plugins += env.SharedLibrary('sh_scaled_bsdf', ['sh_scaled_bsdf.cpp'])
+plugins += env.SharedLibrary('tabulated_scaled_bsdf', ['tabulated_scaled_bsdf.cpp'])
 plugins += env.SharedLibrary('heightmap_bsdf', ['heightmap_bsdf.cpp'])
 
 # Materials that act as modifiers
