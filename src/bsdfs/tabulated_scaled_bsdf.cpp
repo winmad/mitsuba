@@ -41,17 +41,45 @@ public:
 		// load angular scales
 		m_angularScales = new Bitmap(fs::path(m_angularScaleFilename));
 		m_lobeSize = m_angularScales->getSize();
+		m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y));
+		m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x));
+
+		Log(EInfo, "wiRes = %d, woRes = %d", m_wiResolution, m_woResolution);
 
 		BSDF::configure();
 	}
 
 	Spectrum evalScale(const BSDFSamplingRecord &bRec) const {
+		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
-		int r = math::floorToInt((woMacro.y + 1.0) * 0.5 * m_lobeSize.y);
-		r = m_lobeSize.y - r - 1;
-		int c = math::floorToInt((woMacro.x + 1.0) * 0.5 * m_lobeSize.x);
-		Spectrum res = m_angularScales->getPixel(Point2i(c, r));
+
+		int rWi = math::floorToInt((wiMacro.y + 1.0) * 0.5 * m_wiResolution);
+		rWi = math::clamp(m_wiResolution - rWi - 1, 0, m_wiResolution - 1);
+		int cWi = math::floorToInt((wiMacro.x + 1.0) * 0.5 * m_wiResolution);
+		cWi = math::clamp(cWi, 0, m_wiResolution - 1);
+
+		int rWo = math::floorToInt((woMacro.y + 1.0) * 0.5 * m_woResolution);
+		rWo = math::clamp(m_woResolution - rWo - 1, 0, m_woResolution - 1);
+		int cWo = math::floorToInt((woMacro.x + 1.0) * 0.5 * m_woResolution);
+		cWo = math::clamp(cWo, 0, m_woResolution - 1);
+
+		Spectrum res(0.f);
+		Float weights = 0.f;
+
+		res = m_angularScales->getPixel(Point2i(rWo * m_woResolution + cWo, 
+			rWi * m_wiResolution + cWi));
+
+		if (res[0] < 1e-4f) {
+// 			Log(EInfo, "(%d, %d), wi = (%.6f, %.6f, %.6f), wo = (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", 
+// 				rWi * m_wiResolution + cWi, rWo * m_woResolution + cWo, 
+// 				wiMacro.x, wiMacro.y, wiMacro.z,
+// 				woMacro.x, woMacro.y, woMacro.z,
+// 				res[0], res[1], res[2]);
+
+			res = Spectrum(1.0f);
+		}
 		//Log(EInfo, "(%.6f, %.6f, %.6f), (%d, %d), %.6f", 
 		//	woMacro.x, woMacro.y, woMacro.z, r, c, res.average());
 		return res;
@@ -117,6 +145,8 @@ public:
 	ref<BSDF> m_bsdf;
 	std::string m_angularScaleFilename;
 	Vector2i m_lobeSize;
+	int m_wiResolution;
+	int m_woResolution;
 };
 
 MTS_IMPLEMENT_CLASS_S(TabulatedScaledBSDF, false, BSDF)

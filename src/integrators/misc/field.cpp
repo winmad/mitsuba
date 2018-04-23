@@ -67,7 +67,10 @@ public:
 		EPrimIndex,
 
 		// Added by Lifan Wu
-		EFootprint
+		EFootprint,
+		EBaseNormal,
+		EWiMacro,
+		EWoMacro,
 	};
 
 	FieldIntegrator(const Properties &props) : SamplingIntegrator(props) {
@@ -95,6 +98,12 @@ public:
 			m_field = EPrimIndex;
 		} else if (field == "footprint") {
 			m_field = EFootprint;
+		} else if (field == "baseNormal") {
+			m_field = EBaseNormal;
+		} else if (field == "wiMacro") {
+			m_field = EWiMacro;
+		} else if (field == "woMacro") {
+			m_field = EWoMacro;
 		} else {
 			Log(EError, "Invalid 'field' parameter. Must be one of 'position', "
 				"'relPosition', 'distance', 'geoNormal', 'shNormal', "
@@ -194,6 +203,13 @@ public:
 				result[0] = sqrt(its.dudx * its.dudx + its.dvdx * its.dvdx) * 1024;
 				result[1] = sqrt(its.dudy * its.dudy + its.dvdy * its.dvdy) * 1024;
 				result[2] = result[0] * result[1];
+				break;
+			case EBaseNormal:
+				result.fromLinearRGB(its.baseFrame.n.x, its.baseFrame.n.y, its.baseFrame.n.z);
+				break;
+			case EWiMacro:
+				break;
+			case EWoMacro:
 				break;
 			default:
 				Log(EError, "Internal error!");

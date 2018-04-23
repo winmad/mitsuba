@@ -43,6 +43,8 @@ public:
 
         // correspond to z=1 in texture space
         m_maxHeight = props.getFloat("maxHeight", -1.0);
+
+		m_useMacroDeform = props.getBoolean("useMacroDeform", false);
     }
 
     ShellmapHeightfield(Stream *stream, InstanceManager *manager) 
@@ -50,6 +52,7 @@ public:
         m_objectToWorld = Transform(stream);
         m_shellFilename = stream->readString();
         m_maxHeight = stream->readFloat();
+		m_useMacroDeform = stream->readBool();
         m_block = static_cast<Shape *>(manager->getInstance(stream));
         configure();
     }
@@ -62,6 +65,7 @@ public:
         m_objectToWorld.serialize(stream);
         stream->writeString(m_shellFilename);
         stream->writeFloat(m_maxHeight);
+		stream->writeBool(m_useMacroDeform);
         manager->serialize(stream, m_block.get());
     }
 
@@ -288,9 +292,13 @@ public:
 
         its.uv = Point2(tex.x, tex.y);
 
-        Vector dpduTex = temp.dpduBlock; //m_dataToTexture(temp.dpduBlock);
-        Vector dpdvTex = temp.dpdvBlock; //m_dataToTexture(temp.dpdvBlock);
-        Normal normTex = temp.normBlock; //normalize(m_dataToTexture(temp.geoFrameBlock.n));
+        Vector dpduTex = temp.dpduBlock;
+        Vector dpdvTex = temp.dpdvBlock;
+        Normal normTex = temp.normBlock;
+
+// 		Vector dpduTex = m_dataToTexture(temp.dpduBlock);
+// 		Vector dpdvTex = m_dataToTexture(temp.dpdvBlock);
+// 		Normal normTex = normalize(m_dataToTexture(temp.normBlock));
        
         Vector dpduWorld = dpduTex.x * tang.dpdu + dpduTex.y * tang.dpdv + dpduTex.z * norm;
         Vector dpdvWorld = dpdvTex.x * tang.dpdu + dpdvTex.y * tang.dpdv + dpdvTex.z * norm;
@@ -311,7 +319,7 @@ public:
         its.geoFrame.n = normWorld;
         its.geoFrame.s = normalize(its.dpdu);
         its.geoFrame.t = cross(its.geoFrame.n, its.geoFrame.s);
-        */
+		*/
 
         its.geoFrame.s = normalize(its.dpdu);
         its.geoFrame.t = normalize(its.dpdv - dot(its.dpdv, its.geoFrame.s) * its.geoFrame.s);
@@ -320,11 +328,51 @@ public:
         its.shFrame.n = its.geoFrame.n;
 
         its.shape = this;
-        its.hasUVPartials = false;
         its.instance = NULL;
+		its.hasUVPartials = false;
         its.time = ray.time;
 
-		its.baseFrame = Frame(tang.dpdu, tang.dpdv, norm);
+		its.baseFrame.s = tang.dpdu;
+		its.baseFrame.t = normalize(tang.dpdv - dot(tang.dpdv, its.baseFrame.s) * its.baseFrame.s);
+		its.baseFrame.n = cross(its.baseFrame.s, its.baseFrame.t);
+
+		// compute differential geometry
+		if (m_useMacroDeform) {
+			Float step = 1e-4;
+			Point px, py, tx, ty, bo, bx, by;
+			bo = m_textureToData.transformAffine(tex);
+
+			px = its.p + its.baseFrame.s * step;
+			if (m_shell.lookupPoint(px, tx)) {
+				bx = m_textureToData.transformAffine(tx);
+				its.dudx = (bx.x - bo.x) / step;
+				its.dvdx = (bx.y - bo.y) / step;
+			} else {
+				px = its.p - its.baseFrame.s * step;
+				if (m_shell.lookupPoint(px, tx)) {
+					bx = m_textureToData.transformAffine(tx);
+					its.dudx = (bo.x - bx.x) / step;
+					its.dvdx = (bo.y - bx.y) / step;
+				} else {
+					its.dudx = 1.0; its.dvdx = 0.0;
+				}
+			}
+
+			py = its.p + its.baseFrame.t * step;
+			if (m_shell.lookupPoint(py, ty)) {
+				by = m_textureToData.transformAffine(ty);
+				its.dudy = (by.x - bo.x) / step;
+				its.dvdy = (by.y - bo.y) / step;
+			} else {
+				py = its.p - its.baseFrame.t * step;
+				if (m_shell.lookupPoint(py, ty)) {
+					its.dudy = (bo.x - by.x) / step;
+					its.dvdy = (bo.y - by.y) / step;
+				} else {
+					its.dudy = 0.0; its.dvdy = 1.0;
+				}
+			}
+		}
     }
 
     //void getNormalDerivative(const Intersection &its, Vector &dndu, Vector &dndv, 
@@ -374,6 +422,7 @@ public:
             m_ready = true;
 
             Log(EInfo, "%s", toString().c_str());
+			Log(EInfo, "shell area = %.6f", m_shell.getSurfaceArea());
         }
     }
 
@@ -421,6 +470,8 @@ protected:
     
 	AABB m_aabb;
 	int m_tetrahedronCount;
+
+	bool m_useMacroDeform;
 };
 
 MTS_IMPLEMENT_CLASS_S(ShellmapHeightfield, false, Shape)

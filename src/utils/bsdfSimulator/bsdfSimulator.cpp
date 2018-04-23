@@ -89,6 +89,7 @@ public:
 
 		Log(EInfo, "Finish rendering.");
 
+		// Normalization issues!
 		double totValidParticles = (double)proc->m_res->getLobe(m_minDepth + 1)->m_totValidParticles;
 		//double totValidParticles = m_numParticles;
 		double totParticles = m_numParticles;
@@ -99,10 +100,14 @@ public:
 		char txtFilename[256];
 		FILE *fp;
 
-		sprintf(txtFilename, "%s.txt", argv[14]);
-		fp = fopen(txtFilename, "w");
+// 		sprintf(txtFilename, "%s.txt", argv[14]);
+// 		fp = fopen(txtFilename, "w");
+
 		for (int i = 0; i < numLobes; i++) {
 			char filename[256];
+			if (m_minDepth == m_maxDepth && i + 1 != m_minDepth)
+				continue;
+
 			if (i < numLobes - 1)
 				sprintf(filename, "%s_order_%d.exr", argv[14], i + 1);
 			else
@@ -117,20 +122,20 @@ public:
 				totValidParticles, m_numParticles);
 			Log(EInfo, "Total thr = (%.6f, %.6f, %.6f)", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
 			
-			fprintf(fp, "%.6f %.6f %.6f\n", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
+			/*fprintf(fp, "%.6f %.6f %.6f\n", totalThroughput[0], totalThroughput[1], totalThroughput[2]);*/
 		}		
-		fclose(fp);
+		/*fclose(fp);*/
 
-		sprintf(txtFilename, "%s_moments.txt", argv[14]);
-		fp = fopen(txtFilename, "w");
-		for (int i = 0; i < 3; i++) {
-			Vector3d moment = proc->m_res->getLobe(numLobes - 1)->m_moments[i];
-			moment /= totValidParticles;
-			Log(EInfo, "%d-th moment = (%.6f, %.6f, %.6f)", i, moment[0], moment[1], moment[2]);
-
-			fprintf(fp, "%.6f %.6f %.6f\n", moment[0], moment[1], moment[2]);
-		}
-		fclose(fp);
+// 		sprintf(txtFilename, "%s_moments.txt", argv[14]);
+// 		fp = fopen(txtFilename, "w");
+// 		for (int i = 0; i < 3; i++) {
+// 			Vector3d moment = proc->m_res->getLobe(numLobes - 1)->m_moments[i];
+// 			moment /= totValidParticles;
+// 			Log(EInfo, "%d-th moment = (%.6f, %.6f, %.6f)", i, moment[0], moment[1], moment[2]);
+// 
+// 			fprintf(fp, "%.6f %.6f %.6f\n", moment[0], moment[1], moment[2]);
+// 		}
+// 		fclose(fp);
 		
 		//validate();
 		return 0;

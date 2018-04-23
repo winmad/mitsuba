@@ -167,6 +167,11 @@ public:
 				VERIFY_VALUE(fscanf(fin, "%f %f %f", &m_vtxTangent[i].dpdu.x, &m_vtxTangent[i].dpdu.y, &m_vtxTangent[i].dpdu.z), 3);
 				VERIFY_VALUE(fscanf(fin, "%f %f %f", &m_vtxTangent[i].dpdv.x, &m_vtxTangent[i].dpdv.y, &m_vtxTangent[i].dpdv.z), 3);
 #endif
+
+// 				Float cosineTerm = dot(m_vtxTangent[i].dpdu, m_vtxTangent[i].dpdv);
+// 				if (std::abs(cosineTerm) > 1e-4) {
+// 					printf("%.6f, Not an orthogonal frame (input)\n", cosineTerm);
+// 				}
             }
             for ( uint32_t i = 0; i < m_tetrahedronCount; ++i )
                 VERIFY_VALUE(fscanf(fin, "%u %u %u %u", &m_tetra[i].idx[0], &m_tetra[i].idx[1], &m_tetra[i].idx[2], &m_tetra[i].idx[3]), 4);

@@ -15,6 +15,8 @@ MTS_NAMESPACE_BEGIN
 // default world frame with n=(0,0,1)
 // ************
 // UPDATE: use baseFrame
+// ************
+// WORKING: consider macro-surface deformation
 
 class MultiLobeBSDF : public BSDF {
 public:
@@ -28,6 +30,8 @@ public:
 			);
 
 		m_lobeFilenamePrefix = props.getString("prefix", "");
+
+		m_useMacroDeform = props.getBoolean("useMacroDeform", false);
 	}
 
 	MultiLobeBSDF(Stream *stream, InstanceManager *manager) 
@@ -36,6 +40,7 @@ public:
 		m_uvScale = Vector2(stream->readFloat(), stream->readFloat());
 		m_bsdf = static_cast<BSDF *>(manager->getInstance(stream));
 		m_lobeFilenamePrefix = stream->readString();
+		m_useMacroDeform = stream->readBool();
 
 		configure();
 	}
@@ -48,6 +53,7 @@ public:
 		stream->writeFloat(m_uvScale.y);
 		manager->serialize(stream, m_bsdf.get());
 		stream->writeString(m_lobeFilenamePrefix);
+		stream->writeBool(m_useMacroDeform);
 	}
 
 	void configure() {
@@ -357,6 +363,7 @@ private:
 	Vector2 m_uvScale;
 	ref<BSDF> m_bsdf;
 	ref_vector<Sampler> m_samplers;
+	bool m_useMacroDeform;
 };
 
 MTS_IMPLEMENT_CLASS_S(MultiLobeBSDF, false, BSDF)
