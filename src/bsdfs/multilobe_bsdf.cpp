@@ -292,7 +292,8 @@ public:
 // 			<< "wi_local_micro = (" << bsdfRec.wi.x << ", " << bsdfRec.wi.y << ", " << bsdfRec.wi.z << ")" << std::endl
 // 			<< "wo_local_micro = (" << bsdfRec.wo.x << ", " << bsdfRec.wo.y << ", " << bsdfRec.wo.z << ")" << std::endl
 // 			<< "value = (" << res[0] << ", " << res[1] << ", " << res[2] << ")" << std::endl
-// 			<< "wo_local_macro = (" << bRec.wo.x << ", " << bRec.wo.y << ", " << bRec.wo.z << ")" << std::endl;
+// 			<< "wi_macro = (" << wiMacro.x << ", " << wiMacro.y << ", " << wiMacro.z << ")" << std::endl
+// 			<< "wo_macro = (" << woMacro.x << ", " << woMacro.y << ", " << woMacro.z << ")" << std::endl;
 // 		std::cout << oss.str() << std::endl;
 		
 		// hack..

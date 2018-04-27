@@ -47,7 +47,7 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 
 		double weight;
 		Point o = sampleRayOrigin(i, weight);
-		if (weight < 1e-4) {
+		if (weight < 1e-5) {
 			//Log(EInfo, "sample origin fail...");
 			continue;
 		}
@@ -59,8 +59,11 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 		Intersection its;
 		Spectrum throughput = sampleReflectance(ray, rRec, its);
 
-		if (throughput[0] < -Epsilon)
-			continue;
+// 		if (throughput[0] < -Epsilon) {
+// 			//Log(EInfo, "invalid throughput");
+// 			continue;
+// 		}
+
 		//Assert(ray.d.z > -Epsilon);
 		if (ray.d.z < 0)
 			throughput = Spectrum(0.f);
@@ -78,11 +81,11 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 
 		if (rRec.depth > 0) {
 			if (rRec.depth <= m_minDepth)
-				res->getLobe(rRec.depth - 1)->put(ray.d, throughput, normFactor);
+				res->getLobe(rRec.depth - 1)->put(ray.d, throughput, weight, normFactor);
 			else
-				res->getLobe(m_minDepth)->put(ray.d, throughput, normFactor);
+				res->getLobe(m_minDepth)->put(ray.d, throughput, weight, normFactor);
 		}
-		res->getLobe(m_minDepth + 1)->put(ray.d, throughput, normFactor);
+		res->getLobe(m_minDepth + 1)->put(ray.d, throughput, weight, normFactor);
 
 	}
 	//Log(EInfo, "process done %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
@@ -100,7 +103,13 @@ Point BSDFRayTracer::sampleRayOrigin(int idx, double &weight) {
 	m_scene->rayIntersect(ray, its);
 	Normal normal = its.shFrame.n;
 
-	weight = std::max(0.0, dot(normal, m_wi));
+	double cosG = std::max(0.0, normal.z);
+	if (cosG < 1e-5) {
+		weight = 0.0;
+		return o;
+	}
+
+	weight = std::max(0.0, dot(normal, m_wi)) / cosG;
 	if (weight > 0.0) {
 		ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
 		o = its.p + m_wi * 1e2;
@@ -133,7 +142,7 @@ Point BSDFRayTracer::sampleRayOrigin(int idx, double &weight) {
 	//Log(EInfo, "(%.6f, %.6f), (%.6f, %.6f, %.6f)", x, y,
 	//	its.p.x, its.p.y, its.p.z);
 
-	return o;
+	//return o;
 }
 
 Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts) {
@@ -170,10 +179,9 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 
 			if (!its.isValid() || !m_aabb.contains(Point2(its.p.x, its.p.y)) ||
 				rRec.depth == m_maxDepth) {
-			//if (!its.isValid()) {
-				//if (rRec.depth == 0)
-				//	Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
-				//		m_aabb.contains(Point2(its.p.x, its.p.y)));
+// 				if (rRec.depth == 0)
+// 					Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
+// 						m_aabb.contains(Point2(its.p.x, its.p.y)));
 				return throughput;
 			}
 
@@ -187,8 +195,10 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 
 			Spectrum bsdfVal = bsdf->sample(bRec, rRec.nextSample2D());
 			throughput *= bsdfVal;
-			if (bsdfVal.isZero())
+			if (bsdfVal.isZero()) {
+				//Log(EInfo, "zero bsdf, wo = (%.6f, %.6f, %.6f)", bRec.wo.x, bRec.wo.y, bRec.wo.z);
 				break;
+			}
 
 			const Vector wo = its.toWorld(bRec.wo);
 			if (its.isMediumTransition())

@@ -55,33 +55,106 @@ public:
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
-		int rWi = math::floorToInt((wiMacro.y + 1.0) * 0.5 * m_wiResolution);
+		// no interpolation
+// 		int r1 = math::floorToInt((wiMacro.y + 1.0) * 0.5 * m_wiResolution);
+// 		r1 = math::clamp(m_wiResolution - r1 - 1, 0, m_wiResolution - 1);
+// 		int c1 = math::floorToInt((wiMacro.x + 1.0) * 0.5 * m_wiResolution);
+// 		c1 = math::clamp(c1, 0, m_wiResolution - 1);
+// 
+// 		int r2 = math::floorToInt((woMacro.y + 1.0) * 0.5 * m_woResolution);
+// 		r2 = math::clamp(m_woResolution - r2 - 1, 0, m_woResolution - 1);
+// 		int c2 = math::floorToInt((woMacro.x + 1.0) * 0.5 * m_woResolution);
+// 		c2 = math::clamp(c2, 0, m_woResolution - 1);
+// 
+// 		Spectrum result = m_angularScales->getPixel(Point2i(r2 * m_woResolution + c2, 
+// 			r1 * m_wiResolution + c1));
+// 		if (result[0] < 1e-4f) {
+// 			result = Spectrum(1.0f);
+// 		}
+// 		//Log(EInfo, "%.6f, %.6f, %.6f", result[0], result[1], result[2]);
+// 		return result;
+
+		int rWi = math::floorToInt((wiMacro.y + 1.0) * 0.5 * m_wiResolution + 0.5);
 		rWi = math::clamp(m_wiResolution - rWi - 1, 0, m_wiResolution - 1);
-		int cWi = math::floorToInt((wiMacro.x + 1.0) * 0.5 * m_wiResolution);
+		int cWi = math::floorToInt((wiMacro.x + 1.0) * 0.5 * m_wiResolution - 0.5);
 		cWi = math::clamp(cWi, 0, m_wiResolution - 1);
 
-		int rWo = math::floorToInt((woMacro.y + 1.0) * 0.5 * m_woResolution);
+		int rWo = math::floorToInt((woMacro.y + 1.0) * 0.5 * m_woResolution + 0.5);
 		rWo = math::clamp(m_woResolution - rWo - 1, 0, m_woResolution - 1);
-		int cWo = math::floorToInt((woMacro.x + 1.0) * 0.5 * m_woResolution);
+		int cWo = math::floorToInt((woMacro.x + 1.0) * 0.5 * m_woResolution - 0.5);
 		cWo = math::clamp(cWo, 0, m_woResolution - 1);
 
 		Spectrum res(0.f);
 		Float weights = 0.f;
 
-		res = m_angularScales->getPixel(Point2i(rWo * m_woResolution + cWo, 
-			rWi * m_wiResolution + cWi));
+		// interpolation
+		for (int drWi = 0; drWi < 2; drWi++) {
+			int rWiNew = rWi + drWi;
+// 			if (rWiNew < 0 || rWiNew >= m_wiResolution)
+// 				continue;
+			rWiNew = math::clamp(rWiNew, 0, m_wiResolution - 1);
 
-		if (res[0] < 1e-4f) {
-// 			Log(EInfo, "(%d, %d), wi = (%.6f, %.6f, %.6f), wo = (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", 
-// 				rWi * m_wiResolution + cWi, rWo * m_woResolution + cWo, 
+			for (int dcWi = 0; dcWi < 2; dcWi++) {
+				int cWiNew = cWi + dcWi;
+// 				if (cWiNew < 0 || cWiNew >= m_wiResolution)
+// 					continue;
+				cWiNew = math::clamp(cWiNew, 0, m_wiResolution - 1);
+				
+				Vector tableWi;
+				tableWi.x = (cWiNew + 0.5) / m_wiResolution * 2.0 - 1.0;
+				tableWi.y = ((m_wiResolution - rWiNew - 1) + 0.5) / m_wiResolution * 2.0 - 1.0;
+				double tmp = tableWi.x * tableWi.x + tableWi.y * tableWi.y;
+				if (tmp > 1.0)
+					continue;
+				tableWi.z = std::sqrt(1.0 - tmp);
+
+				for (int drWo = 0; drWo < 2; drWo++) {
+					int rWoNew = rWo + drWo;
+// 					if (rWoNew < 0 || rWoNew >= m_woResolution)
+// 						continue;
+					rWoNew = math::clamp(rWoNew, 0, m_woResolution - 1);
+
+					for (int dcWo = 0; dcWo < 2; dcWo++) {
+						int cWoNew = cWo + dcWo;
+// 						if (cWoNew < 0 || cWoNew >= m_woResolution)
+// 							continue;
+						cWoNew = math::clamp(cWoNew, 0, m_woResolution - 1);
+
+						Vector tableWo;
+						tableWo.x = (cWoNew + 0.5) / m_woResolution * 2.0 - 1.0;
+						tableWo.y = ((m_woResolution - rWoNew - 1) + 0.5) / m_woResolution * 2.0 - 1.0;
+						tmp = tableWo.x * tableWo.x + tableWo.y * tableWo.y;
+						if (tmp > 1.0)
+							continue;
+						tableWo.z = std::sqrt(1.0 - tmp);
+
+						Spectrum tmpValue = m_angularScales->getPixel(Point2i(rWoNew * m_woResolution + cWoNew,
+							rWiNew * m_wiResolution + cWiNew));
+						double tmpWeight = std::max(0.0, dot(wiMacro, tableWi)) * std::max(0.0, dot(woMacro, tableWo));
+
+						res += tmpValue * tmpWeight;
+						weights += tmpWeight;
+					}
+				}
+			}
+		}
+
+		if (weights < 1e-5) {
+// 			Log(EInfo, "wi = [%d, %d](%.6f, %.6f, %.6f), wo = [%d, %d](%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)", 
+// 				rWi, cWi, 
 // 				wiMacro.x, wiMacro.y, wiMacro.z,
+// 				rWo, cWo,
 // 				woMacro.x, woMacro.y, woMacro.z,
 // 				res[0], res[1], res[2]);
 
 			res = Spectrum(1.0f);
+		} else {
+			res /= weights;
 		}
-		//Log(EInfo, "(%.6f, %.6f, %.6f), (%d, %d), %.6f", 
-		//	woMacro.x, woMacro.y, woMacro.z, r, c, res.average());
+
+// 		Log(EInfo, "wi = (%.6f, %.6f, %.6f), wo = (%.6f, %.6f, %.6f), %.6f", 
+// 			wiMacro.x, wiMacro.y, wiMacro.z,
+// 			woMacro.x, woMacro.y, woMacro.z, res[0]);
 		return res;
 	}
 

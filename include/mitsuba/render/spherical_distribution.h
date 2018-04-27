@@ -14,7 +14,7 @@ public:
 	SphericalDistribution(int size);
 	void clear();
 	void put(const SphericalDistribution *dist, bool putBitmap=true);
-	void put(const Vector &dir, const Spectrum &value, double normFactor, bool putBitmap=true);
+	void put(const Vector &dir, const Spectrum &value, double weight, double normFactor, bool putBitmap=true);
 	void scale(double scale);
 	void saveExr(fs::path filename);
 
@@ -29,11 +29,12 @@ public:
 	int m_size;
 	Vector3d m_totValue;
 	int m_totValidParticles;
-	ref<Bitmap> m_values;
 	double m_totWeight;
-	Vector3d m_moments[3];
 
-	Float cY[3];
+	ref<Bitmap> m_values;
+	
+// 	Vector3d m_moments[3];
+// 	Float cY[3];
 };
 
 class MTS_EXPORT_RENDER MultiLobeDistribution : public WorkResult {

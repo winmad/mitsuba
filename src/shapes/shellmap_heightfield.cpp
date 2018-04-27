@@ -422,6 +422,7 @@ public:
             m_ready = true;
 
             Log(EInfo, "%s", toString().c_str());
+			Log(EInfo, "blockAABB = %s", blockAABB.toString().c_str());
 			Log(EInfo, "shell area = %.6f", m_shell.getSurfaceArea());
         }
     }
@@ -442,6 +443,7 @@ public:
             << "  objectToWorld = " << indent(m_objectToWorld.toString()) << "," << endl
             << "  textureToData = " << indent(m_textureToData.toString()) << "," << endl
             << "  aabb = " << indent(getAABB().toString()) << endl
+			<< "  blockAABB = " << indent(m_block->getAABB().toString()) << endl
             << "]";
         return oss.str();
     }

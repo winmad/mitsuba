@@ -53,6 +53,9 @@ public:
 		props.setString("distribution", "GGX");
 		props.setFloat("alpha", 0.1);
 		props.setString("material", "none");
+		Spectrum spec;
+		spec[0] = 0.9; spec[1] = 0.1; spec[2] = 0.1;
+		props.setSpectrum("specularReflectance", spec);
 
 		BSDF *baseBSDF = static_cast<BSDF *> (PluginManager::getInstance()->
 			createObject(MTS_CLASS(BSDF), props));
@@ -67,10 +70,20 @@ public:
 		bsdf->addChild("baseBSDF", baseBSDF);
 		bsdf->configure();
 
+		/*
 		props = Properties("sh_scaled_bsdf");
 		props.setInteger("numCoeffs", 9);
 		props.setString("prefix", "F:\\heightfield_prefiltering\\data\\downsample_gabardine\\glossy_env\\albedo_8x_direct_sh_");
 		props.setFloat("uvscale", 4);
+		BSDF *scaledBSDF = static_cast<BSDF *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(BSDF), props));
+		scaledBSDF->addChild(bsdf);
+		scaledBSDF->configure();
+		*/
+
+		props = Properties("tabulated_scaled_bsdf");
+		props.setString("angularScaleFilename", 
+			"F:\\heightfield_prefiltering\\data\\downsample_gabardine\\glossy_change_view\\result_rLobes_8x_blocksize_1024\\A_matrix.exr");
 		BSDF *scaledBSDF = static_cast<BSDF *> (PluginManager::getInstance()->
 			createObject(MTS_CLASS(BSDF), props));
 		scaledBSDF->addChild(bsdf);

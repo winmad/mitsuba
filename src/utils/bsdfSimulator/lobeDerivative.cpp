@@ -107,6 +107,7 @@ public:
 				continue;
 			char filename[256];
 			sprintf(filename, "%s_var_%d.exr", argv[14], i);
+
 			proc->m_res->getLobe(i)->saveExr(fs::path(filename));
 
 			proc->m_res->getLobe(i)->m_totValue /= totValidParticles;
@@ -119,23 +120,23 @@ public:
 		}
 		fclose(fp);
 
-		sprintf(txtFilename, "%s_moments_derivative.txt", argv[14]);
-		fp = fopen(txtFilename, "w");
-		for (int i = 0; i < 3; i++) {
-			// i-th moment
-			for (int k = 0; k < numLobes; k++) {
-				if (!varMask[k])
-					continue;
-				// variable k
-				Vector3d moment = proc->m_res->getLobe(k)->m_moments[i];
-				moment /= totValidParticles;
-				Log(EInfo, "%d-th moment, var %d = (%.6f, %.6f, %.6f)", i, k, moment[0], moment[1], moment[2]);
-
-				fprintf(fp, "%.6f %.6f %.6f ", moment[0], moment[1], moment[2]);
-			}
-			fprintf(fp, "\n");
-		}
-		fclose(fp);
+// 		sprintf(txtFilename, "%s_moments_derivative.txt", argv[14]);
+// 		fp = fopen(txtFilename, "w");
+// 		for (int i = 0; i < 3; i++) {
+// 			// i-th moment
+// 			for (int k = 0; k < numLobes; k++) {
+// 				if (!varMask[k])
+// 					continue;
+// 				// variable k
+// 				Vector3d moment = proc->m_res->getLobe(k)->m_moments[i];
+// 				moment /= totValidParticles;
+// 				Log(EInfo, "%d-th moment, var %d = (%.6f, %.6f, %.6f)", i, k, moment[0], moment[1], moment[2]);
+// 
+// 				fprintf(fp, "%.6f %.6f %.6f ", moment[0], moment[1], moment[2]);
+// 			}
+// 			fprintf(fp, "\n");
+// 		}
+// 		fclose(fp);
 	
 		return 0;
 	}

@@ -49,7 +49,7 @@ void BSDFDerivativeRayTracer::sampleDerivative(RayDifferential &ray,
 			// put result
 			for (int i = 0; i < 4; i++) {
 				Spectrum tmp = throughput * sumDiff[i];
-				res->getLobe(i)->put(ray.d, tmp, normFactor);
+				res->getLobe(i)->put(ray.d, tmp, 1.0, normFactor);
 			}
 			return;
 		}

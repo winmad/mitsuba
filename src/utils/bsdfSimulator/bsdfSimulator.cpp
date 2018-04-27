@@ -94,6 +94,7 @@ public:
 		//double totValidParticles = m_numParticles;
 		double totParticles = m_numParticles;
 		double pScale = totParticles / totValidParticles;
+		double totWeight = proc->m_res->getLobe(m_minDepth + 1)->m_totWeight;
 
 		int numLobes = m_minDepth + 2;
 
@@ -113,12 +114,18 @@ public:
 			else
 				sprintf(filename, "%s_order_all.exr", argv[14]);
 
-			proc->m_res->getLobe(i)->scale(pScale);
-			proc->m_res->getLobe(i)->saveExr(fs::path(filename));
+			SphericalDistribution *lobe = proc->m_res->getLobe(i);
+			
+			//proc->m_res->getLobe(i)->scale(pScale);
+			
+			lobe->scale(totParticles / totWeight);
+			lobe->saveExr(fs::path(filename));
 
-			proc->m_res->getLobe(i)->m_totValue /= totValidParticles;
-			Vector3d &totalThroughput = proc->m_res->getLobe(i)->m_totValue;
-			Log(EInfo, "Total valid particles = %d / (%.0f, %d)", proc->m_res->getLobe(i)->m_totValidParticles, 
+			//lobe->m_totValue /= totValidParticles;
+			lobe->m_totValue /= totWeight;
+
+			Vector3d &totalThroughput = lobe->m_totValue;
+			Log(EInfo, "Total valid particles = %d / (%.0f, %d)", lobe->m_totValidParticles, 
 				totValidParticles, m_numParticles);
 			Log(EInfo, "Total thr = (%.6f, %.6f, %.6f)", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
 			
