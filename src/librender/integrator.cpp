@@ -187,6 +187,12 @@ void SamplingIntegrator::renderBlock(const Scene *scene,
 	}
 }
 
+void SamplingIntegrator::renderBlockX(const Scene *scene,
+		const Sensor *sensor, Sampler *sampler, ImageBlock *block,
+		const bool &stop, const std::vector< TPoint2<uint8_t> > &points) {
+	Log(EError, "%s::renderBlockX() is not implemented", getClass()->getName().c_str());
+}
+
 void MonteCarloIntegrator::renderBlock(const Scene *scene,
 	const Sensor *sensor, Sampler *sampler, ImageBlock *block,
 	const bool &stop, const std::vector< TPoint2<uint8_t> > &points) const {
@@ -235,6 +241,12 @@ void MonteCarloIntegrator::renderBlock(const Scene *scene,
 			sampler->advance();
 		}
 	}
+}
+
+void MonteCarloIntegrator::renderBlockX(const Scene *scene,
+		const Sensor *sensor, Sampler *sampler, ImageBlock *block,
+		const bool &stop, const std::vector< TPoint2<uint8_t> > &points) {
+	Log(EError, "%s::renderBlockX() is not implemented", getClass()->getName().c_str());
 }
 
 MonteCarloIntegrator::MonteCarloIntegrator(const Properties &props) : SamplingIntegrator(props) {

@@ -651,6 +651,7 @@
     <ClCompile Include="..\src\integrators\misc\field.cpp" />
     <ClCompile Include="..\src\integrators\misc\motion.cpp" />
     <ClCompile Include="..\src\integrators\misc\multichannel.cpp" />
+    <ClCompile Include="..\src\integrators\path\baseFrameWiWo.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_ao.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_diff.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_ext.cpp" />
@@ -1008,6 +1009,7 @@
     <ClCompile Include="..\src\utils\samplePatchVis.cpp" />
     <ClCompile Include="..\src\utils\samplePatchVis_fixWo.cpp" />
     <ClCompile Include="..\src\utils\shProjection.cpp" />
+    <ClCompile Include="..\src\utils\shProjection4D.cpp" />
     <ClCompile Include="..\src\utils\sphere2Trimesh.cpp" />
     <ClCompile Include="..\src\utils\splitGridVolume.cpp" />
     <ClCompile Include="..\src\utils\testTextureBitmap.cpp" />

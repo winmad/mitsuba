@@ -74,6 +74,9 @@ public:
 // 		//Log(EInfo, "%.6f, %.6f, %.6f", result[0], result[1], result[2]);
 // 		return result;
 
+		if (wiMacro.z <= 0 || woMacro.z <= 0)
+			return Spectrum(0.0);
+
 		int rWi = math::floorToInt((wiMacro.y + 1.0) * 0.5 * m_wiResolution + 0.5);
 		rWi = math::clamp(m_wiResolution - rWi - 1, 0, m_wiResolution - 1);
 		int cWi = math::floorToInt((wiMacro.x + 1.0) * 0.5 * m_wiResolution - 0.5);
@@ -130,7 +133,8 @@ public:
 
 						Spectrum tmpValue = m_angularScales->getPixel(Point2i(rWoNew * m_woResolution + cWoNew,
 							rWiNew * m_wiResolution + cWiNew));
-						double tmpWeight = std::max(0.0, dot(wiMacro, tableWi)) * std::max(0.0, dot(woMacro, tableWo));
+						double dCosine = std::max(0.0, dot(wiMacro, tableWi)) * std::max(0.0, dot(woMacro, tableWo));
+						double tmpWeight = math::fastexp(1000.0 * (dCosine - 1.0));
 
 						res += tmpValue * tmpWeight;
 						weights += tmpWeight;

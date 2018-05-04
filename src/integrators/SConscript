@@ -1,5 +1,7 @@
 Import('env', 'sys', 'plugins')
 
+plugins += env.SharedLibrary('baseFrameWiWo', ['path/baseFrameWiWo.cpp'])
+
 plugins += env.SharedLibrary('volpath_simple_ao', ['path/volpath_simple_ao.cpp'])
 plugins += env.SharedLibrary('volpath_simple_ext', ['path/volpath_simple_ext.cpp'])
 

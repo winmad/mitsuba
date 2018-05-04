@@ -394,6 +394,10 @@ public:
 		Sampler *sampler, ImageBlock *block, const bool &stop,
 		const std::vector< TPoint2<uint8_t> > &points) const;
 
+	virtual void renderBlockX(const Scene *scene, const Sensor *sensor,
+		Sampler *sampler, ImageBlock *block, const bool &stop,
+		const std::vector< TPoint2<uint8_t> > &points);
+
 	/**
 	 * <tt>NetworkedObject</tt> implementation:
 	 * When a parallel rendering process starts, the integrator is
@@ -449,6 +453,10 @@ public:
 	virtual void renderBlock(const Scene *scene, const Sensor *sensor,
 		Sampler *sampler, ImageBlock *block, const bool &stop,
 		const std::vector< TPoint2<uint8_t> > &points) const;
+
+	virtual void renderBlockX(const Scene *scene, const Sensor *sensor,
+		Sampler *sampler, ImageBlock *block, const bool &stop,
+		const std::vector< TPoint2<uint8_t> > &points);
 
 	MTS_DECLARE_CLASS()
 protected:

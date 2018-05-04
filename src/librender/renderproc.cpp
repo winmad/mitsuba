@@ -77,8 +77,14 @@ public:
 		block->setOffset(rect->getOffset());
 		block->setSize(rect->getSize());
 		m_hilbertCurve.initialize(TVector2<uint8_t>(rect->getSize()));
-		m_integrator->renderBlock(m_scene, m_sensor, m_sampler,
-			block, stop, m_hilbertCurve.getPoints());
+
+		if (m_integrator->getClass()->getName() == "BaseFrameWiWoPathTracer") {
+			m_integrator->renderBlockX(m_scene, m_sensor, m_sampler,
+				block, stop, m_hilbertCurve.getPoints());
+		} else {
+			m_integrator->renderBlock(m_scene, m_sensor, m_sampler,
+				block, stop, m_hilbertCurve.getPoints());
+		}
 
 #ifdef MTS_DEBUG_FP
 		disableFPExceptions();
