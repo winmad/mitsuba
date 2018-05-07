@@ -118,11 +118,14 @@ public:
 			
 			//proc->m_res->getLobe(i)->scale(pScale);
 			
-			lobe->scale(totParticles / totWeight);
+			Float invTotWeight = 0.0;
+			if (totWeight > 1e-8)
+				invTotWeight = 1.0 / totWeight;
+			lobe->scale(totParticles * invTotWeight);
 			lobe->saveExr(fs::path(filename));
 
 			//lobe->m_totValue /= totValidParticles;
-			lobe->m_totValue /= totWeight;
+			lobe->m_totValue *= invTotWeight;
 
 			Vector3d &totalThroughput = lobe->m_totValue;
 			Log(EInfo, "Total valid particles = %d / (%.0f, %d)", lobe->m_totValidParticles, 
