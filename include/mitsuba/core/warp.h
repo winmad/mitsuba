@@ -97,6 +97,9 @@ namespace warp {
 	/// Density of \ref squareToUniformDisk per unit area
 	extern MTS_EXPORT_CORE inline Float squareToUniformDiskConcentricPdf() { return INV_PI; }
 
+	extern MTS_EXPORT_CORE Vector squareToUniformHemisphereConcentric(const Point2 &sample);
+	extern MTS_EXPORT_CORE Point2 uniformHemisphereToSquareConcentric(const Vector &d);
+
 	/// Convert an uniformly distributed square sample into barycentric coordinates
 	extern MTS_EXPORT_CORE Point2 squareToUniformTriangle(const Point2 &sample);
 

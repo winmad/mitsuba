@@ -1253,6 +1253,12 @@
     <ClCompile Include="..\src\integrators\path\baseFrameWiWo.cpp">
       <Filter>Source Files\integrators\path</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\utils\validateConcentricMapping.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bsdfs\sv_tabulated_scaled_bsdf.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">

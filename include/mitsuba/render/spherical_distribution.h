@@ -7,6 +7,8 @@
 #include <mitsuba/core/fstream.h>
 #include <boost/filesystem/path.hpp>
 
+#define USE_SQUARE_CONCENTRIC
+
 MTS_NAMESPACE_BEGIN
 
 class MTS_EXPORT_RENDER SphericalDistribution : public WorkResult {

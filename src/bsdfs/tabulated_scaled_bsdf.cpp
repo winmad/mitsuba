@@ -55,6 +55,56 @@ public:
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
+		if (wiMacro.z <= 0 || woMacro.z <= 0)
+			return Spectrum(0.0);
+
+		Point2 wiTex = warp::uniformHemisphereToSquareConcentric(wiMacro);
+		Point2 woTex = warp::uniformHemisphereToSquareConcentric(woMacro);
+
+		int wiNumCells = m_wiResolution - 1;
+		int woNumCells = m_woResolution - 1;
+
+		int c1 = math::clamp(math::floorToInt(wiTex.x * wiNumCells), 0, wiNumCells - 1);
+		int r1 = math::clamp(math::floorToInt(wiTex.y * wiNumCells), 0, wiNumCells - 1);
+		int c2 = math::clamp(math::floorToInt(woTex.x * woNumCells), 0, woNumCells - 1);
+		int r2 = math::clamp(math::floorToInt(woTex.y * woNumCells), 0, woNumCells - 1);
+
+		Spectrum res(0.f);
+		for (int dr1 = 0; dr1 < 2; dr1++) {
+			Float v1 = wiTex.y * wiNumCells - r1;
+			Float wv1 = std::abs(1.0 - dr1 - v1);
+			
+			for (int dc1 = 0; dc1 < 2; dc1++) {
+				Float u1 = wiTex.x * wiNumCells - c1;
+				Float wu1 = std::abs(1.0 - dc1 - u1);
+				
+				for (int dr2 = 0; dr2 < 2; dr2++) {
+					Float v2 = woTex.y * woNumCells - r2;
+					Float wv2 = std::abs(1.0 - dr2 - v2);
+					
+					for (int dc2 = 0; dc2 < 2; dc2++) {
+						Float u2 = woTex.x * woNumCells - c2;
+						Float wu2 = std::abs(1.0 - dc2 - u2);
+
+						int wiIdx = (r1 + dr1) * m_wiResolution + (c1 + dc1);
+						int woIdx = (r2 + dr2) * m_woResolution + (c2 + dc2);
+
+						Spectrum tmpValue = m_angularScales->getPixel(Point2i(woIdx, wiIdx));
+						res += tmpValue * wv1 * wu1 * wv2 * wu2;
+					}
+				}
+			}
+		}
+
+		return res;
+	}
+
+	Spectrum evalScaleDisk(const BSDFSamplingRecord &bRec) const {
+		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+		Vector woWorld = bRec.its.toWorld(bRec.wo);
+		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
+
 		// no interpolation
 // 		int r1 = math::floorToInt((wiMacro.y + 1.0) * 0.5 * m_wiResolution);
 // 		r1 = math::clamp(m_wiResolution - r1 - 1, 0, m_wiResolution - 1);

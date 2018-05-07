@@ -32,6 +32,7 @@ public:
 		m_lobeFilenamePrefix = props.getString("prefix", "");
 
 		m_useMacroDeform = props.getBoolean("useMacroDeform", false);
+		m_useApproxShadowing = props.getBoolean("useApproxShadowing", false);
 	}
 
 	MultiLobeBSDF(Stream *stream, InstanceManager *manager) 
@@ -41,6 +42,7 @@ public:
 		m_bsdf = static_cast<BSDF *>(manager->getInstance(stream));
 		m_lobeFilenamePrefix = stream->readString();
 		m_useMacroDeform = stream->readBool();
+		m_useApproxShadowing = stream->readBool();
 
 		configure();
 	}
@@ -54,6 +56,7 @@ public:
 		manager->serialize(stream, m_bsdf.get());
 		stream->writeString(m_lobeFilenamePrefix);
 		stream->writeBool(m_useMacroDeform);
+		stream->writeBool(m_useApproxShadowing);
 	}
 
 	void configure() {
@@ -104,6 +107,62 @@ public:
 		BSDF::configure();
 	}
 
+	inline Float conv(Float w1, Float lambda1, const Vector &mu1,
+			Float w2, Float lambda2, const Vector &mu2) const {
+		Vector d = mu1 * lambda1 + mu2 * lambda2;
+		Float len = d.length();
+		Float res = w1 * w2 * 4.0 * M_PI * math::fastexp(-lambda1 - lambda2) 
+			* std::sinh(len) / len;
+		
+// 		if (!std::isfinite(res)) {
+// 			std::ostringstream oss;
+// 			oss << "======================\n"
+// 				<< "w1 = " << w1 << ", " << "lambda1 = " << lambda1 << ", "
+// 				<< "mu1 = (" << mu1.x << ", " << mu1.y << ", " << mu1.z << ")\n"
+// 				<< "w2 = " << w2 << ", " << "lambda2 = " << lambda2 << ", "
+// 				<< "mu2 = (" << mu2.x << ", " << mu2.y << ", " << mu2.z << ")\n";
+// 			std::cout << oss.str();
+// 		}
+		
+		return res;
+	}
+
+	Float G2(const Vector &wi, const Vector &wo, const Vector &nMeso, 
+			const std::vector<Spectrum> &lobesParam0, 
+			const std::vector<Spectrum> &lobesParam1) const {
+		Float wCos = 1.1767;
+		Float lambdaCos = 2.1440;
+		Float integralWi = 0.0;
+		Float integralWo = 0.0;
+		for (int i = 0; i < m_numLobes; i++) {
+			Float alpha = lobesParam0[i][0];
+			if (alpha < 1e-4)
+				continue;
+			Float kappa = lobesParam0[i][1];
+			Vector mu(2.0 * lobesParam1[i][0] - 1.0, 2.0 * lobesParam1[i][1] - 1.0, 2.0 * lobesParam1[i][2] - 1.0);
+			Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
+
+			integralWi += conv(wCos, lambdaCos, wi, wNDF, kappa, mu);
+			integralWo += conv(wCos, lambdaCos, wo, wNDF, kappa, mu);
+		}
+
+		Float a = 1.0 / std::abs(nMeso.z);
+		Float G1Wi = std::max(0.0, dot(wi, nMeso)) * a / integralWi;
+		Float G1Wo = std::max(0.0, dot(wo, nMeso)) * a / integralWo;
+		Float tmp = G1Wi * G1Wo;
+
+// 		std::ostringstream oss;
+// 		oss << "======================\n"
+// 			<< "area_wi = " << std::max(0.0, dot(wi, nMeso)) * a << "\n"
+// 			<< "area_wo = " << std::max(0.0, dot(wo, nMeso)) * a << "\n"
+// 			<< "meso = (" << nMeso.x << ", " << nMeso.y << ", " << nMeso.z << ")\n"
+// 			<< "integral_wi = " << integralWi << "\n"
+// 			<< "integral_wo = " << integralWo << "\n";
+// 		std::cout << oss.str();
+
+		return tmp / (G1Wi + G1Wo + tmp);
+	}
+
 	Spectrum eval(const BSDFSamplingRecord &bRec, EMeasure measure) const {
 		if (!(bRec.typeMask & EGlossyReflection) || measure != ESolidAngle
 			|| Frame::cosTheta(bRec.wi) <= 0
@@ -129,6 +188,10 @@ public:
 
 		//std::ostringstream oss;
 
+		Vector nMeso(0.0);
+		std::vector<Spectrum> lobesParam0(m_numLobes);
+		std::vector<Spectrum> lobesParam1(m_numLobes);
+
 		for (int i = 0; i < m_numLobes; i++) {
 			its.uv.x = uv.x;
 			its.uv.y = uv.y * 0.5;
@@ -137,6 +200,11 @@ public:
 			its.uv.y = uv.y * 0.5 + 0.5;
 			Spectrum param1 = m_lobes[i]->eval(its, false);
 
+			if (m_useApproxShadowing) {
+				lobesParam0[i] = param0;
+				lobesParam1[i] = param1;
+			}
+
 			Float alpha = param0[0];
 			if (alpha < 1e-8)
 				continue;
@@ -144,6 +212,7 @@ public:
 			Float kappa = param0[1];
 			VonMisesFisherDistr vmf(kappa);
 			Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
+			nMeso += alpha * mu;
 
 			Frame lobeFrame(mu);
 			Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
@@ -169,6 +238,17 @@ public:
 // 				<< "value = (" << spec[0] << ", " << spec[1] << ", " << spec[2] << ")" << std::endl;
 
 			res += alpha * spec;
+		}
+
+		if (m_useApproxShadowing) {
+			Float len = nMeso.length();
+			if (len < 1e-4)
+				return Spectrum(0.0);
+			nMeso /= len;
+
+			Float shadowTerm = G2(wiMacro, woMacro, nMeso, lobesParam0, lobesParam1);
+			if (std::isfinite(shadowTerm))
+				res *= shadowTerm;
 		}
 
 		//std::cout << oss.str();
@@ -204,12 +284,21 @@ public:
 		its.hasUVPartials = false;
 		Point2 uv = transformUV(bRec.its.uv);
 
+		Vector nMeso(0.0);
+		std::vector<Spectrum> lobesParam0(m_numLobes);
+		std::vector<Spectrum> lobesParam1(m_numLobes);
+
 		std::vector<Float> cdf(0);
 		std::vector<int> lobeIndices(0);
 		for (int i = 0; i < m_numLobes; i++) {
 			its.uv.x = uv.x;
 			its.uv.y = uv.y * 0.5;
 			Spectrum param0 = m_lobes[i]->eval(its, false);
+
+			if (m_useApproxShadowing) {
+				lobesParam0[i] = param0;
+				lobesParam1[i] = m_lobes[i]->eval(its, false);
+			}
 
 			if (param0[0] < 1e-8)
 				continue;
@@ -273,13 +362,31 @@ public:
 		bRec.sampledComponent = bsdfRec.sampledComponent;
 		// diffuse or glossy
 		bRec.sampledType = bsdfRec.sampledType;
-		
+
 		// hardcode: base brdf has only one lobe
 		bRec.used[0] = true;
 		bRec.dAlbedo[0] = bsdfRec.dAlbedo[0];
 		bRec.dRoughness[0] = bsdfRec.dRoughness[0];
 		bRec.used[1] = false;
 
+		// hack..
+		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
+
+		// side check
+		if (Frame::cosTheta(bRec.wo) <= 0)
+			return Spectrum(0.0f);
+
+		if (m_useApproxShadowing) {
+			Float len = nMeso.length();
+			if (len < 1e-4)
+				return Spectrum(0.0);
+			nMeso /= len;
+
+			Float shadowTerm = G2(wiMacro, woMacro, nMeso, lobesParam0, lobesParam1);
+			if (std::isfinite(shadowTerm))
+				res *= shadowTerm;
+		}
+		
 // 		std::ostringstream oss;
 // 		oss << "===================" << std::endl
 // 			<< "lobe " << lobeIdx << std::endl
@@ -295,13 +402,6 @@ public:
 // 			<< "wi_macro = (" << wiMacro.x << ", " << wiMacro.y << ", " << wiMacro.z << ")" << std::endl
 // 			<< "wo_macro = (" << woMacro.x << ", " << woMacro.y << ", " << woMacro.z << ")" << std::endl;
 // 		std::cout << oss.str() << std::endl;
-		
-		// hack..
-		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
-
-		// side check
-		if (Frame::cosTheta(bRec.wo) <= 0)
-			return Spectrum(0.0f);
 
 		return res;
 	}
@@ -365,6 +465,7 @@ private:
 	ref<BSDF> m_bsdf;
 	ref_vector<Sampler> m_samplers;
 	bool m_useMacroDeform;
+	bool m_useApproxShadowing;
 };
 
 MTS_IMPLEMENT_CLASS_S(MultiLobeBSDF, false, BSDF)

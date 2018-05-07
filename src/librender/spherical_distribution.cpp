@@ -1,4 +1,5 @@
 #include <mitsuba/render/spherical_distribution.h>
+#include <mitsuba/core/warp.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -61,6 +62,44 @@ void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double
 // 	}
 
 	if (putBitmap) {
+#if defined(USE_SQUARE_CONCENTRIC)
+		if (dir.z <= 0)
+			return;
+
+		double *data = m_values->getFloat64Data();
+		Point2 square = warp::uniformHemisphereToSquareConcentric(dir);
+
+		/*
+		int c = math::clamp(math::floorToInt(square.x * m_size), 0, m_size - 1);
+		int r = math::clamp(math::floorToInt(square.y * m_size), 0, m_size - 1);
+		
+		for (int k = 0; k < 3; k++) {
+			int idx = r * m_size + c;
+			data[3 * idx + k] += value[k] * weight * normFactor;
+		}
+		*/
+
+		int numCells = m_size - 1;
+		int c = math::clamp(math::floorToInt(square.x * numCells), 0, numCells - 1);
+		int r = math::clamp(math::floorToInt(square.y * numCells), 0, numCells - 1);
+
+		Float u = square.x * numCells - c;
+		Float v = square.y * numCells - r;
+		
+		Spectrum tmp = value * weight * normFactor;
+		// small kernel
+		for (int dr = 0; dr < 2; dr++) {
+			double wv = std::abs(1.0 - dr - v);
+			for (int dc = 0; dc < 2; dc++) {
+				double wKernel = wv * std::abs(1.0 - dc - u);
+				int idx = (r + dr) * m_size + (c + dc);
+				for (int k = 0; k < 3; k++) {
+					data[3 * idx + k] += tmp[k] * wKernel;
+				}
+			}
+		}
+		
+#else
 		int c = math::clamp(math::floorToInt((dir.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
 		int r = math::clamp(math::floorToInt((dir.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
 
@@ -69,6 +108,7 @@ void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double
 		for (int k = 0; k < 3; k++) {
 			data[3 * idx + k] += (double)value[k] * weight * (dir.z * normFactor);
 		}
+#endif
 	}
 }
 

@@ -128,6 +128,20 @@ Point2 uniformDiskToSquareConcentric(const Point2 &p) {
 	return Point2(0.5f * (a+1), 0.5f * (b+1));
 }
 
+Vector squareToUniformHemisphereConcentric(const Point2 &sample) {
+	Point2 disk = squareToUniformDiskConcentric(sample);
+	Float rSqr = disk.x * disk.x + disk.y * disk.y;
+	Float tmp = std::sqrt(2.0 - rSqr);
+	return Vector(disk.x * tmp, disk.y * tmp, 1.0 - rSqr);
+}
+
+Point2 uniformHemisphereToSquareConcentric(const Vector &d) {
+	Float rSqr = 1.0 - d.z;
+	Float tmp = std::sqrt(2.0 - rSqr);
+	Point2 disk(d.x / tmp, d.y / tmp);
+	return uniformDiskToSquareConcentric(disk);
+}
+
 Point2 squareToStdNormal(const Point2 &sample) {
 	Float r   = std::sqrt(-2 * math::fastlog(1-sample.x)),
 		  phi = 2 * M_PI * sample.y;

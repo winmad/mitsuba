@@ -593,6 +593,7 @@
     <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp" />
     <ClCompile Include="..\src\bsdfs\roughdiffuse_multi.cpp" />
     <ClCompile Include="..\src\bsdfs\sh_scaled_bsdf.cpp" />
+    <ClCompile Include="..\src\bsdfs\sv_tabulated_scaled_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\tabulated_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\tabulated_scaled_bsdf.cpp" />
     <ClCompile Include="..\src\converter\mtsimport.cpp">
@@ -1014,6 +1015,7 @@
     <ClCompile Include="..\src\utils\splitGridVolume.cpp" />
     <ClCompile Include="..\src\utils\testTextureBitmap.cpp" />
     <ClCompile Include="..\src\utils\upSampleVolume.cpp" />
+    <ClCompile Include="..\src\utils\validateConcentricMapping.cpp" />
     <ClCompile Include="..\src\utils\validateEvalBSDF.cpp" />
     <ClCompile Include="..\src\utils\validateSampleBSDF.cpp" />
     <ClCompile Include="..\src\volume\gridvol2_simple.cpp" />

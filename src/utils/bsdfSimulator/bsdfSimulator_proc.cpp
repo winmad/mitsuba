@@ -36,7 +36,11 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 	const RangeWorkUnit *range = static_cast<const RangeWorkUnit *>(workUnit);
 	MultiLobeDistribution *res = static_cast<MultiLobeDistribution *>(workResult);
 
+#if defined(USE_SQUARE_CONCENTRIC)
+	double normFactor = (double)m_size * m_size / (2.0 * M_PI * (double)m_sqrtNumParticles * m_sqrtNumParticles);
+#else
 	double normFactor = (double)m_size * m_size / ((double)m_sqrtNumParticles * (double)m_sqrtNumParticles) * 0.25;
+#endif
 	//m_sampler->generate(Point2i(0));
 
 	res->clear();
