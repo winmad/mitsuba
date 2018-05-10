@@ -79,14 +79,16 @@ public:
 		Log(EInfo, "Finished. Output 4D effective BRDF");
 		output4DEffBRDF(filename);
 
-// 		int tr = 12;
-// 		int tc = 12;
-// 		Vector wi = warp::squareToUniformHemisphereConcentric(Point2(m_wiVec[tc], m_wiVec[tr]));
-// 		//Vector wi(0.9969, 0.0, 0.0784);
-// 		//Vector wi(0.987162, 0.0, 0.1597222);
-// 		//Vector wi(0.95217425, 0.0, 0.3055556);
-// 		//wi = normalize(wi);
-// 		output2DSlice(wi, filename);
+		/*
+		int tr = 12;
+		int tc = 22;
+		Vector wi = warp::squareToUniformHemisphereConcentric(Point2(m_wiVec[tc], m_wiVec[tr]));
+		//Vector wi(0.9969, 0.0, 0.0784);
+		//Vector wi(0.987162, 0.0, 0.1597222);
+		//Vector wi(0.95217425, 0.0, 0.3055556);
+		//wi = normalize(wi);
+		output2DSlice(wi, filename);
+		*/
 	}
 
 	void genLinspace(Float st, Float ed, int n, Float smallest, std::vector<Float> &vec) {
@@ -141,27 +143,25 @@ public:
 				totWeight += weight;
 
 				// shadowing
-				Float cosWo = std::max(0.0, dot(normal, wo));
-				if (cosWo < 1e-5)
-					continue;
+				Float shadowing = 1.0;
 				ray = Ray(its.p + wo * ShadowEpsilon, wo, 0);
 				if (m_shadowOption == 1) {
 					m_scene->rayIntersect(ray, shadowIts);
 					if (shadowIts.isValid() && m_aabb.contains(Point2(shadowIts.p.x, shadowIts.p.y))) {
-						cosWo = 0.0;
+						shadowing = 0.0;
 					}
 				} else if (m_shadowOption == 2) {
 					if (m_scene->rayIntersect(ray)) {
-						cosWo = 0.0;
+						shadowing = 0.0;
 					}
 				}
-				if (cosWo < 1e-5)
+				if (shadowing < 1e-5)
 					continue;
 
 				// eval
 				BSDFSamplingRecord bRec(its, its.toLocal(wi), its.toLocal(wo));
 				Spectrum spec = its.getBSDF()->eval(bRec);
-				res += spec * cosWo * weight;
+				res += spec * shadowing * weight;
 			}
 		}
 

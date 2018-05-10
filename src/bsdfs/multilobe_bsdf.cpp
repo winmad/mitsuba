@@ -220,6 +220,8 @@ public:
 			
 			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
 			Spectrum spec = m_bsdf->eval(bsdfRec);
+			if (spec.average() > 0)
+				spec /= Frame::cosTheta(bsdfRec.wo);
 
 // 			if (mu.length() < 1e-8 || wiWorld.length() < 1e-8 || woWorld.length() < 1e-8 ||
 // 				norm.length() < 1e-8 || bsdfRec.wi.length() < 1e-8 || bsdfRec.wo.length() < 1e-8)
@@ -239,6 +241,8 @@ public:
 
 			res += alpha * spec;
 		}
+
+		res *= Frame::cosTheta(bRec.wo);
 
 		if (m_useApproxShadowing) {
 			Float len = nMeso.length();
@@ -377,6 +381,8 @@ public:
 		// side check
 		if (Frame::cosTheta(bRec.wo) <= 0)
 			return Spectrum(0.0f);
+
+		res *= Frame::cosTheta(bRec.wo) / Frame::cosTheta(bsdfRec.wo);
 
 		if (m_useApproxShadowing) {
 			Float len = nMeso.length();
