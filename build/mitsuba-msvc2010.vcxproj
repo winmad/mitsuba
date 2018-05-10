@@ -1000,6 +1000,7 @@
     <ClCompile Include="..\src\utils\downSampleAlbedo.cpp" />
     <ClCompile Include="..\src\utils\downSampleSGGX.cpp" />
     <ClCompile Include="..\src\utils\downSampleVolume.cpp" />
+    <ClCompile Include="..\src\utils\effBRDFDirect.cpp" />
     <ClCompile Include="..\src\utils\fillEmptyVoxels.cpp" />
     <ClCompile Include="..\src\utils\heightfield2Trimesh.cpp" />
     <ClCompile Include="..\src\utils\LEADR_plane.cpp" />

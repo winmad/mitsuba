@@ -14,6 +14,7 @@ plugins += env.SharedLibrary('testTiledHeightfield', ['testTiledHeightfield.cpp'
 plugins += env.SharedLibrary('samplePatchVis_fixWo', ['samplePatchVis_fixWo.cpp'])
 plugins += env.SharedLibrary('samplePatchVis', ['samplePatchVis.cpp'])
 plugins += env.SharedLibrary('normalMipmap', ['normalMipmap.cpp'])
+plugins += env.SharedLibrary('effBRDFDirect', ['effBRDFDirect.cpp'])
 
 plugins += env.SharedLibrary('LEADR_plane', ['LEADR_plane.cpp'])
 plugins += env.SharedLibrary('checkMesoNormals', ['checkMesoNormals.cpp'])

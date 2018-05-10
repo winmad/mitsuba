@@ -270,6 +270,8 @@ public:
 		if (!(bRec.typeMask & EGlossyReflection) || Frame::cosTheta(bRec.wi) <= 0)
 			return Spectrum(0.0f);
 		
+		
+		// naive sampling
 		/*
 		bRec.wo = warp::squareToCosineHemisphere(sample);
 		bRec.sampledComponent = 0;
@@ -277,7 +279,7 @@ public:
 		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
 		return eval(bRec, ESolidAngle) / pdf;
 		*/
-			
+		
 		Spectrum res(0.0f);
 
 		Intersection its(bRec.its);

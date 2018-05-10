@@ -117,7 +117,7 @@ public:
 		m_res->write(Bitmap::EOpenEXR, stream);
 
 		// output NDF derived by LEADR
-		if (true) {
+		if (false) {
 			char fname[256];
 			sprintf(fname, "LEADR_%s", argv[13]);
 			outputLeadrNDF(normals, fname);
@@ -132,7 +132,7 @@ public:
 			sprintf(fname, "vmf_init_%s", argv[13]);
 			m_vmfs.outputDistribution(m_size, fname);
 
-			int maxIters = 10;
+			int maxIters = 20;
 			for (int i = 0; i < maxIters; i++) {
 				EM(normals, weights);
 

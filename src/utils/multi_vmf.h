@@ -40,15 +40,16 @@ struct MultiLobeVMF {
 			for (int j = 0; j < size; j++)
 				values[i][j] = Vector3d(0.0f);
 
-		int sampleCount = 20;
-#pragma omp parallel for
+		int sampleCount = 1;
 		for (int i = 0; i < size; i++) {
 			for (int j = 0; j < size; j++) {
 				Vector3d res(0.0);
 				for (int k = 0; k < sampleCount; k++) {
-					double x = (j + rand1D()) / (double)size * 2.0 - 1.0;
-					double y = (i + rand1D()) / (double)size * 2.0 - 1.0;
-					if (x * x + y * y > 1.0)
+					//double x = (j + rand1D()) / (double)size * 2.0 - 1.0;
+					//double y = (i + rand1D()) / (double)size * 2.0 - 1.0;
+					double x = (j + 0.5) / (double)size * 2.0 - 1.0;
+					double y = (i + 0.5) / (double)size * 2.0 - 1.0;
+					if (x * x + y * y >= 1.0)
 						continue;
 					double z = sqrt(1.0 - x * x - y * y);
 
@@ -79,6 +80,22 @@ struct MultiLobeVMF {
 
 		ref<FileStream> stream = new FileStream(fs::path(filename), FileStream::ETruncWrite);
 		bitmap->write(Bitmap::EOpenEXR, stream);
+
+		double dp = 4.0 / (double)(size * size);
+		// ensure \int D_{wi}(wm)dwm = 1
+		double totD = 0.0;
+		for (int r = 0; r < size; r++) {
+			double y = (r + 0.5) / (double)size * 2.0 - 1.0;
+			for (int c = 0; c < size; c++) {
+				double x = (c + 0.5) / (double)size * 2.0 - 1.0;
+				double sinTheta2 = x * x + y * y;
+				if (sinTheta2 >= 1.0)
+					continue;
+				double jacobian = 1.0 / std::sqrt(1.0 - sinTheta2);
+				totD += values[size - r - 1][c][0] * jacobian * dp;
+			}
+		}
+		printf("Validation: %.8f should equal to 1\n", totD);
 	}
 
 	int m_numLobes;
