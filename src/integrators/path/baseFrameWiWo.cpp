@@ -317,6 +317,12 @@ public:
 			/* Estimate the direct illumination if this is requested */
 			DirectSamplingRecord dRec(its);
 
+			if (rRec.depth == m_queryDepth) {
+				validWi = true;
+				Vector wiWorld = dRec.d;
+				wiMacro = its.baseFrame.toLocal(wiWorld);
+			}
+
 			if (rRec.type & RadianceQueryRecord::EDirectSurfaceRadiance &&
 				(bsdf->getType() & BSDF::ESmooth)) {
 				Spectrum value = scene->sampleEmitterDirect(dRec, rRec.nextSample2D());
@@ -343,9 +349,7 @@ public:
 						Li += throughput * value * bsdfVal * weight;
 
 						if (rRec.depth == m_queryDepth) {
-							validWi = validWo = true;
-							Vector wiWorld = bRec.its.toWorld(bRec.wi);
-							wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+							validWo = true;
 							Vector woWorld = bRec.its.toWorld(bRec.wo);
 							woMacro = bRec.its.baseFrame.toLocal(woWorld);
 						}

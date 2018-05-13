@@ -109,10 +109,17 @@ public:
 
 	inline Float conv(Float w1, Float lambda1, const Vector &mu1,
 			Float w2, Float lambda2, const Vector &mu2) const {
-		Vector d = mu1 * lambda1 + mu2 * lambda2;
-		Float len = d.length();
-		Float res = w1 * w2 * 4.0 * M_PI * math::fastexp(-lambda1 - lambda2) 
-			* std::sinh(len) / len;
+		Float res = 0.0;
+		if (lambda1 < 10 && lambda2 < 10) {
+			Vector d = mu1 * lambda1 + mu2 * lambda2;
+			Float len = d.length();
+			res = w1 * w2 * 4.0 * M_PI * math::fastexp(-lambda1 - lambda2) 
+				* std::sinh(len) / len;
+		} else {
+			res = 2.0 * M_PI * w1 * w2 / (lambda1 + lambda2);
+			Float dotProd = dot(mu1, mu2);
+			res *= math::fastexp(lambda1 * lambda2 / (lambda1 + lambda2) * (dotProd - 1.0));
+		}
 		
 // 		if (!std::isfinite(res)) {
 // 			std::ostringstream oss;
@@ -123,17 +130,22 @@ public:
 // 				<< "mu2 = (" << mu2.x << ", " << mu2.y << ", " << mu2.z << ")\n";
 // 			std::cout << oss.str();
 // 		}
-		
+
 		return res;
 	}
 
 	Float G2(const Vector &wi, const Vector &wo, const Vector &nMeso, 
 			const std::vector<Spectrum> &lobesParam0, 
 			const std::vector<Spectrum> &lobesParam1) const {
+		if (nMeso.z < 1e-4)
+			return 0;
+
 		Float wCos = 1.1767;
 		Float lambdaCos = 2.1440;
 		Float integralWi = 0.0;
 		Float integralWo = 0.0;
+		Float vertProjArea = 0.0;
+		Vector wg(0, 0, 1);
 		for (int i = 0; i < m_numLobes; i++) {
 			Float alpha = lobesParam0[i][0];
 			if (alpha < 1e-4)
@@ -144,7 +156,11 @@ public:
 
 			integralWi += conv(wCos, lambdaCos, wi, wNDF, kappa, mu);
 			integralWo += conv(wCos, lambdaCos, wo, wNDF, kappa, mu);
+			vertProjArea += conv(wCos, lambdaCos, wg, wNDF, kappa, mu);
 		}
+
+		integralWi /= vertProjArea;
+		integralWo /= vertProjArea;
 
 		Float a = 1.0 / std::abs(nMeso.z);
 		Float G1Wi = std::max(0.0, dot(wi, nMeso)) * a / integralWi;
@@ -157,10 +173,11 @@ public:
 // 			<< "area_wo = " << std::max(0.0, dot(wo, nMeso)) * a << "\n"
 // 			<< "meso = (" << nMeso.x << ", " << nMeso.y << ", " << nMeso.z << ")\n"
 // 			<< "integral_wi = " << integralWi << "\n"
-// 			<< "integral_wo = " << integralWo << "\n";
+// 			<< "integral_wo = " << integralWo << "\n"
+// 			<< "vertProjArea = " << vertProjArea << "\n";
 // 		std::cout << oss.str();
 
-		return tmp / (G1Wi + G1Wo + tmp);
+		return math::clamp(tmp / (G1Wi + G1Wo - tmp), 0.0, 1.0);
 	}
 
 	Spectrum eval(const BSDFSamplingRecord &bRec, EMeasure measure) const {
@@ -303,7 +320,13 @@ public:
 
 			if (m_useApproxShadowing) {
 				lobesParam0[i] = param0;
+
+				its.uv.x = uv.x;
+				its.uv.y = uv.y * 0.5 + 0.5;
 				lobesParam1[i] = m_lobes[i]->eval(its, false);
+				Vector mu(2.0 * lobesParam1[i][0] - 1.0, 2.0 * lobesParam1[i][1] - 1.0, 
+					2.0 * lobesParam1[i][2] - 1.0);
+				nMeso += lobesParam0[i][0] * mu;
 			}
 
 			if (param0[0] < 1e-8)
@@ -386,6 +409,7 @@ public:
 
 		if (m_useApproxShadowing) {
 			Float len = nMeso.length();
+			//Log(EInfo, "%.6f, %.6f, %.6f", nMeso.x, nMeso.y, nMeso.z);
 			if (len < 1e-4)
 				return Spectrum(0.0);
 			nMeso /= len;

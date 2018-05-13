@@ -108,7 +108,7 @@ public:
 				if (sinTheta2 >= 1.0)
 					continue;
 				double jacobian = 1.0 / std::sqrt(1.0 - sinTheta2);
-				totD += data[r * m_size + c] * jacobian * dp;
+				totD += data[(m_size - r - 1) * m_size + c] * jacobian * dp;
 			}
 		}
 		Log(EInfo, "Validation: %.8f should equal to 1", totD);
@@ -146,6 +146,15 @@ public:
 
 			sprintf(fname, "vmf_final_%s", argv[13]);
 			m_vmfs.outputDistribution(m_size, fname);
+
+			FILE *fp = fopen("vmf_params.txt", "w");
+			fprintf(fp, "%d\n", m_numLobes);
+			for (int l = 0; l < m_numLobes; l++) {
+				fprintf(fp, "%.8f %.8f %.8f %.8f %.8f\n", 
+					m_vmfs.m_alpha[l], m_vmfs.m_dist[l].getKappa(),
+					m_vmfs.m_mu[l].x, m_vmfs.m_mu[l].y, m_vmfs.m_mu[l].z);
+			}
+			fclose(fp);
 		}
 
 		// output slopes
@@ -190,7 +199,14 @@ public:
 // 			Log(EInfo, "(%d, %d), h = %.6f", j, i, its.p.z);
 // 		}
 
-		weight = std::max(0.0, dot(normal, m_wi));
+		int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
+		int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
+		Normal binNormal;
+		binNormal.x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
+		binNormal.y = ((m_size - r - 1) + 0.5) / (double)m_size * 2.0 - 1.0;
+		binNormal.z = std::sqrt(std::max(0.0, 1.0 - binNormal.x * binNormal.x - binNormal.y * binNormal.y));
+
+		weight = std::max(0.0, dot(binNormal, m_wi));
 		if (weight > 0.0) {
 			ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
 			if (m_maskingOption == 1) {
@@ -208,7 +224,7 @@ public:
 			}
 		}
 
-		return normal;
+		return binNormal;
 	}
 
 	void outputLeadrNDF(const std::vector<std::vector<Vector> > &normals, char* fname) {

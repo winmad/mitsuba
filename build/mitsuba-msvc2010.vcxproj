@@ -989,6 +989,7 @@
     <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.cpp" />
     <ClCompile Include="..\src\utils\calcDownSampleError.cpp" />
+    <ClCompile Include="..\src\utils\calcNDFVisibility.cpp" />
     <ClCompile Include="..\src\utils\calcPatchDirVis.cpp" />
     <ClCompile Include="..\src\utils\calcPatchDirVis_simple.cpp" />
     <ClCompile Include="..\src\utils\calcPatchNDF.cpp" />
