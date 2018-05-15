@@ -319,7 +319,7 @@ public:
 
 			if (rRec.depth == m_queryDepth) {
 				validWi = true;
-				Vector wiWorld = dRec.d;
+				Vector wiWorld = -ray.d;
 				wiMacro = its.baseFrame.toLocal(wiWorld);
 			}
 

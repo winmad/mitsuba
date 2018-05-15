@@ -75,6 +75,34 @@ public:
 		totWeight /= (double)m_spp;	
 		Log(EInfo, "Validation: %.8f should equal to %.8f", totWeight, dot(avgNormal, m_wi));
 
+		m_D = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
+		m_D->clear();
+		float *dData = m_D->getFloat32Data();
+		for (int i = 0; i < m_sqrtSpp; i++) {
+			for (int j = 0; j < m_sqrtSpp; j++) {
+				Vector &normal = normals[i][j];
+				int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
+				int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
+
+				dData[(m_size - r - 1) * m_size + c] += 1.0 * normFactor;
+			}
+		}
+
+		// ensure \int D(wm)<wm,wg>dwm = 1
+		double totProjArea = 0.0;
+		for (int r = 0; r < m_size; r++) {
+			double y = (r + 0.5) / (double)m_size * 2.0 - 1.0;
+			for (int c = 0; c < m_size; c++) {
+				double x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
+				double sinTheta2 = x * x + y * y;
+				if (sinTheta2 >= 1.0)
+					continue;
+				double jacobian = 1.0 / std::sqrt(1.0 - sinTheta2);
+				totProjArea += dData[(m_size - r - 1) * m_size + c] * dp;  //std::sqrt(1.0 - sinTheta2) * jacobian
+			}
+		}
+		Log(EInfo, "Validation: int[D(wm)cos(wm)] = %.8f should be equal to 1", totProjArea);
+
 		m_res = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
 		m_res->clear();
 		float *data = m_res->getFloat32Data();
@@ -111,7 +139,7 @@ public:
 				totD += data[(m_size - r - 1) * m_size + c] * jacobian * dp;
 			}
 		}
-		Log(EInfo, "Validation: %.8f should equal to 1", totD);
+		Log(EInfo, "Validation: int[D_wi(wm)] = %.8f should be equal to 1", totD);
 
 		ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);
 		m_res->write(Bitmap::EOpenEXR, stream);
@@ -203,8 +231,10 @@ public:
 		int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
 		Normal binNormal;
 		binNormal.x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
-		binNormal.y = ((m_size - r - 1) + 0.5) / (double)m_size * 2.0 - 1.0;
+		binNormal.y = (r + 0.5) / (double)m_size * 2.0 - 1.0;
 		binNormal.z = std::sqrt(std::max(0.0, 1.0 - binNormal.x * binNormal.x - binNormal.y * binNormal.y));
+		if (binNormal.z <= 1e-4)
+			Log(EInfo, "%d, %d; (%.6f, %.6f, %.6f)", c, r, binNormal.x, binNormal.y, binNormal.z);
 
 		weight = std::max(0.0, dot(binNormal, m_wi));
 		if (weight > 0.0) {
@@ -522,7 +552,13 @@ public:
 	int m_size;
 	AABB2 m_aabb;
 	double m_normal_stLim;
+	
+	// D(wm)
+	ref<Bitmap> m_D;
+
+	// D_wi(wm)
 	ref<Bitmap> m_res;
+	
 	ref<Bitmap> m_resLEADR;
 
 	int m_numLobes;

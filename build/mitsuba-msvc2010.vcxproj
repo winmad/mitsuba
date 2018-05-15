@@ -588,6 +588,7 @@
     <ClCompile Include="..\src\bsdfs\aniso_roughdiffuse.cpp" />
     <ClCompile Include="..\src\bsdfs\aniso_roughdiffuse_simple.cpp" />
     <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
+    <ClCompile Include="..\src\bsdfs\heightmap_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\multilobe_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
     <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp" />

@@ -162,9 +162,13 @@ public:
 		integralWi /= vertProjArea;
 		integralWo /= vertProjArea;
 
+// 		Float G1Wi = std::max(0.0, wi.z) / integralWi;
+// 		Float G1Wo = std::max(0.0, wo.z) / integralWo;
+
 		Float a = 1.0 / std::abs(nMeso.z);
 		Float G1Wi = std::max(0.0, dot(wi, nMeso)) * a / integralWi;
 		Float G1Wo = std::max(0.0, dot(wo, nMeso)) * a / integralWo;
+
 		Float tmp = G1Wi * G1Wo;
 
 // 		std::ostringstream oss;
@@ -293,13 +297,11 @@ public:
 		
 		
 		// naive sampling
-		/*
 		bRec.wo = warp::squareToCosineHemisphere(sample);
 		bRec.sampledComponent = 0;
 		bRec.sampledType = EDiffuseReflection;
 		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
 		return eval(bRec, ESolidAngle) / pdf;
-		*/
 		
 		Spectrum res(0.0f);
 
