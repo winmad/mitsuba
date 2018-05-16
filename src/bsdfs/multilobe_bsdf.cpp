@@ -92,6 +92,9 @@ public:
 		}
 		Log(EInfo, "Load vMF lobes as textures");
 
+		m_wCos = 1.1767;
+		m_lambdaCos = 2.1440;
+
 		/*
 		Point2 uv = transformUV(Point2(0.6, 0.7));
 		Log(EInfo, "%.6f, %.6f, %.6f", uv.x, uv.y * 0.5, uv.y * 0.5 + 0.5);
@@ -140,8 +143,6 @@ public:
 		if (nMeso.z < 1e-4)
 			return 0;
 
-		Float wCos = 1.1767;
-		Float lambdaCos = 2.1440;
 		Float integralWi = 0.0;
 		Float integralWo = 0.0;
 		Float vertProjArea = 0.0;
@@ -154,9 +155,9 @@ public:
 			Vector mu(2.0 * lobesParam1[i][0] - 1.0, 2.0 * lobesParam1[i][1] - 1.0, 2.0 * lobesParam1[i][2] - 1.0);
 			Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
 
-			integralWi += conv(wCos, lambdaCos, wi, wNDF, kappa, mu);
-			integralWo += conv(wCos, lambdaCos, wo, wNDF, kappa, mu);
-			vertProjArea += conv(wCos, lambdaCos, wg, wNDF, kappa, mu);
+			integralWi += conv(m_wCos, m_lambdaCos, wi, wNDF, kappa, mu);
+			integralWo += conv(m_wCos, m_lambdaCos, wo, wNDF, kappa, mu);
+			vertProjArea += conv(m_wCos, m_lambdaCos, wg, wNDF, kappa, mu);
 		}
 
 		integralWi /= vertProjArea;
@@ -202,6 +203,7 @@ public:
 		
 		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
+		Vector nMacro = bRec.its.baseFrame.toLocal(bRec.its.shFrame.n);
 
 		// hack to avoid normal inconsistency
 		//Vector wiWorld = bRec.wi;
@@ -212,6 +214,8 @@ public:
 		Vector nMeso(0.0);
 		std::vector<Spectrum> lobesParam0(m_numLobes);
 		std::vector<Spectrum> lobesParam1(m_numLobes);
+
+		Float vmfNorm = 0.0;
 
 		for (int i = 0; i < m_numLobes; i++) {
 			its.uv.x = uv.x;
@@ -235,12 +239,16 @@ public:
 			Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
 			nMeso += alpha * mu;
 
+			Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
+			vmfNorm += conv(m_wCos, m_lambdaCos, nMacro, wNDF, kappa, mu);
+
 			Frame lobeFrame(mu);
 			Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
 			Frame nFrame(norm);
 			
 			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
 			Spectrum spec = m_bsdf->eval(bsdfRec);
+			
 			if (spec.average() > 0)
 				spec /= Frame::cosTheta(bsdfRec.wo);
 
@@ -263,7 +271,8 @@ public:
 			res += alpha * spec;
 		}
 
-		res *= Frame::cosTheta(bRec.wo);
+		res *= Frame::cosTheta(bRec.wo);// / vmfNorm;
+		//res /= std::max(1e-4, Frame::cosTheta(bRec.wi));
 
 		if (m_useApproxShadowing) {
 			Float len = nMeso.length();
@@ -499,7 +508,9 @@ private:
 	ref<BSDF> m_bsdf;
 	ref_vector<Sampler> m_samplers;
 	bool m_useMacroDeform;
+	
 	bool m_useApproxShadowing;
+	Float m_wCos, m_lambdaCos;
 };
 
 MTS_IMPLEMENT_CLASS_S(MultiLobeBSDF, false, BSDF)

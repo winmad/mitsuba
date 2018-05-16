@@ -5,6 +5,7 @@
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/properties.h>
 #include <mitsuba/core/vmf.h>
+#include <mitsuba/core/warp.h>
 #include <mitsuba/render/util.h>
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/bsdf.h>
@@ -58,10 +59,8 @@ public:
 			}
 		}
 		Log(EInfo, "Finish binning.");
-
-		double normFactor = (double)(m_size * m_size) / (4.0 * m_spp);
+	
 		Normal avgNormal(0.0);
-		double dp = 4.0 / (double)(m_size * m_size);
 		double totWeight = 0.0f;
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
@@ -73,36 +72,41 @@ public:
 		}
 		avgNormal /= (double)m_spp;
 		totWeight /= (double)m_spp;	
+		Log(EInfo, "Avg normal = (%.6f, %.6f, %.6f)", avgNormal.x, avgNormal.y, avgNormal.z);
 		Log(EInfo, "Validation: %.8f should equal to %.8f", totWeight, dot(avgNormal, m_wi));
 
+		double normFactor = (double)(m_size * m_size) / (2 * M_PI * m_spp);
+		double dp = 2 * M_PI / (double)(m_size * m_size);
+
+		// NDF
 		m_D = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
 		m_D->clear();
 		float *dData = m_D->getFloat32Data();
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
 				Vector &normal = normals[i][j];
-				int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
-				int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
 
-				dData[(m_size - r - 1) * m_size + c] += 1.0 * normFactor;
+				Point2 p = warp::uniformHemisphereToSquareConcentric(normal);
+				int c = math::clamp(math::floorToInt(p.x * m_size), 0, m_size - 1);
+				int r = math::clamp(math::floorToInt(p.y * m_size), 0, m_size - 1);
+
+				dData[r * m_size + c] += 1.0 / normal.z * normFactor;
 			}
 		}
 
 		// ensure \int D(wm)<wm,wg>dwm = 1
 		double totProjArea = 0.0;
 		for (int r = 0; r < m_size; r++) {
-			double y = (r + 0.5) / (double)m_size * 2.0 - 1.0;
+			double y = (r + 0.5) / (double)m_size;
 			for (int c = 0; c < m_size; c++) {
-				double x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
-				double sinTheta2 = x * x + y * y;
-				if (sinTheta2 >= 1.0)
-					continue;
-				double jacobian = 1.0 / std::sqrt(1.0 - sinTheta2);
-				totProjArea += dData[(m_size - r - 1) * m_size + c] * dp;  //std::sqrt(1.0 - sinTheta2) * jacobian
+				double x = (c + 0.5) / (double)m_size;
+				Vector normal = warp::squareToUniformHemisphereConcentric(Point2(x, y));
+				totProjArea += dData[r * m_size + c] * normal.z * dp;
 			}
 		}
 		Log(EInfo, "Validation: int[D(wm)cos(wm)] = %.8f should be equal to 1", totProjArea);
 
+		// visible NDF
 		m_res = new Bitmap(Bitmap::ELuminance, Bitmap::EFloat32, Vector2i(m_size, m_size));
 		m_res->clear();
 		float *data = m_res->getFloat32Data();
@@ -112,37 +116,27 @@ public:
 			for (int j = 0; j < m_sqrtSpp; j++) {
 				Vector &normal = normals[i][j];
 
-				//int c = (normal.x > 0.9999f ? m_size - 1 : math::floorToInt((normal.x + 1.0) * 0.5 * m_size));
-				//int r = (normal.y > 0.9999f ? m_size - 1 : math::floorToInt((normal.y + 1.0) * 0.5 * m_size));
-				int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
-				int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
+				Point2 p = warp::uniformHemisphereToSquareConcentric(normal);
+				int c = math::clamp(math::floorToInt(p.x * m_size), 0, m_size - 1);
+				int r = math::clamp(math::floorToInt(p.y * m_size), 0, m_size - 1);
 
-// 				if (r == 64 && c == 64) {
-// 					Log(EInfo, "(%.6f, %.6f, %.6f), (%d, %d), %.6f", normal.x, normal.y, normal.z,
-// 						i, j, normFactor * (weights[i][j] / totWeight));
-// 				}
-
-				data[(m_size - r - 1) * m_size + c] += normFactor * (weights[i][j] / totWeight);
+				data[r * m_size + c] += 1.0 / normal.z * normFactor * (weights[i][j] / totWeight);
 			}
 		}
 		
 		// ensure \int D_{wi}(wm)dwm = 1
 		double totD = 0.0;
 		for (int r = 0; r < m_size; r++) {
-			double y = (r + 0.5) / (double)m_size * 2.0 - 1.0;
 			for (int c = 0; c < m_size; c++) {
-				double x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
-				double sinTheta2 = x * x + y * y;
-				if (sinTheta2 >= 1.0)
-					continue;
-				double jacobian = 1.0 / std::sqrt(1.0 - sinTheta2);
-				totD += data[(m_size - r - 1) * m_size + c] * jacobian * dp;
+				totD += data[r * m_size + c] * dp;
 			}
 		}
 		Log(EInfo, "Validation: int[D_wi(wm)] = %.8f should be equal to 1", totD);
 
 		ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);
 		m_res->write(Bitmap::EOpenEXR, stream);
+		stream = new FileStream("D_omega.exr", FileStream::ETruncWrite);
+		m_D->write(Bitmap::EOpenEXR, stream);
 
 		// output NDF derived by LEADR
 		if (false) {
@@ -227,14 +221,12 @@ public:
 // 			Log(EInfo, "(%d, %d), h = %.6f", j, i, its.p.z);
 // 		}
 
-		int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * m_size), 0, m_size - 1);
-		int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * m_size), 0, m_size - 1);
+		Point2 p = warp::uniformHemisphereToSquareConcentric(normal);
+		int c = math::clamp(math::floorToInt(p.x * m_size), 0, m_size - 1);
+		int r = math::clamp(math::floorToInt(p.y * m_size), 0, m_size - 1);
 		Normal binNormal;
-		binNormal.x = (c + 0.5) / (double)m_size * 2.0 - 1.0;
-		binNormal.y = (r + 0.5) / (double)m_size * 2.0 - 1.0;
-		binNormal.z = std::sqrt(std::max(0.0, 1.0 - binNormal.x * binNormal.x - binNormal.y * binNormal.y));
-		if (binNormal.z <= 1e-4)
-			Log(EInfo, "%d, %d; (%.6f, %.6f, %.6f)", c, r, binNormal.x, binNormal.y, binNormal.z);
+		binNormal = warp::squareToUniformHemisphereConcentric(Point2(
+			(c + 0.5) / m_size, (r + 0.5) / m_size));
 
 		weight = std::max(0.0, dot(binNormal, m_wi));
 		if (weight > 0.0) {
@@ -410,7 +402,7 @@ public:
 					}
 
 					// update centers
-					Float w = weights[i][j] / normals[i][j].z;
+					Float w = weights[i][j] / normals[i][j].z; // weight of each normal!
 					centers[1 - now][k] += normals[i][j] * w;
 					cnt[k] += w;
 				}
@@ -531,11 +523,11 @@ public:
 		
 			Float kappa;
 			if (std::abs(r.length() - 1.0) < 1e-8) {
-				kappa = 1e4;
+				kappa = 1e3;
 			}
 			else {
 				kappa = VonMisesFisherDistr::forMeanLength(r.length());
-				kappa = std::min(kappa, 1e4);
+				kappa = std::min(kappa, 1e3);
 			}
 			m_vmfs.m_alpha[l] = alpha;
 			m_vmfs.m_mu[l] = normalize(r);

@@ -4,6 +4,7 @@
 #include <mitsuba/core/ray.h>
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/core/properties.h>
+#include <mitsuba/core/warp.h>
 #include <mitsuba/render/util.h>
 #include <mitsuba/render/scene.h>
 #include <mitsuba/render/bsdf.h>
@@ -80,7 +81,7 @@ public:
 // 				sprintf(fname, "vmf_init_%d_%d.exr", i / step, j / step);
 // 				vmfs.outputDistribution(128, fname);
 
-				int maxIters = 10;
+				int maxIters = 20;
 				for (int iter = 0; iter < maxIters; iter++) {
 					EM(m_normals, i, step, j, step, vmfs);
 				}
@@ -211,7 +212,7 @@ public:
 
 			vmfsInit.m_mu[l] = normalize(centers[now][l]);
 			Float kappa = VonMisesFisherDistr::forMeanLength(centers[now][l].length());
-			kappa = std::min(kappa, 1e4);
+			kappa = std::min(kappa, 1e3);
 			vmfsInit.m_dist[l] = VonMisesFisherDistr(kappa);
 		}
 	}
@@ -269,11 +270,11 @@ public:
 
 			Float kappa;
 			if (std::abs(r.length() - 1.0) < 1e-8) {
-				kappa = 1e4;
+				kappa = 1e3;
 			}
 			else {
 				kappa = VonMisesFisherDistr::forMeanLength(r.length());
-				kappa = std::min(kappa, 1e4);
+				kappa = std::min(kappa, 1e3);
 			}
 			vmfs.m_alpha[l] = alpha;
 			vmfs.m_mu[l] = normalize(r);
@@ -314,10 +315,11 @@ public:
 			for (int j = cSt; j < cSt + cSize; j++) {
 				const Vector &normal = normals[i][j];
 
-				int c = math::clamp(math::floorToInt((normal.x + 1.0) * 0.5 * size), 0, size - 1);
-				int r = math::clamp(math::floorToInt((normal.y + 1.0) * 0.5 * size), 0, size - 1);
+				Point2 p = warp::uniformHemisphereToSquareConcentric(normal);
+				int c = math::clamp(math::floorToInt(p.x * size), 0, size - 1);
+				int r = math::clamp(math::floorToInt(p.y * size), 0, size - 1);
 
-				data[(size - r - 1) * size + c] += normal.z * size * size / (4.0 * rSize * cSize);
+				data[r * size + c] += size * size / (2.0 * M_PI * rSize * cSize);
 			}
 		}
 
