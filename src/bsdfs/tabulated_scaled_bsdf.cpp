@@ -6,9 +6,11 @@
 #include <mitsuba/core/sched.h>
 #include <mitsuba/core/shvector.h>
 #include <mitsuba/core/warp.h>
+#include <mitsuba/core/pmf.h>
 #include <mitsuba/render/texture.h>
 #include <mitsuba/render/mipmap.h>
 #include <mitsuba/render/bsdf.h>
+#include <mitsuba/render/scene.h>
 #include <mitsuba/hw/basicshader.h>
 
 MTS_NAMESPACE_BEGIN
@@ -17,11 +19,13 @@ class TabulatedScaledBSDF : public BSDF {
 public:
 	TabulatedScaledBSDF(const Properties &props) : BSDF(props) {
 		m_angularScaleFilename = props.getString("angularScaleFilename", "");
+		m_useMIS = props.getBoolean("useMIS", false);
 	}
 
 	TabulatedScaledBSDF(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
 		m_angularScaleFilename = stream->readString();
+		m_useMIS = stream->readBool();
 
 		configure();
 	}
@@ -30,6 +34,7 @@ public:
 		BSDF::serialize(stream, manager);
 
 		stream->writeString(m_angularScaleFilename);
+		stream->writeBool(m_useMIS);
 	}
 
 	void configure() {
@@ -46,6 +51,25 @@ public:
 
 		Log(EInfo, "wiRes = %d, woRes = %d", m_wiResolution, m_woResolution);
 
+		if (m_useMIS) {
+			m_rowCondCdfs.resize(m_lobeSize.y, DiscreteDistribution(m_lobeSize.x));
+			for (int r = 0; r < m_lobeSize.y; r++) {
+				for (int c = 0; c < m_lobeSize.x; c++) {
+					Spectrum spec = m_angularScales->getPixel(Point2i(c, r));
+					m_rowCondCdfs[r].append(spec.average());
+				}
+				m_rowCondCdfs[r].normalize();
+			}
+
+			m_samplers.resize(233);
+			m_samplers[0] = static_cast<Sampler *>(PluginManager::getInstance()->
+				createObject(MTS_CLASS(Sampler), Properties("independent")));
+			m_samplers[0]->configure();
+			for (int i = 1; i < 233; i++) {
+				m_samplers[i] = m_samplers[0]->clone();
+			}
+		}
+
 		BSDF::configure();
 	}
 
@@ -61,6 +85,7 @@ public:
 		Point2 wiTex = warp::uniformHemisphereToSquareConcentric(wiMacro);
 		Point2 woTex = warp::uniformHemisphereToSquareConcentric(woMacro);
 
+		// piecewise bilinear
 		int wiNumCells = m_wiResolution - 1;
 		int woNumCells = m_woResolution - 1;
 
@@ -220,16 +245,97 @@ public:
 		return spec * scale;
 	}
 
+	inline int getScaleMatrixRow(const BSDFSamplingRecord &bRec) const {
+		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+		Point2 wiTex = warp::uniformHemisphereToSquareConcentric(wiMacro);
+		
+		// piecewise constant
+		int wiNumCells = m_wiResolution;
+		int c1 = math::clamp(math::floorToInt(wiTex.x * wiNumCells), 0, wiNumCells - 1);
+		int r1 = math::clamp(math::floorToInt(wiTex.y * wiNumCells), 0, wiNumCells - 1);
+		return r1 * m_wiResolution + c1;
+	}
+
+	inline int getScaleMatrixCol(const BSDFSamplingRecord &bRec) const {
+		Vector woWorld = bRec.its.toWorld(bRec.wo);
+		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
+		Point2 woTex = warp::uniformHemisphereToSquareConcentric(woMacro);
+
+		// piecewise constant
+		int woNumCells = m_woResolution;
+		int c2 = math::clamp(math::floorToInt(woTex.x * woNumCells), 0, woNumCells - 1);
+		int r2 = math::clamp(math::floorToInt(woTex.y * woNumCells), 0, woNumCells - 1);
+		return r2 * m_woResolution + c2;
+	}
+
+	inline Spectrum sampleScaleMatrixCol(BSDFSamplingRecord &bRec, Float &pdf, const Point2 &sample) const {
+		Point2i p;
+		p.y = getScaleMatrixRow(bRec);
+		p.x = m_rowCondCdfs[p.y].sample(sample.x);
+		pdf = m_rowCondCdfs[p.y][p.x];
+		Spectrum spec = m_angularScales->getPixel(p);
+
+		// reconstruct wo
+		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+		int c2 = p.x % m_woResolution;
+		int r2 = p.x / m_woResolution;
+		Point2 woTex((c2 + sampler->next1D()) / (double)m_woResolution,
+			(r2 + sampler->next1D()) / (double)m_woResolution);
+		Vector woMacro = warp::squareToUniformHemisphereConcentric(woTex);
+		Vector woWorld = bRec.its.baseFrame.toWorld(woMacro);
+		
+		bRec.wo = bRec.its.toLocal(woWorld);
+		bRec.sampledComponent = 0;
+		bRec.sampledType = EDiffuseReflection;
+		return spec;
+	}
+
 	Float pdf(const BSDFSamplingRecord &bRec, EMeasure measure) const {
-		return m_bsdf->pdf(bRec, measure);
+		if (m_useMIS) {
+			Float pdf1 = m_bsdf->pdf(bRec, measure);
+			Point2i p;
+			p.x = getScaleMatrixCol(bRec);
+			p.y = getScaleMatrixRow(bRec);
+			Float pdf2 = m_rowCondCdfs[p.y][p.x];
+			return 0.5 * (pdf1 + pdf2);
+		} else {
+			return m_bsdf->pdf(bRec, measure);
+		}
 	}
 
 	Spectrum sample(BSDFSamplingRecord &bRec, Float &pdf, const Point2 &sample) const {
-		Spectrum spec = m_bsdf->sample(bRec, pdf, sample);
-		if (spec.isZero())
-			return Spectrum(0.f);
-		Spectrum scale = evalScale(bRec);
-		return spec * scale;
+		if (m_useMIS) {
+			ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+			if (sampler->next1D() <= 0.5) {
+				Spectrum spec = m_bsdf->sample(bRec, pdf, sample);
+				if (spec.isZero())
+					return Spectrum(0.f);
+				Spectrum scale = evalScale(bRec);
+
+				Point2i p;
+				p.y = getScaleMatrixRow(bRec);
+				p.x = getScaleMatrixCol(bRec);
+				Float pdf2 = m_rowCondCdfs[p.y][p.x];
+				Float weight = miWeight(pdf, pdf2);
+				return spec * scale * weight * 2.0;
+			} else {
+				Spectrum scale = sampleScaleMatrixCol(bRec, pdf, sample);
+				Spectrum spec = m_bsdf->eval(bRec);
+				if (spec.isZero())
+					return Spectrum(0.f);
+
+				Float pdf2 = m_bsdf->pdf(bRec);
+				Float weight = miWeight(pdf, pdf2);
+				return spec * scale * weight * 2.0;
+			}
+		} else {
+			Spectrum spec = m_bsdf->sample(bRec, pdf, sample);
+			if (spec.isZero())
+				return Spectrum(0.f);
+			Spectrum scale = evalScale(bRec);
+			return spec * scale;
+		}
 	}
 
 	Spectrum sample(BSDFSamplingRecord &bRec, const Point2 &sp) const {
@@ -266,6 +372,12 @@ public:
 		return m_bsdf->getLobeRoughness(its, component);
 	}
 
+	inline Float miWeight(Float pdfA, Float pdfB) const {
+		pdfA *= pdfA;
+		pdfB *= pdfB;
+		return pdfA / (pdfA + pdfB);
+	}
+
 	MTS_DECLARE_CLASS()
 public:
 	ref<Bitmap> m_angularScales;
@@ -274,6 +386,10 @@ public:
 	Vector2i m_lobeSize;
 	int m_wiResolution;
 	int m_woResolution;
+
+	bool m_useMIS;
+	ref_vector<Sampler> m_samplers;
+	std::vector<DiscreteDistribution> m_rowCondCdfs;
 };
 
 MTS_IMPLEMENT_CLASS_S(TabulatedScaledBSDF, false, BSDF)
