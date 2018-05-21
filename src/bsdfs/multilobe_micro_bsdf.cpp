@@ -18,9 +18,9 @@ MTS_NAMESPACE_BEGIN
 // ************
 // WORKING: consider macro-surface deformation
 
-class MultiLobeBSDF : public BSDF {
+class MultiLobeMicroBSDF : public BSDF {
 public:
-	MultiLobeBSDF(const Properties &props) : BSDF(props) {
+	MultiLobeMicroBSDF(const Properties &props) : BSDF(props) {
 		m_numLobes = props.getInteger("numLobes", 1);
 		
 		Float uvscale = props.getFloat("uvscale", 1.0f);
@@ -35,7 +35,7 @@ public:
 		m_useApproxShadowing = props.getBoolean("useApproxShadowing", false);
 	}
 
-	MultiLobeBSDF(Stream *stream, InstanceManager *manager) 
+	MultiLobeMicroBSDF(Stream *stream, InstanceManager *manager) 
 		: BSDF(stream, manager) {
 		m_numLobes = stream->readInt();
 		m_uvScale = Vector2(stream->readFloat(), stream->readFloat());
@@ -239,18 +239,15 @@ public:
 			Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
 			nMeso += alpha * mu;
 
-			Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
-			vmfNorm += conv(m_wCos, m_lambdaCos, nMacro, wNDF, kappa, mu);
-
 			Frame lobeFrame(mu);
 			Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
 			Frame nFrame(norm);
 			
 			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
 			Spectrum spec = m_bsdf->eval(bsdfRec);
-			
-			if (spec.average() > 0)
-				spec /= Frame::cosTheta(bsdfRec.wo);
+
+			if (spec.isZero())
+				continue;
 
 // 			if (mu.length() < 1e-8 || wiWorld.length() < 1e-8 || woWorld.length() < 1e-8 ||
 // 				norm.length() < 1e-8 || bsdfRec.wi.length() < 1e-8 || bsdfRec.wo.length() < 1e-8)
@@ -268,10 +265,10 @@ public:
 // 				<< "wo_local = (" << bsdfRec.wo.x << ", " << bsdfRec.wo.y << ", " << bsdfRec.wo.z << ")" << std::endl
 // 				<< "value = (" << spec[0] << ", " << spec[1] << ", " << spec[2] << ")" << std::endl;
 
-			res += alpha * spec;
+			res += alpha * spec * dot(wiMacro, norm);
 		}
 
-		res *= Frame::cosTheta(bRec.wo) / vmfNorm;
+		//res *= Frame::cosTheta(bRec.wo);// / vmfNorm;
 		//res /= std::max(1e-4, Frame::cosTheta(bRec.wi));
 
 		if (m_useApproxShadowing) {
@@ -279,7 +276,7 @@ public:
 			if (len < 1e-4)
 				return Spectrum(0.0);
 			nMeso /= len;
-
+		
 			Float shadowTerm = G2(wiMacro, woMacro, nMeso, lobesParam0, lobesParam1);
 			if (std::isfinite(shadowTerm))
 				res *= shadowTerm;
@@ -513,6 +510,6 @@ private:
 	Float m_wCos, m_lambdaCos;
 };
 
-MTS_IMPLEMENT_CLASS_S(MultiLobeBSDF, false, BSDF)
-MTS_EXPORT_PLUGIN(MultiLobeBSDF, "Base BSDF convolve multi-lobe visible NDF");
+MTS_IMPLEMENT_CLASS_S(MultiLobeMicroBSDF, false, BSDF)
+MTS_EXPORT_PLUGIN(MultiLobeMicroBSDF, "Base BSDF convolve multi-lobe NDF");
 MTS_NAMESPACE_END

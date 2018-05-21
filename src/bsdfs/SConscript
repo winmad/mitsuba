@@ -13,6 +13,7 @@ plugins += env.SharedLibrary('roughplastic', ['roughplastic.cpp'])
 plugins += env.SharedLibrary('aniso_roughdiffuse', ['aniso_roughdiffuse.cpp'])
 plugins += env.SharedLibrary('aniso_roughdiffuse_simple', ['aniso_roughdiffuse_simple.cpp'])
 plugins += env.SharedLibrary('multilobe_bsdf', ['multilobe_bsdf.cpp'])
+plugins += env.SharedLibrary('multilobe_micro_bsdf', ['multilobe_micro_bsdf.cpp'])
 plugins += env.SharedLibrary('tabulated_bsdf', ['tabulated_bsdf.cpp'])
 
 plugins += env.SharedLibrary('roughdiffuse_multi', ['roughdiffuse_multi.cpp'])

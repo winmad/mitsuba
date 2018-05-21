@@ -590,6 +590,7 @@
     <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
     <ClCompile Include="..\src\bsdfs\heightmap_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\multilobe_bsdf.cpp" />
+    <ClCompile Include="..\src\bsdfs\multilobe_micro_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
     <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp" />
     <ClCompile Include="..\src\bsdfs\roughdiffuse_multi.cpp" />
@@ -1008,6 +1009,7 @@
     <ClCompile Include="..\src\utils\LEADR_plane.cpp" />
     <ClCompile Include="..\src\utils\microfacet.cpp" />
     <ClCompile Include="..\src\utils\microflake2SGGX.cpp" />
+    <ClCompile Include="..\src\utils\ndfMipmap.cpp" />
     <ClCompile Include="..\src\utils\normalMipmap.cpp" />
     <ClCompile Include="..\src\utils\orientation2Albedo.cpp" />
     <ClCompile Include="..\src\utils\samplePatchVis.cpp" />

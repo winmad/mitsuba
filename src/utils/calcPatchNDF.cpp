@@ -451,7 +451,7 @@ public:
 
 			m_vmfs.m_mu[l] = normalize(centers[now][l]);
 			Float kappa = VonMisesFisherDistr::forMeanLength(centers[now][l].length());
-			kappa = std::min(kappa, 1e4);
+			kappa = std::min(kappa, 1e3);
 			m_vmfs.m_dist[l] = VonMisesFisherDistr(kappa);
 		}
 

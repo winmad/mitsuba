@@ -15,7 +15,7 @@
 
 MTS_NAMESPACE_BEGIN
 
-class NormalMipmap : public Utility {
+class NDFMipmap : public Utility {
 public:
 	typedef std::vector<std::vector<Vector> > Vector2DArray;
 
@@ -41,12 +41,12 @@ public:
 		// sample normals
 		m_normals = std::vector<std::vector<Vector> >(m_resolution * m_sqrtSpp,
 			std::vector<Vector>(m_resolution * m_sqrtSpp));
-//#pragma omp parallel for
+#pragma omp parallel for
 		for (int i = 0; i < m_resolution * m_sqrtSpp; i++) {
 			for (int j = 0; j < m_resolution * m_sqrtSpp; j++) {
 				Point2 uv;
-				uv.x = (Float)(j + m_samplers[0]->next1D()) / (Float)(m_resolution * m_sqrtSpp);
-				uv.y = (Float)(i + m_samplers[0]->next1D()) / (Float)(m_resolution * m_sqrtSpp);
+				uv.x = (Float)(j + m_samplers[Thread::getID() % 233]->next1D()) / (Float)(m_resolution * m_sqrtSpp);
+				uv.y = (Float)(i + m_samplers[Thread::getID() % 233]->next1D()) / (Float)(m_resolution * m_sqrtSpp);
 
 				Normal norm;
 				m_hmap->getPosAndNormal(uv, NULL, &norm);
@@ -77,19 +77,32 @@ public:
 			for (int j = 0; j < m_resolution * m_sqrtSpp; j += step) {
 				MultiLobeVMF vmfs;
 				initKMeans(m_normals, i, step, j, step, vmfs);
-				
-// 				sprintf(fname, "vmf_init_%d_%d.exr", i / step, j / step);
+
+// 				sprintf(fname, "vmf_D_init_%d_%d.exr", i / step, j / step);
 // 				vmfs.outputDistribution(128, fname);
 
+// 				Log(EInfo, "====== Iter %d vMF distribution ======", 0);
+// 				for (int l = 0; l < m_numLobes; l++) {
+// 					Log(EInfo, "alpha = %.6f, kappa = %.6f, mu = (%.6f, %.6f, %.6f)",
+// 						vmfs.m_alpha[l], vmfs.m_dist[l].getKappa(),
+// 						vmfs.m_mu[l].x, vmfs.m_mu[l].y, vmfs.m_mu[l].z);
+// 				}
 				int maxIters = 20;
 				for (int iter = 0; iter < maxIters; iter++) {
 					EM(m_normals, i, step, j, step, vmfs);
+
+// 					Log(EInfo, "====== Iter %d vMF distribution ======", iter + 1);
+// 					for (int l = 0; l < m_numLobes; l++) {
+// 						Log(EInfo, "alpha = %.6f, kappa = %.6f, mu = (%.6f, %.6f, %.6f)",
+// 							vmfs.m_alpha[l], vmfs.m_dist[l].getKappa(),
+// 							vmfs.m_mu[l].x, vmfs.m_mu[l].y, vmfs.m_mu[l].z);
+// 					}
 				}
 
-// 				sprintf(fname, "vmf_%d_%d.exr", i / step, j / step);
+// 				sprintf(fname, "vmf_D_%d_%d.exr", i / step, j / step);
 // 				vmfs.outputDistribution(128, fname);
 // 
-// 				sprintf(fname, "ndf_%d_%d.exr", i / step, j / step);
+// 				sprintf(fname, "ndf_D_%d_%d.exr", i / step, j / step);
 // 				outputOriginalNDF(m_normals, i, step, j, step, fname);
 
 				putVMF(vmfs, bitmaps, j / step, i / step, m_resolution / scale,
@@ -107,7 +120,7 @@ public:
 
 		for (int l = 0; l < m_numLobes; l++) {
 			char fname[256];
-			sprintf(fname, "vmf_%dx_lobe_%d.exr", scale, l);
+			sprintf(fname, "vmf_D_%dx_lobe_%d.exr", scale, l);
 			ref<FileStream> stream = new FileStream(fs::path(fname), FileStream::ETruncWrite);
 			bitmaps[l]->write(Bitmap::EOpenEXR, stream);
 		}
@@ -116,6 +129,7 @@ public:
 	void initKMeans(const Vector2DArray &normals, int rSt, int rSize, int cSt, int cSize,
 		MultiLobeVMF &vmfsInit) {
 		std::vector<Float> cnt(m_numLobes);
+		std::vector<Float> areas(m_numLobes);
 		std::vector<Vector> centers[2];
 
 		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
@@ -134,17 +148,18 @@ public:
 					if (dot(normals[r][c], centers[0][l]) > 0.9999)
 						continue;
 				}
-			
+
 				centers[0][i] = normals[r][c];
 				break;
 			}
 		}
-		
+
 		int now = 0;
 		int maxIters = 100;
 		for (int iter = 0; iter < maxIters; iter++) {
 			for (int l = 0; l < m_numLobes; l++) {
 				cnt[l] = 0.0;
+				areas[l] = 0.0;
 				centers[1 - now][l] = Vector(0.0);
 			}
 
@@ -164,7 +179,9 @@ public:
 					}
 
 					// update centers
+					Float w = 1.0 / normals[i][j].z; // weight of each normal
 					centers[1 - now][k] += normals[i][j];
+					areas[k] += w;
 					cnt[k] += 1.0;
 				}
 			}
@@ -201,12 +218,10 @@ public:
 // 			Log(EInfo, "center %d, (%.8f, %.8f, %.8f)", l, centers[now][l].x, centers[now][l].y, centers[now][l].z);
 // 		}
 
-		Float totWeights = 0.0;
 		vmfsInit = MultiLobeVMF(m_numLobes);
-		for (int l = 0; l < m_numLobes; l++)
-			totWeights += cnt[l];
+
 		for (int l = 0; l < m_numLobes; l++) {
-			vmfsInit.m_alpha[l] = cnt[l] / totWeights;
+			vmfsInit.m_alpha[l] = areas[l] / (rSize * cSize);
 			if (vmfsInit.m_alpha[l] < 1e-8)
 				continue;
 
@@ -244,17 +259,20 @@ public:
 		for (int l = 0; l < m_numLobes; l++) {
 			Float alpha = 0.0;
 			Vector r(0.0);
+			Float totArea = 0.0;
 			Float totW = 0.0;
 
 			for (int i = 0; i < rSize; i++) {
 				for (int j = 0; j < cSize; j++) {
 					int idx = i * cSize + j;
 
-					Float w = 1.0;
+					//Float w = 1.0;
+					Float w = 1.0 / normals[rSt + i][cSt + j].z;
 					alpha += w * prob[idx][l];
-					totW += w;
+					totArea += 1.0;
 
-					r += w * prob[idx][l] * normals[rSt + i][cSt + j];
+					r += prob[idx][l] * normals[rSt + i][cSt + j];
+					totW += prob[idx][l];
 				}
 			}
 
@@ -265,8 +283,8 @@ public:
 				continue;
 			}
 
-			r /= alpha;
-			alpha /= totW;
+			alpha /= totArea;
+			r /= totW;
 
 			Float kappa;
 			if (std::abs(r.length() - 1.0) < 1e-8) {
@@ -319,7 +337,7 @@ public:
 				int c = math::clamp(math::floorToInt(p.x * size), 0, size - 1);
 				int r = math::clamp(math::floorToInt(p.y * size), 0, size - 1);
 
-				data[r * size + c] += size * size / (2.0 * M_PI * rSize * cSize);
+				data[r * size + c] += 1.0 / normal.z * size * size / (2.0 * M_PI * rSize * cSize);
 			}
 		}
 
@@ -340,5 +358,5 @@ public:
 	MTS_DECLARE_UTILITY()
 };
 
-MTS_EXPORT_UTILITY(NormalMipmap, "Generate top-visible normal mip-mapping")
+MTS_EXPORT_UTILITY(NDFMipmap, "Generate NDF mip-mapping")
 MTS_NAMESPACE_END

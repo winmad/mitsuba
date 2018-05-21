@@ -1268,6 +1268,12 @@
     <ClCompile Include="..\src\bsdfs\heightmap_bsdf.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\utils\ndfMipmap.cpp">
+      <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bsdfs\multilobe_micro_bsdf.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
     <ClInclude Include="..\src\converter\converter.h">
