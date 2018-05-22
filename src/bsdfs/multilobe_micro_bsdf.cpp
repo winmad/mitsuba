@@ -287,7 +287,7 @@ public:
 			return Spectrum(0.0);
 		nMeso /= len;
 
-		Float invProjAreaWi = nMeso.z / std::max(0.0, dot(nMeso, wiMacro));
+		Float invProjAreaWi = nMeso.z / std::max(1e-4, dot(nMeso, wiMacro));
 		res *= invProjAreaWi;
 
 		if (m_useApproxShadowing) {

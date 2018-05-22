@@ -118,6 +118,13 @@ Point BSDFRayTracer::sampleRayOrigin(int idx, double &weight) {
 		ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
 		o = its.p + m_wi * 1e2;
 
+		// by default: global masking
+		if (m_scene->rayIntersect(ray)) {
+			weight = 0.0;
+			//Log(EInfo, "masked...");
+		}
+
+		/*
 		if (m_shadowOption == 1) {
 			m_scene->rayIntersect(ray, its);
 			if (its.isValid() && m_aabb.contains(Point2(its.p.x, its.p.y))) {
@@ -131,6 +138,7 @@ Point BSDFRayTracer::sampleRayOrigin(int idx, double &weight) {
 				//Log(EInfo, "masked...");
 			}
 		}
+		*/
 	}
 
 	return o;
