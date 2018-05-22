@@ -32,7 +32,6 @@ public:
 		m_lobeFilenamePrefix = props.getString("prefix", "");
 
 		m_useMacroDeform = props.getBoolean("useMacroDeform", false);
-		m_useApproxShadowing = props.getBoolean("useApproxShadowing", false);
 	}
 
 	MultiLobeBSDF(Stream *stream, InstanceManager *manager) 
@@ -42,7 +41,6 @@ public:
 		m_bsdf = static_cast<BSDF *>(manager->getInstance(stream));
 		m_lobeFilenamePrefix = stream->readString();
 		m_useMacroDeform = stream->readBool();
-		m_useApproxShadowing = stream->readBool();
 
 		configure();
 	}
@@ -56,7 +54,6 @@ public:
 		manager->serialize(stream, m_bsdf.get());
 		stream->writeString(m_lobeFilenamePrefix);
 		stream->writeBool(m_useMacroDeform);
-		stream->writeBool(m_useApproxShadowing);
 	}
 
 	void configure() {
@@ -123,7 +120,7 @@ public:
 			Float dotProd = dot(mu1, mu2);
 			res *= math::fastexp(lambda1 * lambda2 / (lambda1 + lambda2) * (dotProd - 1.0));
 		}
-		
+
 // 		if (!std::isfinite(res)) {
 // 			std::ostringstream oss;
 // 			oss << "======================\n"
@@ -135,54 +132,6 @@ public:
 // 		}
 
 		return res;
-	}
-
-	Float G2(const Vector &wi, const Vector &wo, const Vector &nMeso, 
-			const std::vector<Spectrum> &lobesParam0, 
-			const std::vector<Spectrum> &lobesParam1) const {
-		if (nMeso.z < 1e-4)
-			return 0;
-
-		Float integralWi = 0.0;
-		Float integralWo = 0.0;
-		Float vertProjArea = 0.0;
-		Vector wg(0, 0, 1);
-		for (int i = 0; i < m_numLobes; i++) {
-			Float alpha = lobesParam0[i][0];
-			if (alpha < 1e-4)
-				continue;
-			Float kappa = lobesParam0[i][1];
-			Vector mu(2.0 * lobesParam1[i][0] - 1.0, 2.0 * lobesParam1[i][1] - 1.0, 2.0 * lobesParam1[i][2] - 1.0);
-			Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
-
-			integralWi += conv(m_wCos, m_lambdaCos, wi, wNDF, kappa, mu);
-			integralWo += conv(m_wCos, m_lambdaCos, wo, wNDF, kappa, mu);
-			vertProjArea += conv(m_wCos, m_lambdaCos, wg, wNDF, kappa, mu);
-		}
-
-		integralWi /= vertProjArea;
-		integralWo /= vertProjArea;
-
-// 		Float G1Wi = std::max(0.0, wi.z) / integralWi;
-// 		Float G1Wo = std::max(0.0, wo.z) / integralWo;
-
-		Float a = 1.0 / std::abs(nMeso.z);
-		Float G1Wi = std::max(0.0, dot(wi, nMeso)) * a / integralWi;
-		Float G1Wo = std::max(0.0, dot(wo, nMeso)) * a / integralWo;
-
-		Float tmp = G1Wi * G1Wo;
-
-// 		std::ostringstream oss;
-// 		oss << "======================\n"
-// 			<< "area_wi = " << std::max(0.0, dot(wi, nMeso)) * a << "\n"
-// 			<< "area_wo = " << std::max(0.0, dot(wo, nMeso)) * a << "\n"
-// 			<< "meso = (" << nMeso.x << ", " << nMeso.y << ", " << nMeso.z << ")\n"
-// 			<< "integral_wi = " << integralWi << "\n"
-// 			<< "integral_wo = " << integralWo << "\n"
-// 			<< "vertProjArea = " << vertProjArea << "\n";
-// 		std::cout << oss.str();
-
-		return math::clamp(tmp / (G1Wi + G1Wo - tmp), 0.0, 1.0);
 	}
 
 	Spectrum eval(const BSDFSamplingRecord &bRec, EMeasure measure) const {
@@ -211,12 +160,7 @@ public:
 
 		//std::ostringstream oss;
 
-		Vector nMeso(0.0);
-		std::vector<Spectrum> lobesParam0(m_numLobes);
-		std::vector<Spectrum> lobesParam1(m_numLobes);
-
 		Float vmfNorm = 0.0;
-
 		for (int i = 0; i < m_numLobes; i++) {
 			its.uv.x = uv.x;
 			its.uv.y = uv.y * 0.5;
@@ -225,11 +169,6 @@ public:
 			its.uv.y = uv.y * 0.5 + 0.5;
 			Spectrum param1 = m_lobes[i]->eval(its, false);
 
-			if (m_useApproxShadowing) {
-				lobesParam0[i] = param0;
-				lobesParam1[i] = param1;
-			}
-
 			Float alpha = param0[0];
 			if (alpha < 1e-8)
 				continue;
@@ -237,7 +176,6 @@ public:
 			Float kappa = param0[1];
 			VonMisesFisherDistr vmf(kappa);
 			Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
-			nMeso += alpha * mu;
 
 			Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
 			vmfNorm += conv(m_wCos, m_lambdaCos, nMacro, wNDF, kappa, mu);
@@ -249,9 +187,6 @@ public:
 			BSDFSamplingRecord bsdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
 			Spectrum spec = m_bsdf->eval(bsdfRec);
 			
-			if (spec.average() > 0)
-				spec /= Frame::cosTheta(bsdfRec.wo);
-
 // 			if (mu.length() < 1e-8 || wiWorld.length() < 1e-8 || woWorld.length() < 1e-8 ||
 // 				norm.length() < 1e-8 || bsdfRec.wi.length() < 1e-8 || bsdfRec.wo.length() < 1e-8)
 // 			oss << "===================" << std::endl
@@ -271,19 +206,7 @@ public:
 			res += alpha * spec;
 		}
 
-		res *= Frame::cosTheta(bRec.wo) / vmfNorm;
-		//res /= std::max(1e-4, Frame::cosTheta(bRec.wi));
-
-		if (m_useApproxShadowing) {
-			Float len = nMeso.length();
-			if (len < 1e-4)
-				return Spectrum(0.0);
-			nMeso /= len;
-
-			Float shadowTerm = G2(wiMacro, woMacro, nMeso, lobesParam0, lobesParam1);
-			if (std::isfinite(shadowTerm))
-				res *= shadowTerm;
-		}
+		//res /= vmfNorm;
 
 		//std::cout << oss.str();
 
@@ -304,14 +227,15 @@ public:
 		if (!(bRec.typeMask & EGlossyReflection) || Frame::cosTheta(bRec.wi) <= 0)
 			return Spectrum(0.0f);
 		
-		
+		/*
 		// naive sampling
 		bRec.wo = warp::squareToCosineHemisphere(sample);
 		bRec.sampledComponent = 0;
 		bRec.sampledType = EDiffuseReflection;
 		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
 		return eval(bRec, ESolidAngle) / pdf;
-		
+		*/
+
 		Spectrum res(0.0f);
 
 		Intersection its(bRec.its);
@@ -328,17 +252,6 @@ public:
 			its.uv.x = uv.x;
 			its.uv.y = uv.y * 0.5;
 			Spectrum param0 = m_lobes[i]->eval(its, false);
-
-			if (m_useApproxShadowing) {
-				lobesParam0[i] = param0;
-
-				its.uv.x = uv.x;
-				its.uv.y = uv.y * 0.5 + 0.5;
-				lobesParam1[i] = m_lobes[i]->eval(its, false);
-				Vector mu(2.0 * lobesParam1[i][0] - 1.0, 2.0 * lobesParam1[i][1] - 1.0, 
-					2.0 * lobesParam1[i][2] - 1.0);
-				nMeso += lobesParam0[i][0] * mu;
-			}
 
 			if (param0[0] < 1e-8)
 				continue;
@@ -416,20 +329,6 @@ public:
 		if (Frame::cosTheta(bRec.wo) <= 0)
 			return Spectrum(0.0f);
 
-		res *= Frame::cosTheta(bRec.wo) / Frame::cosTheta(bsdfRec.wo);
-
-		if (m_useApproxShadowing) {
-			Float len = nMeso.length();
-			//Log(EInfo, "%.6f, %.6f, %.6f", nMeso.x, nMeso.y, nMeso.z);
-			if (len < 1e-4)
-				return Spectrum(0.0);
-			nMeso /= len;
-
-			Float shadowTerm = G2(wiMacro, woMacro, nMeso, lobesParam0, lobesParam1);
-			if (std::isfinite(shadowTerm))
-				res *= shadowTerm;
-		}
-		
 // 		std::ostringstream oss;
 // 		oss << "===================" << std::endl
 // 			<< "lobe " << lobeIdx << std::endl
@@ -509,7 +408,6 @@ private:
 	ref_vector<Sampler> m_samplers;
 	bool m_useMacroDeform;
 	
-	bool m_useApproxShadowing;
 	Float m_wCos, m_lambdaCos;
 };
 
