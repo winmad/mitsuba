@@ -205,6 +205,16 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			//	return Spectrum(-1.0f);
 			//}
 
+			/*
+			if (rRec.depth > 0) {
+				Vector wiMacro = its.baseFrame.toLocal(-ray.d);
+				if (wiMacro.z > 0) {
+					Log(EInfo, "Macro = %.6f, %.6f, %.6f", wiMacro.x, wiMacro.y, wiMacro.z);
+					Log(EInfo, "Local = %.6f, %.6f, %.6f", its.wi.x, its.wi.y, its.wi.z);
+				}
+			}
+			*/
+
 			Spectrum bsdfVal = bsdf->sample(bRec, rRec.nextSample2D());
 			throughput *= bsdfVal;
 			if (bsdfVal.isZero()) {

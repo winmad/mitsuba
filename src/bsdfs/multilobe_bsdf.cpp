@@ -32,6 +32,7 @@ public:
 		m_lobeFilenamePrefix = props.getString("prefix", "");
 
 		m_useMacroDeform = props.getBoolean("useMacroDeform", false);
+		m_useVmfNorm = props.getBoolean("useVmfNorm", false);
 	}
 
 	MultiLobeBSDF(Stream *stream, InstanceManager *manager) 
@@ -41,6 +42,7 @@ public:
 		m_bsdf = static_cast<BSDF *>(manager->getInstance(stream));
 		m_lobeFilenamePrefix = stream->readString();
 		m_useMacroDeform = stream->readBool();
+		m_useVmfNorm = stream->readBool();
 
 		configure();
 	}
@@ -54,6 +56,7 @@ public:
 		manager->serialize(stream, m_bsdf.get());
 		stream->writeString(m_lobeFilenamePrefix);
 		stream->writeBool(m_useMacroDeform);
+		stream->writeBool(m_useVmfNorm);
 	}
 
 	void configure() {
@@ -177,8 +180,10 @@ public:
 			VonMisesFisherDistr vmf(kappa);
 			Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
 
-			Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
-			vmfNorm += conv(m_wCos, m_lambdaCos, nMacro, wNDF, kappa, mu);
+			if (m_useVmfNorm) {
+				Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
+				vmfNorm += conv(m_wCos, m_lambdaCos, nMacro, wNDF, kappa, mu);
+			}
 
 			Frame lobeFrame(mu);
 			Vector norm = lobeFrame.toWorld(vmf.sample(Point2(sampler->next1D(), sampler->next1D())));
@@ -206,7 +211,8 @@ public:
 			res += alpha * spec;
 		}
 
-		//res /= vmfNorm;
+		if (m_useVmfNorm)
+			res /= vmfNorm;
 
 		//std::cout << oss.str();
 
@@ -220,21 +226,59 @@ public:
 			return 0.0f;
 		
 		// hack...
-		return warp::squareToCosineHemispherePdf(bRec.wo);
+		if (m_useVmfNorm)
+			return warp::squareToCosineHemispherePdf(bRec.wo);
+
+		Float res = 0;
+		
+		Intersection its(bRec.its);
+		its.hasUVPartials = false;
+		Point2 uv = transformUV(bRec.its.uv);
+
+		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+		Vector woWorld = bRec.its.toWorld(bRec.wo);
+
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
+		Vector HMacro = normalize(wiMacro + woMacro);
+		
+		for (int i = 0; i < m_numLobes; i++) {
+			its.uv.x = uv.x;
+			its.uv.y = uv.y * 0.5;
+			Spectrum param0 = m_lobes[i]->eval(its, false);
+			its.uv.x = uv.x;
+			its.uv.y = uv.y * 0.5 + 0.5;
+			Spectrum param1 = m_lobes[i]->eval(its, false);
+
+			Float alpha = param0[0];
+			if (alpha < 1e-8)
+				continue;
+			Float kappa = param0[1];
+			VonMisesFisherDistr vmf(kappa);
+			Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
+
+			res += alpha * vmf.eval(dot(mu, HMacro));
+
+// 			Frame nFrame(mu);
+// 			BSDFSamplingRecord pdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
+// 			res += alpha * m_bsdf->pdf(pdfRec);
+		}
+		res = std::max(res, warp::squareToCosineHemispherePdf(bRec.wo));
+		return res;
 	}
 
 	Spectrum sample(BSDFSamplingRecord &bRec, Float &pdf, const Point2 &sample) const {
 		if (!(bRec.typeMask & EGlossyReflection) || Frame::cosTheta(bRec.wi) <= 0)
 			return Spectrum(0.0f);
 		
-		/*
 		// naive sampling
-		bRec.wo = warp::squareToCosineHemisphere(sample);
-		bRec.sampledComponent = 0;
-		bRec.sampledType = EDiffuseReflection;
-		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
-		return eval(bRec, ESolidAngle) / pdf;
-		*/
+		if (m_useVmfNorm) {
+			bRec.wo = warp::squareToCosineHemisphere(sample);
+			bRec.sampledComponent = 0;
+			bRec.sampledType = EDiffuseReflection;
+			pdf = warp::squareToCosineHemispherePdf(bRec.wo);
+			return eval(bRec, ESolidAngle) / pdf;
+		}
 
 		Spectrum res(0.0f);
 
@@ -242,7 +286,6 @@ public:
 		its.hasUVPartials = false;
 		Point2 uv = transformUV(bRec.its.uv);
 
-		Vector nMeso(0.0);
 		std::vector<Spectrum> lobesParam0(m_numLobes);
 		std::vector<Spectrum> lobesParam1(m_numLobes);
 
@@ -252,6 +295,12 @@ public:
 			its.uv.x = uv.x;
 			its.uv.y = uv.y * 0.5;
 			Spectrum param0 = m_lobes[i]->eval(its, false);
+			its.uv.x = uv.x;
+			its.uv.y = uv.y * 0.5 + 0.5;
+			Spectrum param1 = m_lobes[i]->eval(its, false);
+
+			lobesParam0[i] = param0;
+			lobesParam1[i] = param1;
 
 			if (param0[0] < 1e-8)
 				continue;
@@ -281,12 +330,8 @@ public:
 		if (lobeIdx > 0)
 			alpha -= cdf[lobeIdx - 1];
 
-		its.uv.x = uv.x;
-		its.uv.y = uv.y * 0.5;
-		Spectrum param0 = m_lobes[lobeIdx]->eval(its, false);
-		its.uv.x = uv.x;
-		its.uv.y = uv.y * 0.5 + 0.5;
-		Spectrum param1 = m_lobes[lobeIdx]->eval(its, false);
+		Spectrum &param0 = lobesParam0[lobeIdx];
+		Spectrum &param1 = lobesParam1[lobeIdx];
 
 		Float kappa = param0[1];
 		VonMisesFisherDistr vmf(kappa);
@@ -323,11 +368,30 @@ public:
 		bRec.used[1] = false;
 
 		// hack..
-		pdf = warp::squareToCosineHemispherePdf(bRec.wo);
+		//pdf = warp::squareToCosineHemispherePdf(bRec.wo);
+		
+		pdf = 0;
+		Vector HMacro = normalize(wiMacro + woMacro);
+		for (int i = 0; i < m_numLobes; i++) {
+			Float alpha = lobesParam0[i][0];
+			if (alpha < 1e-8)
+				continue;
+			Float kappa = lobesParam0[i][1];
+			VonMisesFisherDistr vmf(kappa);
+			Vector mu(2.0 * lobesParam1[i][0] - 1.0, 2.0 * lobesParam1[i][1] - 1.0, 2.0 * lobesParam1[i][2] - 1.0);
+			
+			pdf += alpha * vmf.eval(dot(mu, HMacro));
+
+// 			Frame nFrame(mu);
+// 			BSDFSamplingRecord pdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
+// 			pdf += alpha * m_bsdf->pdf(pdfRec);
+		}
+		pdf = std::max(pdf, warp::squareToCosineHemispherePdf(bRec.wo));
 
 		// side check
 		if (Frame::cosTheta(bRec.wo) <= 0)
 			return Spectrum(0.0f);
+		
 
 // 		std::ostringstream oss;
 // 		oss << "===================" << std::endl
@@ -407,6 +471,7 @@ private:
 	ref<BSDF> m_bsdf;
 	ref_vector<Sampler> m_samplers;
 	bool m_useMacroDeform;
+	bool m_useVmfNorm;
 	
 	Float m_wCos, m_lambdaCos;
 };

@@ -986,6 +986,7 @@
     <ClCompile Include="..\src\utils\albedoRemapping.cpp" />
     <ClCompile Include="..\src\utils\alignLobes.cpp" />
     <ClCompile Include="..\src\utils\beckmannSurface.cpp" />
+    <ClCompile Include="..\src\utils\bsdfReflectance.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp" />
     <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative.cpp" />

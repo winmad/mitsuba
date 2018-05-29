@@ -323,7 +323,7 @@ public:
 	}
 
 	Spectrum sample(BSDFSamplingRecord &bRec, const Point2 &sample) const {
-		if (Frame::cosTheta(bRec.wi) < 0 ||
+		if (Frame::cosTheta(bRec.wi) <= 0 ||
 			((bRec.component != -1 && bRec.component != 0) ||
 			!(bRec.typeMask & EGlossyReflection)))
 			return Spectrum(0.0f);

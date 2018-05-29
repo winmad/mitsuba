@@ -17,6 +17,7 @@ plugins += env.SharedLibrary('samplePatchVis', ['samplePatchVis.cpp'])
 plugins += env.SharedLibrary('normalMipmap', ['normalMipmap.cpp'])
 plugins += env.SharedLibrary('ndfMipmap', ['ndfMipmap.cpp'])
 plugins += env.SharedLibrary('effBRDFDirect', ['effBRDFDirect.cpp'])
+plugins += env.SharedLibrary('bsdfReflectance', ['bsdfReflectance.cpp'])
 
 plugins += env.SharedLibrary('LEADR_plane', ['LEADR_plane.cpp'])
 plugins += env.SharedLibrary('checkMesoNormals', ['checkMesoNormals.cpp'])
