@@ -211,8 +211,12 @@ public:
 			res += alpha * spec;
 		}
 
-		if (m_useVmfNorm)
-			res /= vmfNorm;
+		if (m_useVmfNorm) {
+			if (std::abs(vmfNorm) < Epsilon)
+				res = Spectrum(0.0);
+			else
+				res /= vmfNorm;
+		}
 
 		//std::cout << oss.str();
 
@@ -226,8 +230,8 @@ public:
 			return 0.0f;
 		
 		// hack...
-		if (m_useVmfNorm)
-			return warp::squareToCosineHemispherePdf(bRec.wo);
+		//if (m_useVmfNorm)
+		//	return warp::squareToCosineHemispherePdf(bRec.wo);
 
 		Float res = 0;
 		
@@ -271,6 +275,7 @@ public:
 		if (!(bRec.typeMask & EGlossyReflection) || Frame::cosTheta(bRec.wi) <= 0)
 			return Spectrum(0.0f);
 		
+		/*
 		// naive sampling
 		if (m_useVmfNorm) {
 			bRec.wo = warp::squareToCosineHemisphere(sample);
@@ -279,6 +284,7 @@ public:
 			pdf = warp::squareToCosineHemispherePdf(bRec.wo);
 			return eval(bRec, ESolidAngle) / pdf;
 		}
+		*/
 
 		Spectrum res(0.0f);
 
@@ -286,9 +292,12 @@ public:
 		its.hasUVPartials = false;
 		Point2 uv = transformUV(bRec.its.uv);
 
+		Vector nMacro = bRec.its.baseFrame.toLocal(bRec.its.shFrame.n);
+
 		std::vector<Spectrum> lobesParam0(m_numLobes);
 		std::vector<Spectrum> lobesParam1(m_numLobes);
 
+		Float vmfNorm = 0.0;
 		std::vector<Float> cdf(0);
 		std::vector<int> lobeIndices(0);
 		for (int i = 0; i < m_numLobes; i++) {
@@ -310,6 +319,15 @@ public:
 				cdf.push_back(param0[0]);
 			else
 				cdf.push_back(cdf.back() + param0[0]);
+
+			if (m_useVmfNorm) {
+				Float alpha = param0[0];
+				Float kappa = param0[1];
+				VonMisesFisherDistr vmf(kappa);
+				Vector mu(2.0 * param1[0] - 1.0, 2.0 * param1[1] - 1.0, 2.0 * param1[2] - 1.0);
+				Float wNDF = alpha * kappa / (2 * M_PI * (1 - math::fastexp(-2 * kappa)));
+				vmfNorm += conv(m_wCos, m_lambdaCos, nMacro, wNDF, kappa, mu);
+			}
 		}
 		if (cdf.size() == 0) {
 			Log(EError, "no lobes?!");
@@ -392,6 +410,12 @@ public:
 		if (Frame::cosTheta(bRec.wo) <= 0)
 			return Spectrum(0.0f);
 		
+		if (m_useVmfNorm) {
+			if (std::abs(vmfNorm) < Epsilon)
+				res = Spectrum(0.0);
+			else
+				res /= vmfNorm;
+		}
 
 // 		std::ostringstream oss;
 // 		oss << "===================" << std::endl

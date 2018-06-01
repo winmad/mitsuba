@@ -4,8 +4,14 @@
 MTS_NAMESPACE_BEGIN
 
 // WorkResult
-SphericalDistribution::SphericalDistribution(int size) : m_size(size) {
-	m_values = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat64, Vector2i(m_size));
+SphericalDistribution::SphericalDistribution(int size, int useFullSphere) : m_size(size), m_useFullSphere(useFullSphere) {
+	if (m_useFullSphere)
+		m_imgSize = Vector2i(m_size, m_size * 2);
+	else
+		m_imgSize = Vector2i(m_size);
+	
+	m_values = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat64, m_imgSize);
+
 // 	cY[0] = 0.5 * std::sqrt(INV_PI);
 // 	cY[1] = 0.5 * std::sqrt(3.0 * INV_PI);
 // 	cY[2] = 0.25 * std::sqrt(5.0 * INV_PI);
@@ -16,7 +22,8 @@ void SphericalDistribution::clear() {
 	m_totValidParticles = 0;
 	m_totWeight = 0.0;
 	double *data = m_values->getFloat64Data();
-	for (int i = 0; i < m_size * m_size * SPECTRUM_SAMPLES; i++)
+
+	for (int i = 0; i < m_imgSize.x * m_imgSize.y * SPECTRUM_SAMPLES; i++)
 		*data++ = 0.0;
 
 // 	for (int i = 0; i < 3; i++)
@@ -24,7 +31,7 @@ void SphericalDistribution::clear() {
 }
 
 void SphericalDistribution::put(const SphericalDistribution *dist, bool putBitmap) {
-	Assert(m_size == dist->m_size);
+	Assert(m_imgSize == dist->m_imgSize);
 	m_totValue += dist->m_totValue;
 	m_totValidParticles += dist->m_totValidParticles;
 	m_totWeight += dist->m_totWeight;
@@ -35,7 +42,7 @@ void SphericalDistribution::put(const SphericalDistribution *dist, bool putBitma
 	if (putBitmap) {
 		double *target = m_values->getFloat64Data();
 		const double *source = dist->m_values->getFloat64Data();
-		for (int i = 0; i < m_size * m_size * SPECTRUM_SAMPLES; i++)
+		for (int i = 0; i < m_imgSize.x * m_imgSize.y * SPECTRUM_SAMPLES; i++)
 			*target++ += *source++;
 	}
 }
@@ -63,8 +70,13 @@ void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double
 
 	if (putBitmap) {
 #if defined(USE_SQUARE_CONCENTRIC)
-		if (dir.z <= 0)
-			return;
+		int offset_r = 0;
+		if (dir.z <= 0) {
+			if (m_useFullSphere)
+				offset_r = m_size;
+			else
+				return;
+		}
 
 		double *data = m_values->getFloat64Data();
 		Point2 square = warp::uniformHemisphereToSquareConcentric(dir);
@@ -92,7 +104,7 @@ void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double
 			double wv = std::abs(1.0 - dr - v);
 			for (int dc = 0; dc < 2; dc++) {
 				double wKernel = wv * std::abs(1.0 - dc - u);
-				int idx = (r + dr) * m_size + (c + dc);
+				int idx = (r + dr + offset_r) * m_size + (c + dc);
 				for (int k = 0; k < 3; k++) {
 					data[3 * idx + k] += tmp[k] * wKernel;
 				}
@@ -114,7 +126,7 @@ void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double
 
 void SphericalDistribution::scale(double scale) {
 	double *data = m_values->getFloat64Data();
-	for (int i = 0; i < m_size * m_size * SPECTRUM_SAMPLES; i++)
+	for (int i = 0; i < m_imgSize.x * m_imgSize.y * SPECTRUM_SAMPLES; i++)
 		*data++ *= scale;
 }
 
@@ -128,12 +140,15 @@ void SphericalDistribution::saveExr(fs::path filename) {
 
 void SphericalDistribution::load(Stream *stream) {
 	m_size = stream->readInt();
+	m_useFullSphere = stream->readInt();
+	m_imgSize.x = stream->readInt();
+	m_imgSize.y = stream->readInt();
 	m_totValue[0] = stream->readDouble();
 	m_totValue[1] = stream->readDouble();
 	m_totValue[2] = stream->readDouble();
 	m_totValidParticles = stream->readInt();
 	m_totWeight = stream->readDouble();
-	stream->readDoubleArray(m_values->getFloat64Data(), m_size * m_size * SPECTRUM_SAMPLES);
+	stream->readDoubleArray(m_values->getFloat64Data(), m_imgSize.x * m_imgSize.y * SPECTRUM_SAMPLES);
 // 	for (int i = 0; i < 3; i++)
 // 		for (int c = 0; c < 3; c++)
 // 			m_moments[i][c] = stream->readDouble();
@@ -141,12 +156,15 @@ void SphericalDistribution::load(Stream *stream) {
 
 void SphericalDistribution::save(Stream *stream) const {
 	stream->writeInt(m_size);
+	stream->writeInt(m_useFullSphere);
+	stream->writeInt(m_imgSize.x);
+	stream->writeInt(m_imgSize.y);
 	stream->writeDouble(m_totValue[0]);
 	stream->writeDouble(m_totValue[1]);
 	stream->writeDouble(m_totValue[2]);
 	stream->writeInt(m_totValidParticles);
 	stream->writeDouble(m_totWeight);
-	stream->writeDoubleArray(m_values->getFloat64Data(), m_size * m_size * SPECTRUM_SAMPLES);
+	stream->writeDoubleArray(m_values->getFloat64Data(), m_imgSize.x * m_imgSize.y * SPECTRUM_SAMPLES);
 // 	for (int i = 0; i < 3; i++)
 // 		for (int c = 0; c < 3; c++)
 // 			stream->writeDouble(m_moments[i][c]);
@@ -156,15 +174,16 @@ std::string SphericalDistribution::toString() const {
 	std::ostringstream oss;
 	oss << "SphericalDistribution[" << endl
 		<< "  size = " << m_size << endl
+		<< "  useFullSphere = " << m_useFullSphere << endl
 		<< "]";
 	return oss.str();
 }
 
 // WorkResult
-MultiLobeDistribution::MultiLobeDistribution(int numLobes, int size) : m_numLobes(numLobes) {
+MultiLobeDistribution::MultiLobeDistribution(int numLobes, int size, int useFullSphere) : m_numLobes(numLobes) {
 	m_lobes.resize(numLobes);
 	for (int i = 0; i < numLobes; i++) {
-		m_lobes[i] = new SphericalDistribution(size);
+		m_lobes[i] = new SphericalDistribution(size, useFullSphere);
 	}
 }
 

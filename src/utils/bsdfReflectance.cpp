@@ -105,8 +105,8 @@ public:
 				// estimate meso-normal
 				Vector nMeso(0.0);
 				Vector2i spcnt;
-				spcnt.x = math::clamp(m_size.x / m_blockNums.x, 16, 64);
-				spcnt.y = math::clamp(m_size.y / m_blockNums.y, 16, 64);
+				spcnt.x = math::clamp(m_size.x / m_blockNums.x, 16, 128);
+				spcnt.y = math::clamp(m_size.y / m_blockNums.y, 16, 128);
 
 				for (int i = 0; i < spcnt.y; i++) {
 					for (int j = 0; j < spcnt.x; j++) {

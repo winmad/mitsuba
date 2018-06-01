@@ -131,7 +131,7 @@ ref<WorkUnit> BSDFDerivativeRayTracer::createWorkUnit() const {
 }
 
 ref<WorkResult> BSDFDerivativeRayTracer::createWorkResult() const {
-	return new MultiLobeDistribution(m_numVars, m_size);
+	return new MultiLobeDistribution(m_numVars, m_size, 0);
 }
 
 ref<WorkProcessor> BSDFDerivativeRayTracer::clone() const {
@@ -180,7 +180,7 @@ BSDFDerivativeProcess::BSDFDerivativeProcess(int numVars, const Vector &wi, int 
 	m_granularity = std::max((size_t)1, m_numParticles
 		/ (16 * Scheduler::getInstance()->getWorkerCount()));
 
-	m_res = new MultiLobeDistribution(m_numVars, m_size);
+	m_res = new MultiLobeDistribution(m_numVars, m_size, 0);
 	m_res->clear();
 
 	m_resultCount = 0;
@@ -215,11 +215,11 @@ void BSDFDerivativeProcess::processResult(const WorkResult *result, bool cancell
 		return;
 
 	const MultiLobeDistribution *res = static_cast<const MultiLobeDistribution *>(result);
+	UniqueLock lock(m_resultMutex);
 
 	m_res->put(res);
 
 	m_progress->update(++m_resultCount);
-	UniqueLock lock(m_resultMutex);
 	lock.unlock();
 }
 

@@ -20,12 +20,16 @@ public:
 	TabulatedScaledBSDF(const Properties &props) : BSDF(props) {
 		m_angularScaleFilename = props.getString("angularScaleFilename", "");
 		m_useMIS = props.getBoolean("useMIS", false);
+
+		m_wiUseFullSphere = props.getBoolean("wiUseFullSphere", false);
 	}
 
 	TabulatedScaledBSDF(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
 		m_angularScaleFilename = stream->readString();
 		m_useMIS = stream->readBool();
+
+		m_wiUseFullSphere = stream->readBool();
 
 		configure();
 	}
@@ -35,6 +39,8 @@ public:
 
 		stream->writeString(m_angularScaleFilename);
 		stream->writeBool(m_useMIS);
+
+		stream->writeBool(m_wiUseFullSphere);
 	}
 
 	void configure() {
@@ -46,7 +52,11 @@ public:
 		// load angular scales
 		m_angularScales = new Bitmap(fs::path(m_angularScaleFilename));
 		m_lobeSize = m_angularScales->getSize();
-		m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y));
+
+		if (m_wiUseFullSphere)
+			m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y * 0.5));
+		else
+			m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y));
 		m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x));
 
 		Log(EInfo, "wiRes = %d, woRes = %d", m_wiResolution, m_woResolution);
@@ -79,8 +89,22 @@ public:
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
-		if (wiMacro.z <= 0 || woMacro.z <= 0)
+		//if (wiMacro.z < 0 && wiMacro.z < -0.1)
+		//	Log(EInfo, "wiMacro = (%.6f, %.6f, %.6f), woMacro = (%.6f, %.6f, %.6f)",
+		//		wiMacro.x, wiMacro.y, wiMacro.z, woMacro.x, woMacro.y, woMacro.z);
+
+		if (woMacro.z <= 0)
 			return Spectrum(0.0);
+
+		int r1Offset = 0;
+		if (wiMacro.z <= 0) {
+			return Spectrum(0.0);
+
+			if (m_wiUseFullSphere && wiMacro.z > -0.2)
+				r1Offset = m_wiResolution;
+			else
+				return Spectrum(0.0);
+		}
 
 		Point2 wiTex = warp::uniformHemisphereToSquareConcentric(wiMacro);
 		Point2 woTex = warp::uniformHemisphereToSquareConcentric(woMacro);
@@ -90,7 +114,7 @@ public:
 		int woNumCells = m_woResolution - 1;
 
 		int c1 = math::clamp(math::floorToInt(wiTex.x * wiNumCells), 0, wiNumCells - 1);
-		int r1 = math::clamp(math::floorToInt(wiTex.y * wiNumCells), 0, wiNumCells - 1);
+		int r1 = math::clamp(math::floorToInt(wiTex.y * wiNumCells), 0, wiNumCells - 1) + r1Offset;
 		int c2 = math::clamp(math::floorToInt(woTex.x * woNumCells), 0, woNumCells - 1);
 		int r2 = math::clamp(math::floorToInt(woTex.y * woNumCells), 0, woNumCells - 1);
 
@@ -386,6 +410,7 @@ public:
 	Vector2i m_lobeSize;
 	int m_wiResolution;
 	int m_woResolution;
+	bool m_wiUseFullSphere;
 
 	bool m_useMIS;
 	ref_vector<Sampler> m_samplers;

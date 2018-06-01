@@ -15,7 +15,7 @@ MTS_NAMESPACE_BEGIN
 class BSDFRayTracer : public WorkProcessor {
 public:
 	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb,
-		int minDepth, int maxDepth, int shadowOption);
+		int minDepth, int maxDepth, int shadowOption, int useFullSphere, Float distGiTexelScale);
 	Point sampleRayOrigin(int idx, double &weight);
 	Spectrum sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts);
 
@@ -41,12 +41,16 @@ public:
 	int m_maxDepth;
 	AABB2 m_aabb;
 	int m_shadowOption;
+	int m_useFullSphere;
+
+	Float m_distGiTexelScale;
+	Vector2 m_distGiRange;
 };
 
 class BSDFSimulatorProcess : public ParallelProcess {
 public:
 	BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb, 
-		int minDepth, int maxDepth, int shadowOption);
+		int minDepth, int maxDepth, int shadowOption, int useFullSphere, Float distGiTexelScale);
 	void setGranularity(int granularity);
 
 	EStatus generateWork(WorkUnit *unit, int worker);
@@ -71,6 +75,8 @@ public:
 	int m_maxDepth;
 	AABB2 m_aabb;
 	int m_shadowOption;
+	int m_useFullSphere;
+	Float m_distGiTexelScale;
 	ref<MultiLobeDistribution> m_res;
 };
 

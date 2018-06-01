@@ -13,7 +13,7 @@ MTS_NAMESPACE_BEGIN
 
 class MTS_EXPORT_RENDER SphericalDistribution : public WorkResult {
 public:
-	SphericalDistribution(int size);
+	SphericalDistribution(int size, int useFullSphere);
 	void clear();
 	void put(const SphericalDistribution *dist, bool putBitmap=true);
 	void put(const Vector &dir, const Spectrum &value, double weight, double normFactor, bool putBitmap=true);
@@ -32,7 +32,9 @@ public:
 	Vector3d m_totValue;
 	int m_totValidParticles;
 	double m_totWeight;
+	int m_useFullSphere;
 
+	Vector2i m_imgSize;
 	ref<Bitmap> m_values;
 	
 // 	Vector3d m_moments[3];
@@ -41,7 +43,7 @@ public:
 
 class MTS_EXPORT_RENDER MultiLobeDistribution : public WorkResult {
 public:
-	MultiLobeDistribution(int numLobes, int size);
+	MultiLobeDistribution(int numLobes, int size, int useFullSphere);
 	SphericalDistribution *getLobe(int lobeIdx);
 	const SphericalDistribution *getLobe(int lobeIdx) const;
 	void clear();

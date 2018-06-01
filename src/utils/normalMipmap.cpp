@@ -95,6 +95,33 @@ public:
 				putVMF(vmfs, bitmaps, j / step, i / step, m_resolution / scale,
 					m_resolution / scale);
 
+				// no lobe error
+				bool flag = false;
+				for (int l = 0; l < m_numLobes; l++) {
+					if (vmfs.m_alpha[l] > 1e-5)
+						flag = true;
+				}
+				if (!flag) {
+					std::ostringstream oss;
+
+					/*
+					for (int di = 0; di < step; di++) {
+						for (int dj = 0; dj < step; dj++) {
+							Vector &n = m_normals[i + di][j + dj];
+							oss << "(" << n.x << ", " << n.y << ", " << n.z << ")\n";
+						}
+					}
+					*/
+
+					initKMeans(m_normals, i, step, j, step, vmfs);
+					for (int l = 0; l < m_numLobes; l++) {
+						oss << "alpha: " << vmfs.m_alpha[l] << " kappa: " << vmfs.m_dist[l].getKappa() << "\n";
+					}
+
+					Log(EInfo, "%s", oss.str().c_str());					
+					exit(0);
+				}
+
 // 				if (i / step == 0 && j / step == 0) {
 // 					sprintf(fname, "vmf_%d_%d.exr", i / step, j / step);
 // 					vmfs.outputDistribution(128, fname);
@@ -124,15 +151,19 @@ public:
 		centers[0].resize(m_numLobes);
 		centers[1].resize(m_numLobes);
 		for (int i = 0; i < m_numLobes; i++) {
+			int counter = 0;
 			while (1) {
 				int u = math::floorToInt(sampler->next1D() * rSize);
 				int v = math::floorToInt(sampler->next1D() * cSize);
 				int r = rSt + v;
 				int c = cSt + u;
 
-				for (int l = 0; l < i; l++) {
-					if (dot(normals[r][c], centers[0][l]) > 0.9999)
-						continue;
+				if (counter < 1000) {
+					counter++;
+					for (int l = 0; l < i; l++) {
+						if (dot(normals[r][c], centers[0][l]) > 0.9999)
+							continue;
+					}
 				}
 			
 				centers[0][i] = normals[r][c];
@@ -211,8 +242,14 @@ public:
 				continue;
 
 			vmfsInit.m_mu[l] = normalize(centers[now][l]);
-			Float kappa = VonMisesFisherDistr::forMeanLength(centers[now][l].length());
-			kappa = std::min(kappa, 1e3);
+
+			Float kappa;
+			if (std::abs(centers[now][l].length() - 1.0) < 1e-3)
+				kappa = 1e3;
+			else {
+				kappa = VonMisesFisherDistr::forMeanLength(centers[now][l].length());
+				kappa = std::min(kappa, 1e3);
+			}
 			vmfsInit.m_dist[l] = VonMisesFisherDistr(kappa);
 		}
 	}

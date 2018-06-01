@@ -133,7 +133,7 @@ public:
                 break;
 
 			if (++cnt > m_tetrahedronCount) {
-				Log(EInfo, "Loop forever when intersecting...");
+				//Log(EInfo, "Loop forever when intersecting...");
 				break;
 			}
 

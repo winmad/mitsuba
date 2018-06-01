@@ -9,20 +9,22 @@ MTS_NAMESPACE_BEGIN
 
 // WorkProcessor
 BSDFRayTracer::BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, 
-		const AABB2 &aabb, int minDepth, int maxDepth, int shadowOption)
+		const AABB2 &aabb, int minDepth, int maxDepth, int shadowOption, 
+		int useFullSphere, Float distGiTexelScale)
 	: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), m_minDepth(minDepth), m_maxDepth(maxDepth), 
-	m_aabb(aabb), m_shadowOption(shadowOption) { }
+	m_aabb(aabb), m_shadowOption(shadowOption), m_useFullSphere(useFullSphere), m_distGiTexelScale(distGiTexelScale) { }
 
 ref<WorkUnit> BSDFRayTracer::createWorkUnit() const {
 	return new RangeWorkUnit();
 }
 
 ref<WorkResult> BSDFRayTracer::createWorkResult() const {
-	return new MultiLobeDistribution(m_minDepth + 2, m_size);
+	return new MultiLobeDistribution(m_minDepth + 2, m_size, m_useFullSphere);
 }
 
 ref<WorkProcessor> BSDFRayTracer::clone() const {
-	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_aabb, m_minDepth, m_maxDepth, m_shadowOption);
+	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_aabb, m_minDepth, m_maxDepth, 
+		m_shadowOption, m_useFullSphere, m_distGiTexelScale);
 }
 
 void BSDFRayTracer::prepare() {
@@ -44,6 +46,9 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 	//m_sampler->generate(Point2i(0));
 
 	res->clear();
+
+	m_distGiRange.x = (m_aabb.max.x - m_aabb.min.x) * m_distGiTexelScale;
+	m_distGiRange.y = (m_aabb.max.y - m_aabb.min.y) * m_distGiTexelScale;
 	
 	//Log(EInfo, "process start %d: (%d, %d)", Thread::getID(), range->getRangeStart(), range->getRangeEnd());
 	for (size_t i = range->getRangeStart(); i <= range->getRangeEnd() && !stop; i++) {
@@ -69,7 +74,7 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 // 		}
 
 		//Assert(ray.d.z > -Epsilon);
-		if (ray.d.z < 0)
+		if (ray.d.z < 0 && !m_useFullSphere)
 			throughput = Spectrum(0.f);
 
 		if (!throughput.isZero()) {
@@ -110,18 +115,29 @@ Point BSDFRayTracer::sampleRayOrigin(int idx, double &weight) {
 	double cosG = std::max(0.0, normal.z);
 	if (cosG < 1e-5) {
 		weight = 0.0;
+		//Log(EInfo, "bad cosG: %.6f, %.6f, %.6f", normal.x, normal.y, normal.z);
 		return o;
 	}
 
 	weight = std::max(0.0, dot(normal, m_wi)) / cosG;
 	if (weight > 0.0) {
 		ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
-		o = its.p + m_wi * 1e2;
+		o = its.p + m_wi * ShadowEpsilon * 10;
 
 		// by default: global masking
-		if (m_scene->rayIntersect(ray)) {
-			weight = 0.0;
-			//Log(EInfo, "masked...");
+		if (m_wi.z > 0) {
+			if (m_scene->rayIntersect(ray)) {
+				weight = 0.0;
+				//Log(EInfo, "masked...");
+			}
+		} else {
+			m_scene->rayIntersect(ray, its);
+			
+			if (its.isValid() && std::abs(its.p.x - x) < m_distGiRange.x && std::abs(its.p.y - y) < m_distGiRange.y) {
+				weight = 0.0;
+				//Log(EInfo, "%.6f, %.6f", std::abs(its.p.x - x) / (m_aabb.max.x - m_aabb.min.x) * 4096,
+				//	std::abs(its.p.y - y) / (m_aabb.max.y - m_aabb.min.y) * 4096);
+			}
 		}
 
 		/*
@@ -240,8 +256,12 @@ BSDFRayTracer::BSDFRayTracer(Stream *stream, InstanceManager *manager) {
 		m_wi[i] = stream->readFloat();
 	m_sqrtNumParticles = stream->readInt();
 	m_size = stream->readInt();
+	m_minDepth = stream->readInt();
 	m_maxDepth = stream->readInt();
 	m_aabb = AABB2(stream);
+	m_shadowOption = stream->readInt();
+	m_useFullSphere = stream->readInt();
+	m_distGiTexelScale = stream->readFloat();
 }
 
 void BSDFRayTracer::serialize(Stream *stream, InstanceManager *manager) const {
@@ -249,21 +269,27 @@ void BSDFRayTracer::serialize(Stream *stream, InstanceManager *manager) const {
 		stream->writeFloat(m_wi[i]);
 	stream->writeInt(m_sqrtNumParticles);
 	stream->writeInt(m_size);
+	stream->writeInt(m_minDepth);
 	stream->writeInt(m_maxDepth);
 	m_aabb.serialize(stream);
+	stream->writeInt(m_shadowOption);
+	stream->writeInt(m_useFullSphere);
+	stream->writeFloat(m_distGiTexelScale);
 }
 
 // ParallelProcess
 BSDFSimulatorProcess::BSDFSimulatorProcess(const Vector &wi, int sqrtNumParticles,
-		int size, const AABB2 &aabb, int minDepth, int maxDepth, int shadowOption)
+		int size, const AABB2 &aabb, int minDepth, int maxDepth, int shadowOption, 
+		int useFullSphere, Float distGiTexelScale)
 		: m_wi(wi), m_sqrtNumParticles(sqrtNumParticles), m_size(size), m_minDepth(minDepth),
-		m_maxDepth(maxDepth), m_aabb(aabb), m_shadowOption(shadowOption) {
+		m_maxDepth(maxDepth), m_aabb(aabb), m_shadowOption(shadowOption), m_useFullSphere(useFullSphere),
+		m_distGiTexelScale(distGiTexelScale) {
 	m_numParticles = m_sqrtNumParticles * m_sqrtNumParticles;
 	m_start = 0;
 	m_granularity = std::max((size_t)1, m_numParticles 
 		/ (16 * Scheduler::getInstance()->getWorkerCount()));
 	
-	m_res = new MultiLobeDistribution(m_minDepth + 2, m_size);
+	m_res = new MultiLobeDistribution(m_minDepth + 2, m_size, m_useFullSphere);
 	m_res->clear();
 
 	m_resultCount = 0;
@@ -298,16 +324,17 @@ void BSDFSimulatorProcess::processResult(const WorkResult *result, bool cancelle
 		return;
 
 	const MultiLobeDistribution *res = static_cast<const MultiLobeDistribution *>(result);
+	UniqueLock lock(m_resultMutex);
 
 	m_res->put(res);
-
 	m_progress->update(++m_resultCount);
-	UniqueLock lock(m_resultMutex);
+
 	lock.unlock();
 }
 
 ref<WorkProcessor> BSDFSimulatorProcess::createWorkProcessor() const {
-	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_aabb, m_minDepth, m_maxDepth, m_shadowOption);
+	return new BSDFRayTracer(m_wi, m_sqrtNumParticles, m_size, m_aabb, m_minDepth, m_maxDepth, m_shadowOption,
+		m_useFullSphere, m_distGiTexelScale);
 }
 
 MTS_IMPLEMENT_CLASS_S(BSDFRayTracer, false, WorkProcessor)

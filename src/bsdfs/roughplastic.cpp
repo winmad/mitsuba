@@ -311,7 +311,9 @@ public:
 		Float alpha = m_alpha->eval(its).average();
 		Float Ftr = m_externalRoughTransmittance->evalDiffuse(alpha);
 
-		return m_diffuseReflectance->eval(its) * Ftr;
+		// modified by Lifan: only return texture
+		return m_diffuseReflectance->eval(its);
+		//return m_diffuseReflectance->eval(its) * Ftr;
 	}
 
 	Spectrum getSpecularReflectance(const Intersection &its) const {
