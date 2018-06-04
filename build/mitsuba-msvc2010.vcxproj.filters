@@ -842,9 +842,6 @@
     <ClCompile Include="..\src\shapes\ply\ply_parser.cpp">
       <Filter>Source Files\shapes\ply</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\shapes\cube.cpp">
-      <Filter>Source Files\shapes</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\shapes\serialized.cpp">
       <Filter>Source Files\shapes</Filter>
     </ClCompile>
@@ -1276,6 +1273,12 @@
     </ClCompile>
     <ClCompile Include="..\src\utils\bsdfReflectance.cpp">
       <Filter>Source Files\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\shapes\cube.cpp">
+      <Filter>Source Files\shapes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bsdfs\roughbsdf_single.cpp">
+      <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">

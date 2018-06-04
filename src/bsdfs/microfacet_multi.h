@@ -88,7 +88,10 @@ struct RayInfo {
 		// ignore covariance
 		alpha = cosPhi2 * sigmaX2 + sinPhi2 * sigmaY2 + 2.0 * cosPhi * sinPhi * cxy;
 		//alpha = cosPhi2 * sigmaX2 + sinPhi2 * sigmaY2;
+		
+		// is this for GGX?
 		alpha = sqrt(2.0 * alpha);
+
 		if (w.z > 0.9999f)
 			Lambda = 0.0f;
 		else if (w.z < -0.9999f)

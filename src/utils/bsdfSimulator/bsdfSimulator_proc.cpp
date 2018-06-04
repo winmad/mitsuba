@@ -77,7 +77,7 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 		if (ray.d.z < 0 && !m_useFullSphere)
 			throughput = Spectrum(0.f);
 
-		if (!throughput.isZero()) {
+		if (!throughput.isZero() && ray.d.z > 0) {
 			if (m_shadowOption == 1) {
 				if (its.isValid() && m_aabb.contains(Point2(its.p.x, its.p.y)))
 					throughput = Spectrum(0.f);

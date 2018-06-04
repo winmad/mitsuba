@@ -264,11 +264,12 @@ public:
 			| ((constAlpha && m_diffuseReflectance->isConstant())
 				? 0 : ESpatiallyVarying));
 
+		// disable energy conservation
 		/* Verify the input parameters and fix them if necessary */
-		m_specularReflectance = ensureEnergyConservation(
-			m_specularReflectance, "specularReflectance", 1.0f);
-		m_diffuseReflectance = ensureEnergyConservation(
-			m_diffuseReflectance, "diffuseReflectance", 1.0f);
+// 		m_specularReflectance = ensureEnergyConservation(
+// 			m_specularReflectance, "specularReflectance", 1.0f);
+// 		m_diffuseReflectance = ensureEnergyConservation(
+// 			m_diffuseReflectance, "diffuseReflectance", 1.0f);
 
 		/* Compute weights that further steer samples towards
 		   the specular or diffuse components */

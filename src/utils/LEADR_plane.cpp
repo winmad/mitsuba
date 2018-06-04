@@ -61,7 +61,7 @@ public:
 			useHeightfield = false;
 		}
 
-#pragma omp parallel for
+//#pragma omp parallel for
 		for (int y = 0; y < m_size; y++) {
 			for (int x = 0; x < m_size; x++) {
 				moments[y][x] = Vector6(0.0);
@@ -70,8 +70,11 @@ public:
 				for (int i = 0; i < m_sqrtSpp; i++) {
 					for (int j = 0; j < m_sqrtSpp; j++) {
 						Point2 uv;
-						uv.x = (x + (j + positionSamples[i][j].x) / (double)m_sqrtSpp) / (double)m_size;
-						uv.y = (y + (i + positionSamples[i][j].y) / (double)m_sqrtSpp) / (double)m_size;
+						//uv.x = (x + (j + positionSamples[i][j].x) / (double)m_sqrtSpp) / (double)m_size;
+						//uv.y = (y + (i + positionSamples[i][j].y) / (double)m_sqrtSpp) / (double)m_size;
+
+						uv.x = (x + (j + m_sampler->next1D()) / (double)m_sqrtSpp) / (double)m_size;
+						uv.y = (y + (i + m_sampler->next1D()) / (double)m_sqrtSpp) / (double)m_size;
 
 						Point pos;
 						Normal norm;
@@ -82,8 +85,8 @@ public:
 
 						moments[y][x][0] += slopeX;
 						moments[y][x][1] += slopeY;
-						moments[y][x][2] += slopeX * slopeX;
-						moments[y][x][3] += slopeY * slopeY;
+						moments[y][x][2] += slopeX * slopeX + 0.5 * 1e-10;
+						moments[y][x][3] += slopeY * slopeY + 0.5 * 1e-10;
 						moments[y][x][4] += slopeX * slopeY;
 
 						uvs[y][x] += Vector3(uv.x, uv.y, 0);
@@ -93,16 +96,16 @@ public:
 				moments[y][x] /= (double)m_spp;
 				uvs[y][x] /= (double)m_spp;
 
-				/*
+				
 				Float sigmaX2 = moments[y][x][2] - moments[y][x][0] * moments[y][x][0];
 				Float sigmaY2 = moments[y][x][3] - moments[y][x][1] * moments[y][x][1];
 				Float cxy = moments[y][x][4] - moments[y][x][0] * moments[y][x][1];
-				if (sigmaX2 * sigmaY2 - cxy * cxy < 0) {
+				if (sigmaX2 < -1e8 || sigmaY2 < -1e8 || sigmaX2 * sigmaY2 - cxy * cxy < -1e8) {
 					Log(EInfo, "%.8f, %.8f, %.8f, %.8f, %.8f", moments[y][x][0], moments[y][x][1],
 						moments[y][x][2], moments[y][x][3], moments[y][x][4]);
-					//Log(EInfo, "cov matrix = (%.8f, %.8f; %.8f, %.8f)", sigmaX2, cxy, cxy, sigmaY2);
+					Log(EInfo, "cov matrix = (%.8f, %.8f; %.8f, %.8f)", sigmaX2, cxy, cxy, sigmaY2);
 				}
-				*/
+				
 			}
 		}
 		
@@ -128,6 +131,16 @@ public:
 				for (int j = 0; j < sizeNext; j++) {
 					momentsNext[i][j] = (momentsNow[2 * i][2 * j] + momentsNow[2 * i][2 * j + 1] +
 						momentsNow[2 * i + 1][2 * j] + momentsNow[2 * i + 1][2 * j + 1]) * 0.25;
+
+					Float sigmaX2 = momentsNext[i][j][2] - momentsNext[i][j][0] * momentsNext[i][j][0];
+					Float sigmaY2 = momentsNext[i][j][3] - momentsNext[i][j][1] * momentsNext[i][j][1];
+					Float cxy = momentsNext[i][j][4] - momentsNext[i][j][0] * momentsNext[i][j][1];
+					
+					if (sigmaX2 < -1e8 || sigmaY2 < -1e8 || sigmaX2 * sigmaY2 - cxy * cxy < -1e8) {
+						Log(EInfo, "%.8f, %.8f, %.8f, %.8f, %.8f", momentsNext[i][j][0], momentsNext[i][j][1],
+							momentsNext[i][j][2], momentsNext[i][j][3], momentsNext[i][j][4]);
+						Log(EInfo, "cov matrix = (%.8f, %.8f; %.8f, %.8f)", sigmaX2, cxy, cxy, sigmaY2);
+					}
 				}
 			}
 
@@ -159,6 +172,17 @@ public:
 				data1[3 * idx + 0] = moments[i][j][2] + m_offset;
 				data1[3 * idx + 1] = moments[i][j][3] + m_offset;
 				data1[3 * idx + 2] = moments[i][j][4] + m_offset;
+
+				Float sigmaX2 = (data1[3 * idx + 0] - m_offset) - 
+					(data0[3 * idx + 0] - m_offset) * (data0[3 * idx + 0] - m_offset);
+				Float sigmaY2 = (data1[3 * idx + 1] - m_offset) - 
+					(data0[3 * idx + 1] - m_offset) * (data0[3 * idx + 1] - m_offset);
+				Float cxy = (data1[3 * idx + 2] - m_offset) - 
+					(data0[3 * idx + 0] - m_offset) * (data0[3 * idx + 1] - m_offset);
+
+				if (sigmaX2 < -1e8 || sigmaY2 < -1e8 || sigmaX2 * sigmaY2 - cxy * cxy < -1e8) {
+					Log(EInfo, "cov matrix = (%.8f, %.8f; %.8f, %.8f)", sigmaX2, cxy, cxy, sigmaY2);
+				}
 			}
 		}
 

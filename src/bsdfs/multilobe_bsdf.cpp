@@ -370,6 +370,8 @@ public:
 		BSDFSamplingRecord bsdfRec(its, sampler);
 
 		res = m_bsdf->sample(bsdfRec, Point2(sampler->next1D(), sampler->next1D()));
+		if (res.isZero())
+			return res;
 
 		Vector woMacro = nFrame.toWorld(bsdfRec.wo);
 		Vector woWorld = bRec.its.baseFrame.toWorld(woMacro);
@@ -389,6 +391,16 @@ public:
 		//pdf = warp::squareToCosineHemispherePdf(bRec.wo);
 		
 		pdf = 0;
+		/*
+		// magic?! not used
+		Vector tempH = wiMacro + woMacro;
+		if (tempH.length() < 1e-5) {
+			Log(EInfo, "%.6f, %.6f, %.6f", wiMacro.x, wiMacro.y, wiMacro.z);
+			Log(EInfo, "%.6f, %.6f, %.6f", woMacro.x, woMacro.y, woMacro.z);
+			Log(EInfo, "%.6f, %.6f, %.6f", tempH.x, tempH.y, tempH.z);
+		}
+		*/
+
 		Vector HMacro = normalize(wiMacro + woMacro);
 		for (int i = 0; i < m_numLobes; i++) {
 			Float alpha = lobesParam0[i][0];

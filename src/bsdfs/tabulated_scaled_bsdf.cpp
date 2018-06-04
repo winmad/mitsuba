@@ -90,8 +90,9 @@ public:
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
 		//if (wiMacro.z < 0 && wiMacro.z < -0.1)
-		//	Log(EInfo, "wiMacro = (%.6f, %.6f, %.6f), woMacro = (%.6f, %.6f, %.6f)",
-		//		wiMacro.x, wiMacro.y, wiMacro.z, woMacro.x, woMacro.y, woMacro.z);
+// 		if (woMacro.z < -0.1)
+// 			Log(EInfo, "wiMacro = (%.6f, %.6f, %.6f), woMacro = (%.6f, %.6f, %.6f)",
+// 				wiMacro.x, wiMacro.y, wiMacro.z, woMacro.x, woMacro.y, woMacro.z);
 
 		if (woMacro.z <= 0)
 			return Spectrum(0.0);

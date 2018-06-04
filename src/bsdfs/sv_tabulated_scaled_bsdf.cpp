@@ -125,11 +125,13 @@ public:
 			}
 		}
 
+		/*
 		for (int c = 0; c < 3; c++) {
 			if (res[c] > 30 || res[c] < 0) {
 				res[c] = 1;
 			}
 		}
+		*/
 
 		return res;
 	}

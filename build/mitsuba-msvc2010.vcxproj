@@ -593,6 +593,7 @@
     <ClCompile Include="..\src\bsdfs\multilobe_micro_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
     <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp" />
+    <ClCompile Include="..\src\bsdfs\roughbsdf_single.cpp" />
     <ClCompile Include="..\src\bsdfs\roughdiffuse_multi.cpp" />
     <ClCompile Include="..\src\bsdfs\sh_scaled_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\sv_tabulated_scaled_bsdf.cpp" />

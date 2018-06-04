@@ -273,10 +273,7 @@ public:
 				BSDF::addChild(name, child);
 		}
 		else if (child->getClass()->derivesFrom(MTS_CLASS(BSDF))) {
-			if (name == "baseBSDF")
-				m_bsdf = static_cast<BSDF *>(child);
-			else
-				BSDF::addChild(name, child);
+			m_bsdf = static_cast<BSDF *>(child);
 		}
 		else {
 			BSDF::addChild(name, child);
