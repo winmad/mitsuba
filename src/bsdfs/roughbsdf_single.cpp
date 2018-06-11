@@ -1,6 +1,7 @@
 #include <mitsuba/core/fresolver.h>
 #include <mitsuba/render/bsdf.h>
 #include <mitsuba/render/texture.h>
+#include <mitsuba/render/scene.h>
 #include <mitsuba/hw/basicshader.h>
 #include <mitsuba/core/warp.h>
 #include <mitsuba/core/plugin.h>
