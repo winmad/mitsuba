@@ -701,6 +701,8 @@ public:
 			Point3(0, 0, m_minmax[m_levelCount - 1][0].min),
 			Point3(m_levelSize0f.x, m_levelSize0f.y, m_minmax[m_levelCount - 1][0].max)
 			);
+		if (std::abs(m_dataAABB.min.z - m_dataAABB.max.z) < 1e-5)
+			m_dataAABB.max.z += 1e-3;
 
 		m_totAABB = AABB(
 			Point3(0, 0, m_dataAABB.min.z),

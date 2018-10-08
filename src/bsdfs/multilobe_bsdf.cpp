@@ -73,24 +73,16 @@ public:
 			m_samplers[i] = m_samplers[0]->clone();
 		}
 
-		// load textures
+		// load bitmaps
 		m_lobes.resize(m_numLobes);
 		for (int i = 0; i < m_numLobes; i++) {
-			Properties props("bitmap");
-			props.setString("wrapMode", "repeat");
-			props.setFloat("gamma", 1.0f);
-			props.setFloat("uscale", 1.0f);
-			props.setFloat("vscale", 1.0f);
-			props.setString("filterType", "nearest");
 			std::ostringstream oss;
 			oss << m_lobeFilenamePrefix << i << ".exr";
-			props.setString("filename", oss.str());
 			Log(EInfo, "Load vMF texture %s", oss.str().c_str());
-			m_lobes[i] = static_cast<Texture *>(PluginManager::getInstance()->
-				createObject(MTS_CLASS(Texture), props));
-			m_lobes[i]->configure();
+			m_lobes[i] = new Bitmap(fs::path(oss.str()));
 		}
 		Log(EInfo, "Load vMF lobes as textures");
+		m_lobeSize = m_lobes[0]->getSize();
 
 		m_wCos = 1.1767;
 		m_lambdaCos = 2.1440;
@@ -147,6 +139,8 @@ public:
 		Intersection its(bRec.its);
 		its.hasUVPartials = false;
 		Point2 uv = transformUV(bRec.its.uv);
+		Point2i texP0(math::floorToInt(uv.x * m_lobeSize.x), math::floorToInt(uv.y * 0.5 * m_lobeSize.y));
+		Point2i texP1(texP0.x, texP0.y + m_lobeSize.y / 2);
 		
 		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
 		
@@ -165,12 +159,8 @@ public:
 
 		Float vmfNorm = 0.0;
 		for (int i = 0; i < m_numLobes; i++) {
-			its.uv.x = uv.x;
-			its.uv.y = uv.y * 0.5;
-			Spectrum param0 = m_lobes[i]->eval(its, false);
-			its.uv.x = uv.x;
-			its.uv.y = uv.y * 0.5 + 0.5;
-			Spectrum param1 = m_lobes[i]->eval(its, false);
+			Spectrum param0 = m_lobes[i]->getPixel(texP0);
+			Spectrum param1 = m_lobes[i]->getPixel(texP1);
 
 			Float alpha = param0[0];
 			if (alpha < 1e-8)
@@ -238,6 +228,8 @@ public:
 		Intersection its(bRec.its);
 		its.hasUVPartials = false;
 		Point2 uv = transformUV(bRec.its.uv);
+		Point2i texP0(math::floorToInt(uv.x * m_lobeSize.x), math::floorToInt(uv.y * 0.5 * m_lobeSize.y));
+		Point2i texP1(texP0.x, texP0.y + m_lobeSize.y / 2);
 
 		Vector wiWorld = bRec.its.toWorld(bRec.wi);
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
@@ -247,12 +239,8 @@ public:
 		Vector HMacro = normalize(wiMacro + woMacro);
 		
 		for (int i = 0; i < m_numLobes; i++) {
-			its.uv.x = uv.x;
-			its.uv.y = uv.y * 0.5;
-			Spectrum param0 = m_lobes[i]->eval(its, false);
-			its.uv.x = uv.x;
-			its.uv.y = uv.y * 0.5 + 0.5;
-			Spectrum param1 = m_lobes[i]->eval(its, false);
+			Spectrum param0 = m_lobes[i]->getPixel(texP0);
+			Spectrum param1 = m_lobes[i]->getPixel(texP1);
 
 			Float alpha = param0[0];
 			if (alpha < 1e-8)
@@ -291,6 +279,8 @@ public:
 		Intersection its(bRec.its);
 		its.hasUVPartials = false;
 		Point2 uv = transformUV(bRec.its.uv);
+		Point2i texP0(math::floorToInt(uv.x * m_lobeSize.x), math::floorToInt(uv.y * 0.5 * m_lobeSize.y));
+		Point2i texP1(texP0.x, texP0.y + m_lobeSize.y / 2);
 
 		Vector nMacro = bRec.its.baseFrame.toLocal(bRec.its.shFrame.n);
 
@@ -301,12 +291,8 @@ public:
 		std::vector<Float> cdf(0);
 		std::vector<int> lobeIndices(0);
 		for (int i = 0; i < m_numLobes; i++) {
-			its.uv.x = uv.x;
-			its.uv.y = uv.y * 0.5;
-			Spectrum param0 = m_lobes[i]->eval(its, false);
-			its.uv.x = uv.x;
-			its.uv.y = uv.y * 0.5 + 0.5;
-			Spectrum param1 = m_lobes[i]->eval(its, false);
+			Spectrum param0 = m_lobes[i]->getPixel(texP0);
+			Spectrum param1 = m_lobes[i]->getPixel(texP1);
 
 			lobesParam0[i] = param0;
 			lobesParam1[i] = param1;
@@ -502,7 +488,8 @@ public:
 private:
 	int m_numLobes;
 	std::string m_lobeFilenamePrefix;
-	ref_vector<Texture> m_lobes;
+	ref_vector<Bitmap> m_lobes;
+	Vector2i m_lobeSize;
 	Vector2 m_uvScale;
 	ref<BSDF> m_bsdf;
 	ref_vector<Sampler> m_samplers;
