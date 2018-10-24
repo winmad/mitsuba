@@ -21,7 +21,9 @@ public:
 
 	int run(int argc, char **argv) {
 		// avoid negative value
-		m_offset = 1e4;
+		//m_offset = 1e4;
+		m_offset = 0;
+		eps = 1e-4;
 
 		m_size = std::atoi(argv[2]);
 		m_sqrtSpp = std::atoi(argv[3]);
@@ -100,7 +102,8 @@ public:
 				Float sigmaX2 = moments[y][x][2] - moments[y][x][0] * moments[y][x][0];
 				Float sigmaY2 = moments[y][x][3] - moments[y][x][1] * moments[y][x][1];
 				Float cxy = moments[y][x][4] - moments[y][x][0] * moments[y][x][1];
-				if (sigmaX2 < -1e8 || sigmaY2 < -1e8 || sigmaX2 * sigmaY2 - cxy * cxy < -1e8) {
+				
+				if (sigmaX2 < -eps || sigmaY2 < -eps || sigmaX2 * sigmaY2 - cxy * cxy < -eps) {
 					Log(EInfo, "%.8f, %.8f, %.8f, %.8f, %.8f", moments[y][x][0], moments[y][x][1],
 						moments[y][x][2], moments[y][x][3], moments[y][x][4]);
 					Log(EInfo, "cov matrix = (%.8f, %.8f; %.8f, %.8f)", sigmaX2, cxy, cxy, sigmaY2);
@@ -131,12 +134,12 @@ public:
 				for (int j = 0; j < sizeNext; j++) {
 					momentsNext[i][j] = (momentsNow[2 * i][2 * j] + momentsNow[2 * i][2 * j + 1] +
 						momentsNow[2 * i + 1][2 * j] + momentsNow[2 * i + 1][2 * j + 1]) * 0.25;
-
+					
 					Float sigmaX2 = momentsNext[i][j][2] - momentsNext[i][j][0] * momentsNext[i][j][0];
 					Float sigmaY2 = momentsNext[i][j][3] - momentsNext[i][j][1] * momentsNext[i][j][1];
 					Float cxy = momentsNext[i][j][4] - momentsNext[i][j][0] * momentsNext[i][j][1];
 					
-					if (sigmaX2 < -1e8 || sigmaY2 < -1e8 || sigmaX2 * sigmaY2 - cxy * cxy < -1e8) {
+					if (sigmaX2 < -eps || sigmaY2 < -eps || sigmaX2 * sigmaY2 - cxy * cxy < -eps) {
 						Log(EInfo, "%.8f, %.8f, %.8f, %.8f, %.8f", momentsNext[i][j][0], momentsNext[i][j][1],
 							momentsNext[i][j][2], momentsNext[i][j][3], momentsNext[i][j][4]);
 						Log(EInfo, "cov matrix = (%.8f, %.8f; %.8f, %.8f)", sigmaX2, cxy, cxy, sigmaY2);
@@ -173,6 +176,7 @@ public:
 				data1[3 * idx + 1] = moments[i][j][3] + m_offset;
 				data1[3 * idx + 2] = moments[i][j][4] + m_offset;
 
+				/*
 				Float sigmaX2 = (data1[3 * idx + 0] - m_offset) - 
 					(data0[3 * idx + 0] - m_offset) * (data0[3 * idx + 0] - m_offset);
 				Float sigmaY2 = (data1[3 * idx + 1] - m_offset) - 
@@ -180,9 +184,10 @@ public:
 				Float cxy = (data1[3 * idx + 2] - m_offset) - 
 					(data0[3 * idx + 0] - m_offset) * (data0[3 * idx + 1] - m_offset);
 
-				if (sigmaX2 < -1e8 || sigmaY2 < -1e8 || sigmaX2 * sigmaY2 - cxy * cxy < -1e8) {
+				if (sigmaX2 < -eps || sigmaY2 < -eps || sigmaX2 * sigmaY2 - cxy * cxy < -eps) {
 					Log(EInfo, "cov matrix = (%.8f, %.8f; %.8f, %.8f)", sigmaX2, cxy, cxy, sigmaY2);
 				}
+				*/
 			}
 		}
 
@@ -221,6 +226,7 @@ public:
 	int m_size;
 	int m_maxScale;
 	Float m_offset;
+	Float eps;
 
 	MTS_DECLARE_UTILITY()
 };

@@ -84,6 +84,7 @@ struct TriAccel;
 struct TriAccel4;
 class TriMesh;
 class Utility;
+class VectorBlock;
 class VolumeDataSource;
 struct VPL;
 

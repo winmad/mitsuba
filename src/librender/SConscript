@@ -18,7 +18,7 @@ librender = renderEnv.SharedLibrary('mitsuba-render', [
 	'testcase.cpp', 'photonmap.cpp', 'gatherproc.cpp', 'volume.cpp', 'volume2.cpp',
 	'vpl.cpp', 'shader.cpp', 'scenehandler.cpp', 'intersection.cpp',
 	'common.cpp', 'phase.cpp', 'noise.cpp', 'photon.cpp', 'lightcutter.cpp',
-	'spherical_distribution.cpp'
+	'spherical_distribution.cpp', 'vectorblock.cpp'
 ])
 
 if sys.platform == "darwin":

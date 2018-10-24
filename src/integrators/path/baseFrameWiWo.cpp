@@ -22,6 +22,7 @@
 #include <mitsuba/core/statistics.h>
 #include <mitsuba/core/bitmap.h>
 #include <mitsuba/core/fstream.h>
+#include <mitsuba/core/warp.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -118,6 +119,10 @@ public:
 		m_queryDepth = props.getInteger("queryDepth", 1);
 		m_height = props.getInteger("height");
 		m_width = props.getInteger("width");
+		
+		m_remap = props.getBoolean("remap", false);
+		m_wiNumCells = props.getInteger("wiNumCells", 0);
+		m_woNumCells = props.getInteger("woNumCells", 0);
 	}
 
 	/// Unserialize from a binary data stream
@@ -126,6 +131,10 @@ public:
 		m_queryDepth = stream->readInt();
 		m_height = stream->readInt();
 		m_width = stream->readInt();
+
+		m_remap = stream->readBool();
+		m_wiNumCells = stream->readInt();
+		m_woNumCells = stream->readInt();
 	}
 
 	void configure() {
@@ -166,9 +175,20 @@ public:
 		m_process = NULL;
 		sched->unregisterResource(integratorResID);
 
-		ref<FileStream> stream = new FileStream("wiMacro.exr", FileStream::ETruncWrite);
+		std::ostringstream oss;
+		oss << "wiMacro";
+		if (m_remap)
+			oss << "_remap";
+		oss << ".exr";
+		ref<FileStream> stream = new FileStream(oss.str(), FileStream::ETruncWrite);
 		m_wi->write(Bitmap::EOpenEXR, stream);
-		stream = new FileStream("woMacro.exr", FileStream::ETruncWrite);
+
+		oss.str("");
+		oss << "woMacro";
+		if (m_remap)
+			oss << "_remap";
+		oss << ".exr";
+		stream = new FileStream(oss.str(), FileStream::ETruncWrite);
 		m_wo->write(Bitmap::EOpenEXR, stream);
 
 		return proc->getReturnStatus() == ParallelProcess::ESuccess;
@@ -252,10 +272,28 @@ public:
 				}
 
 				int idx = offset.y * m_width + offset.x;
-				for (int c = 0; c < 3; c++) {
-					wiData[idx * 3 + c] = avgWi[c];
-					woData[idx * 3 + c] = avgWo[c];
+				if (m_remap) {
+					Point2 wiTex = warp::uniformHemisphereToSquareConcentric(avgWi);
+					Point2 woTex = warp::uniformHemisphereToSquareConcentric(avgWo);
+					int x1 = math::clamp(math::floorToInt(wiTex.x * m_wiNumCells), 0, m_wiNumCells - 1);
+					int y1 = math::clamp(math::floorToInt(wiTex.y * m_wiNumCells), 0, m_wiNumCells - 1);
+					int x2 = math::clamp(math::floorToInt(woTex.x * m_woNumCells), 0, m_woNumCells - 1);
+					int y2 = math::clamp(math::floorToInt(woTex.y * m_woNumCells), 0, m_woNumCells - 1);
+
+					wiData[idx * 3] = x1;
+					wiData[idx * 3 + 1] = y1;
+					wiData[idx * 3 + 2] = 0;
+
+					woData[idx * 3] = x2;
+					woData[idx * 3 + 1] = y2;
+					woData[idx * 3 + 2] = 0;
+				} else {
+					for (int c = 0; c < 3; c++) {
+						wiData[idx * 3 + c] = avgWi[c];
+						woData[idx * 3 + c] = avgWo[c];
+					}
 				}
+
 				//Log(EInfo, "(%d, %d), (%.6f, %.6f, %.6f), (%.6f, %.6f, %.6f)",
 				//	offset.x, offset.y, avgWi.x, avgWi.y, avgWi.z, avgWo.x, avgWo.y, avgWo.z);
 			}
@@ -466,6 +504,10 @@ public:
 		stream->writeInt(m_queryDepth);
 		stream->writeInt(m_height);
 		stream->writeInt(m_width);
+
+		stream->writeBool(m_remap);
+		stream->writeInt(m_wiNumCells);
+		stream->writeInt(m_woNumCells);
 	}
 
 	std::string toString() const {
@@ -487,6 +529,8 @@ public:
 	int m_width;
 	ref<Bitmap> m_wi;
 	ref<Bitmap> m_wo;
+	bool m_remap;
+	int m_wiNumCells, m_woNumCells;
 };
 
 MTS_IMPLEMENT_CLASS_S(BaseFrameWiWoPathTracer, false, MonteCarloIntegrator)

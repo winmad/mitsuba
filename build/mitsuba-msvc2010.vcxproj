@@ -120,6 +120,7 @@
     <ClInclude Include="..\include\mitsuba\render\lightnode.h" />
     <ClInclude Include="..\include\mitsuba\render\lighttree.h" />
     <ClInclude Include="..\include\mitsuba\render\spherical_distribution.h" />
+    <ClInclude Include="..\include\mitsuba\render\vectorblock.h" />
     <ClInclude Include="..\include\mitsuba\render\volume2.h" />
     <ClInclude Include="..\src\bsdfs\microfacet_multi.h" />
     <ClInclude Include="..\src\converter\converter.h">
@@ -716,6 +717,7 @@
     </ClCompile>
     <ClCompile Include="..\src\librender\renderproc.cpp">
     </ClCompile>
+    <ClCompile Include="..\src\librender\vectorblock.cpp" />
     <ClCompile Include="..\src\librender\volume2.cpp" />
     <ClCompile Include="..\src\librender\vpl.cpp">
     </ClCompile>

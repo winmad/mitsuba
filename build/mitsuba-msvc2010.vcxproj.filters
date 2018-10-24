@@ -150,6 +150,9 @@
     <Filter Include="Source Files\integrators\info">
       <UniqueIdentifier>{80b56aac-62ab-4d8a-ad85-8dbbe4a5573b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\utils\bsdfSimulator">
+      <UniqueIdentifier>{cd13b62e-a470-40e6-b080-5218ead2e588}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup Label="Source Files">
     <ClCompile Include="..\src\converter\mtsimport.cpp">
@@ -1151,12 +1154,6 @@
     <ClCompile Include="..\src\utils\beckmannSurface.cpp">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\utils\microfacet.cpp">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
@@ -1223,12 +1220,6 @@
     <ClCompile Include="..\src\bsdfs\tabulated_bsdf.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.cpp">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative.cpp">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\librender\spherical_distribution.cpp">
       <Filter>Source Files\librender</Filter>
     </ClCompile>
@@ -1279,6 +1270,21 @@
     </ClCompile>
     <ClCompile Include="..\src\bsdfs\roughbsdf_single.cpp">
       <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\librender\vectorblock.cpp">
+      <Filter>Source Files\librender</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.cpp">
+      <Filter>Source Files\utils\bsdfSimulator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfSimulator.cpp">
+      <Filter>Source Files\utils\bsdfSimulator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative.cpp">
+      <Filter>Source Files\utils\bsdfSimulator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.cpp">
+      <Filter>Source Files\utils\bsdfSimulator</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
@@ -1987,13 +1993,7 @@
     <ClInclude Include="..\src\volume\tetra2.h">
       <Filter>Source Files\volume</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.h">
-      <Filter>Source Files\utils</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\utils\multi_vmf.h">
-      <Filter>Source Files\utils</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.h">
       <Filter>Source Files\utils</Filter>
     </ClInclude>
     <ClInclude Include="..\include\mitsuba\render\spherical_distribution.h">
@@ -2001,6 +2001,15 @@
     </ClInclude>
     <ClInclude Include="..\src\bsdfs\microfacet_multi.h">
       <Filter>Source Files\bsdfs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\mitsuba\render\vectorblock.h">
+      <Filter>Header Files\mitsuba\render</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\bsdfSimulator\bsdfSimulator_proc.h">
+      <Filter>Source Files\utils\bsdfSimulator</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\utils\bsdfSimulator\lobeDerivative_proc.h">
+      <Filter>Source Files\utils\bsdfSimulator</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

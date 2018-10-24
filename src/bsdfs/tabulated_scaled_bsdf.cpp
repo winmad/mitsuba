@@ -89,6 +89,10 @@ public:
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
+		// Added Oct 23, 2018
+		if (wiMacro.z <= 0 || woMacro.z <= 0)
+			return Spectrum(0.0);
+
 		//if (wiMacro.z < 0 && wiMacro.z < -0.1)
 // 		if (woMacro.z < -0.1)
 // 			Log(EInfo, "wiMacro = (%.6f, %.6f, %.6f), woMacro = (%.6f, %.6f, %.6f)",
