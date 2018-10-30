@@ -196,6 +196,10 @@ public:
 	bool used[2];
 	Spectrum dAlbedo[2];
 	Float dRoughness[2];
+
+	// Additional parameters for scale matrix grad
+	int smIndices[16];
+	Spectrum smDiff[16];
 };
 
 /**

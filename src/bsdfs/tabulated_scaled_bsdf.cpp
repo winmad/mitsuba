@@ -22,6 +22,8 @@ public:
 		m_useMIS = props.getBoolean("useMIS", false);
 
 		m_wiUseFullSphere = props.getBoolean("wiUseFullSphere", false);
+		m_woUseFullSphere = props.getBoolean("woUseFullSphere", false);
+		m_useGrad = props.getBoolean("useGrad", false);
 	}
 
 	TabulatedScaledBSDF(Stream *stream, InstanceManager *manager)
@@ -30,6 +32,8 @@ public:
 		m_useMIS = stream->readBool();
 
 		m_wiUseFullSphere = stream->readBool();
+		m_woUseFullSphere = stream->readBool();
+		m_useGrad = stream->readBool();
 
 		configure();
 	}
@@ -41,6 +45,8 @@ public:
 		stream->writeBool(m_useMIS);
 
 		stream->writeBool(m_wiUseFullSphere);
+		stream->writeBool(m_woUseFullSphere);
+		stream->writeBool(m_useGrad);
 	}
 
 	void configure() {
@@ -57,7 +63,11 @@ public:
 			m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y * 0.5));
 		else
 			m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y));
-		m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x));
+		
+		if (m_woUseFullSphere)
+			m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x * 0.5));
+		else
+			m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x));
 
 		Log(EInfo, "wiRes = %d, woRes = %d", m_wiResolution, m_woResolution);
 
@@ -90,17 +100,13 @@ public:
 		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
 
 		// Added Oct 23, 2018
-		if (wiMacro.z <= 0 || woMacro.z <= 0)
-			return Spectrum(0.0);
+// 		if (wiMacro.z <= 0 || woMacro.z <= 0)
+// 			return Spectrum(0.0);
 
-		//if (wiMacro.z < 0 && wiMacro.z < -0.1)
-// 		if (woMacro.z < -0.1)
-// 			Log(EInfo, "wiMacro = (%.6f, %.6f, %.6f), woMacro = (%.6f, %.6f, %.6f)",
-// 				wiMacro.x, wiMacro.y, wiMacro.z, woMacro.x, woMacro.y, woMacro.z);
+// 		if (woMacro.z <= 0)
+// 			return Spectrum(0.0);
 
-		if (woMacro.z <= 0)
-			return Spectrum(0.0);
-
+		/*
 		int r1Offset = 0;
 		if (wiMacro.z <= 0) {
 			return Spectrum(0.0);
@@ -109,6 +115,23 @@ public:
 				r1Offset = m_wiResolution;
 			else
 				return Spectrum(0.0);
+		}
+		*/
+
+		int r1Offset = 0;
+		if (wiMacro.z <= 0) {
+			if (!m_wiUseFullSphere)
+				return Spectrum(0.0);
+			r1Offset = m_wiResolution;
+			wiMacro.z = -wiMacro.z;
+		}
+
+		int r2Offset = 0;
+		if (woMacro.z <= 0) {
+			if (!m_woUseFullSphere)
+				return Spectrum(0.0);
+			r2Offset = m_woResolution;
+			woMacro.z = -woMacro.z;
 		}
 
 		Point2 wiTex = warp::uniformHemisphereToSquareConcentric(wiMacro);
@@ -121,11 +144,12 @@ public:
 		int c1 = math::clamp(math::floorToInt(wiTex.x * wiNumCells), 0, wiNumCells - 1);
 		int r1 = math::clamp(math::floorToInt(wiTex.y * wiNumCells), 0, wiNumCells - 1) + r1Offset;
 		int c2 = math::clamp(math::floorToInt(woTex.x * woNumCells), 0, woNumCells - 1);
-		int r2 = math::clamp(math::floorToInt(woTex.y * woNumCells), 0, woNumCells - 1);
+		int r2 = math::clamp(math::floorToInt(woTex.y * woNumCells), 0, woNumCells - 1) + r2Offset;
 
 		Spectrum res(0.f);
+		Float w(0.f);
 		for (int dr1 = 0; dr1 < 2; dr1++) {
-			Float v1 = wiTex.y * wiNumCells - r1;
+			Float v1 = wiTex.y * wiNumCells - (r1 % m_wiResolution);
 			Float wv1 = std::abs(1.0 - dr1 - v1);
 			
 			for (int dc1 = 0; dc1 < 2; dc1++) {
@@ -133,7 +157,7 @@ public:
 				Float wu1 = std::abs(1.0 - dc1 - u1);
 				
 				for (int dr2 = 0; dr2 < 2; dr2++) {
-					Float v2 = woTex.y * woNumCells - r2;
+					Float v2 = woTex.y * woNumCells - (r2 % m_woResolution);
 					Float wv2 = std::abs(1.0 - dr2 - v2);
 					
 					for (int dc2 = 0; dc2 < 2; dc2++) {
@@ -145,6 +169,7 @@ public:
 
 						Spectrum tmpValue = m_angularScales->getPixel(Point2i(woIdx, wiIdx));
 						res += tmpValue * wv1 * wu1 * wv2 * wu2;
+						w += wv1 * wu1 * wv2 * wu2;
 					}
 				}
 			}
@@ -153,7 +178,81 @@ public:
 		return res;
 	}
 
-	Spectrum evalScaleDisk(const BSDFSamplingRecord &bRec) const {
+	Spectrum evalScaleAndGrad(BSDFSamplingRecord &bRec) const {
+		Vector wiWorld = bRec.its.toWorld(bRec.wi);
+		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+		Vector woWorld = bRec.its.toWorld(bRec.wo);
+		Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
+
+		int r1Offset = 0;
+		if (wiMacro.z <= 0) {
+			if (!m_wiUseFullSphere)
+				return Spectrum(0.0);
+			r1Offset = m_wiResolution;
+			wiMacro.z = -wiMacro.z;
+		}
+
+		int r2Offset = 0;
+		if (woMacro.z <= 0) {
+			if (!m_woUseFullSphere)
+				return Spectrum(0.0);
+			r2Offset = m_woResolution;
+			woMacro.z = -woMacro.z;
+		}
+
+		Point2 wiTex = warp::uniformHemisphereToSquareConcentric(wiMacro);
+		Point2 woTex = warp::uniformHemisphereToSquareConcentric(woMacro);
+
+		// piecewise bilinear
+		int wiNumCells = m_wiResolution - 1;
+		int woNumCells = m_woResolution - 1;
+
+		int c1 = math::clamp(math::floorToInt(wiTex.x * wiNumCells), 0, wiNumCells - 1);
+		int r1 = math::clamp(math::floorToInt(wiTex.y * wiNumCells), 0, wiNumCells - 1) + r1Offset;
+		int c2 = math::clamp(math::floorToInt(woTex.x * woNumCells), 0, woNumCells - 1);
+		int r2 = math::clamp(math::floorToInt(woTex.y * woNumCells), 0, woNumCells - 1) + r2Offset;
+
+		Spectrum res(0.f);
+		int k = 0;
+		for (int dr1 = 0; dr1 < 2; dr1++) {
+			Float v1 = wiTex.y * wiNumCells - (r1 % m_wiResolution);
+			Float wv1 = std::abs(1.0 - dr1 - v1);
+			
+			for (int dc1 = 0; dc1 < 2; dc1++) {
+				Float u1 = wiTex.x * wiNumCells - c1;
+				Float wu1 = std::abs(1.0 - dc1 - u1);
+				
+				for (int dr2 = 0; dr2 < 2; dr2++) {
+					Float v2 = woTex.y * woNumCells - (r2 % m_woResolution);
+					Float wv2 = std::abs(1.0 - dr2 - v2);
+					
+					for (int dc2 = 0; dc2 < 2; dc2++) {
+						Float u2 = woTex.x * woNumCells - c2;
+						Float wu2 = std::abs(1.0 - dc2 - u2);
+
+						int wiIdx = (r1 + dr1) * m_wiResolution + (c1 + dc1);
+						int woIdx = (r2 + dr2) * m_woResolution + (c2 + dc2);
+
+						Spectrum tmpValue = m_angularScales->getPixel(Point2i(woIdx, wiIdx));
+						Float weight = wv1 * wu1 * wv2 * wu2;
+						res += tmpValue * weight;
+
+						bRec.smIndices[k] = wiIdx * (2 * m_woResolution * m_woResolution) + woIdx;
+						bRec.smDiff[k] = Spectrum(weight);
+						k++;
+					}
+				}
+			}
+		}
+
+		for (int i = 0; i < 16; i++)
+			for (int c = 0; c < 3; c++)
+				bRec.smDiff[i][c] /= res[c];
+
+		return res;
+	}
+
+	Spectrum evalScaleDisk(BSDFSamplingRecord &bRec) const {
 		Vector wiWorld = bRec.its.toWorld(bRec.wi);
 		Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
 		Vector woWorld = bRec.its.toWorld(bRec.wo);
@@ -362,7 +461,13 @@ public:
 			Spectrum spec = m_bsdf->sample(bRec, pdf, sample);
 			if (spec.isZero())
 				return Spectrum(0.f);
-			Spectrum scale = evalScale(bRec);
+			Spectrum scale;
+			
+			if (!m_useGrad)
+				scale = evalScale(bRec);
+			else
+				scale = evalScaleAndGrad(bRec);
+
 			return spec * scale;
 		}
 	}
@@ -415,7 +520,10 @@ public:
 	Vector2i m_lobeSize;
 	int m_wiResolution;
 	int m_woResolution;
+	
 	bool m_wiUseFullSphere;
+	bool m_woUseFullSphere;
+	bool m_useGrad;
 
 	bool m_useMIS;
 	ref_vector<Sampler> m_samplers;

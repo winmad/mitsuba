@@ -194,8 +194,8 @@ public:
 // 					ray.rxOrigin.x, ray.rxOrigin.y, ray.rxOrigin.z,
 // 					ray.ryOrigin.x, ray.ryOrigin.y, ray.ryOrigin.z);
 				//Log(EInfo, "%.6f, %.6f; %.6f, %.6f", its.dudx, its.dvdx, its.dudy, its.dvdy);
-				result[0] = sqrt(its.dudx * its.dudx + its.dvdx * its.dvdx) * 1024 * 4;
-				result[1] = sqrt(its.dudy * its.dudy + its.dvdy * its.dvdy) * 1024 * 4;
+				result[0] = sqrt(its.dudx * its.dudx + its.dvdx * its.dvdx) * 1024 * 1000;
+				result[1] = sqrt(its.dudy * its.dudy + its.dvdy * its.dvdy) * 1024 * 1000;
 				result[2] = result[0] * result[1];
 				break;
 			case EBaseNormal:

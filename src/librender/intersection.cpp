@@ -19,12 +19,20 @@ void Intersection::computePartials(const RayDifferential &ray) {
 	}
 
 	/* Compute a few projections onto the surface normal */
+	/*
 	const Float
 		pp  = dot(geoFrame.n, Vector(p)),
 	    pox = dot(geoFrame.n, Vector(ray.rxOrigin)),
 	    poy = dot(geoFrame.n, Vector(ray.ryOrigin)),
 	    prx = dot(geoFrame.n, ray.rxDirection),
 	    pry = dot(geoFrame.n, ray.ryDirection);
+	*/
+	const Float
+		pp  = dot(baseFrame.n, Vector(p)),
+		pox = dot(baseFrame.n, Vector(ray.rxOrigin)),
+		poy = dot(baseFrame.n, Vector(ray.ryOrigin)),
+		prx = dot(baseFrame.n, ray.rxDirection),
+		pry = dot(baseFrame.n, ray.ryDirection);
 
 	if (EXPECT_NOT_TAKEN(prx == 0 || pry == 0)) {
 		dudx = dvdx = dudy = dvdy = 0.0f;
@@ -36,9 +44,14 @@ void Intersection::computePartials(const RayDifferential &ray) {
 
 	/* Calculate the U and V partials by solving two out
 	   of a set of 3 equations in an overconstrained system */
+	/*
 	Float absX = std::abs(geoFrame.n.x),
 		  absY = std::abs(geoFrame.n.y),
 		  absZ = std::abs(geoFrame.n.z);
+	*/
+	Float absX = std::abs(baseFrame.n.x),
+		absY = std::abs(baseFrame.n.y),
+		absZ = std::abs(baseFrame.n.z);
 
 	if (absX > absY && absX > absZ) {
 		axes[0] = 1; axes[1] = 2;
