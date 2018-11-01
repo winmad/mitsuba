@@ -254,6 +254,14 @@ public:
 	/// Distance from the reference point to the target direction
 	Float dist;
 
+	Float uvFootprint;
+	int levelOffset;
+
+	inline void setUvFootprint(Float fval, int lOffset) {
+		uvFootprint = fval;
+		levelOffset = lOffset;
+	}
+
 public:
 	/// Create an invalid direct sampling record
 	inline DirectSamplingRecord() { }

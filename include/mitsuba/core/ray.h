@@ -49,6 +49,9 @@ template <typename _PointType, typename _VectorType> struct TRay {
 	Float time;  ///< Time value associated with this ray
 
 	Vector2i index;
+	
+	Float uvFootprint; 
+	int levelOffset;
 
 	/// Construct a new ray
 	inline TRay() : mint(Epsilon),
@@ -58,13 +61,14 @@ template <typename _PointType, typename _VectorType> struct TRay {
 	/// Copy constructor (1)
 	inline TRay(const TRay &ray)
 	 : o(ray.o), mint(ray.mint), d(ray.d), maxt(ray.maxt),
-	   dRcp(ray.dRcp), time(ray.time), index(ray.index) {
-	}
+	   dRcp(ray.dRcp), time(ray.time), 
+	   index(ray.index) { }
 
 	/// Copy constructor (2)
 	inline TRay(const TRay &ray, Scalar mint, Scalar maxt)
 	 : o(ray.o), mint(mint), d(ray.d), maxt(maxt),
-	   dRcp(ray.dRcp), time(ray.time), index(ray.index) { }
+	   dRcp(ray.dRcp), time(ray.time), 
+	   index(ray.index) { }
 
 	/// Construct a new ray, while not specifying a direction yet
 	inline TRay(const PointType &o, Scalar time) : o(o), mint(Epsilon),
@@ -114,6 +118,11 @@ template <typename _PointType, typename _VectorType> struct TRay {
 #ifdef MTS_DEBUG_FP
 		restoreFPExceptions(state);
 #endif
+	}
+
+	inline void setUvFootprint(Scalar fval, int lOffset) { 
+		uvFootprint = fval; 
+		levelOffset = lOffset;
 	}
 
 	/**

@@ -78,7 +78,8 @@ public:
 		block->setSize(rect->getSize());
 		m_hilbertCurve.initialize(TVector2<uint8_t>(rect->getSize()));
 
-		if (m_integrator->getClass()->getName() == "BaseFrameWiWoPathTracer") {
+		if (m_integrator->getClass()->getName() == "BaseFrameWiWoPathTracer" ||
+			m_integrator->getClass()->getName() == "PathLodTracer") {
 			m_integrator->renderBlockX(m_scene, m_sensor, m_sampler,
 				block, stop, m_hilbertCurve.getPoints());
 		} else {

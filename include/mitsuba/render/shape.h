@@ -146,6 +146,10 @@ public:
 	/// Base frame, used in heightmaps
 	Frame baseFrame;
 
+	/// Chosen disp. lod level according to pixel footprint
+	Float lodLevel;
+	Float effTexReso;
+
 	/// UV surface coordinates
 	Point2 uv;
 

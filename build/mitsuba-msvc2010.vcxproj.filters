@@ -1121,9 +1121,6 @@
     <ClCompile Include="..\src\utils\alignLobes.cpp">
       <Filter>Source Files\utils</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\librender\renderproc.cpp">
-      <Filter>Source Files\mitsuba</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\integrators\path\volpath_simple_multi_lobe_diff.cpp">
       <Filter>Source Files\integrators\path</Filter>
     </ClCompile>
@@ -1291,6 +1288,18 @@
     </ClCompile>
     <ClCompile Include="..\src\utils\bsdfSimulator\scaleMatrixGrad_proc.cpp">
       <Filter>Source Files\utils\bsdfSimulator</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\shapes\lod_heightfield.cpp">
+      <Filter>Source Files\shapes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\integrators\path\path_lod.cpp">
+      <Filter>Source Files\integrators\path</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\librender\renderproc.cpp">
+      <Filter>Source Files\librender</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\integrators\path\footprint.cpp">
+      <Filter>Source Files\integrators\path</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">

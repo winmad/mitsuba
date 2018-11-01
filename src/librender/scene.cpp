@@ -838,7 +838,10 @@ Spectrum Scene::sampleEmitterDirect(DirectSamplingRecord &dRec,
 	if (dRec.pdf != 0) {
 		if (testVisibility) {
 			Ray ray(dRec.ref, dRec.d, Epsilon,
-					dRec.dist*(1-ShadowEpsilon), dRec.time);
+					dRec.dist*(1-ShadowEpsilon), dRec.time);	
+			// disp. map lod level
+			ray.setUvFootprint(dRec.uvFootprint, dRec.levelOffset);
+
 			if (m_kdtree->rayIntersect(ray))
 				return Spectrum(0.0f);
 		}

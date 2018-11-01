@@ -17,5 +17,6 @@ plugins += env.SharedLibrary('heightfield', ['heightfield.cpp'])
 
 plugins += env.SharedLibrary('tiled_heightfield', ['tiled_heightfield.cpp'])
 plugins += env.SharedLibrary('shellmap_heightfield', ['shellmap_heightfield.cpp'])
+plugins += env.SharedLibrary('lod_heightfield', ['lod_heightfield.cpp'])
 
 Export('plugins')

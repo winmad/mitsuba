@@ -1,5 +1,7 @@
 Import('env', 'sys', 'plugins')
 
+plugins += env.SharedLibrary('footprint', ['path/footprint.cpp'])
+plugins += env.SharedLibrary('path_lod', ['path/path_lod.cpp'])
 plugins += env.SharedLibrary('baseFrameWiWo', ['path/baseFrameWiWo.cpp'])
 
 plugins += env.SharedLibrary('volpath_simple_ao', ['path/volpath_simple_ao.cpp'])

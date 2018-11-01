@@ -658,6 +658,8 @@
     <ClCompile Include="..\src\integrators\misc\motion.cpp" />
     <ClCompile Include="..\src\integrators\misc\multichannel.cpp" />
     <ClCompile Include="..\src\integrators\path\baseFrameWiWo.cpp" />
+    <ClCompile Include="..\src\integrators\path\footprint.cpp" />
+    <ClCompile Include="..\src\integrators\path\path_lod.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_ao.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_diff.cpp" />
     <ClCompile Include="..\src\integrators\path\volpath_simple_ext.cpp" />
@@ -918,6 +920,7 @@
     <ClCompile Include="..\src\libcore\sched.cpp">
     </ClCompile>
     <ClCompile Include="..\src\shapes\heightfield.cpp" />
+    <ClCompile Include="..\src\shapes\lod_heightfield.cpp" />
     <ClCompile Include="..\src\shapes\shellmap_heightfield.cpp" />
     <ClCompile Include="..\src\shapes\tiled_heightfield.cpp" />
     <ClCompile Include="..\src\tests\test_spectrum.cpp">
