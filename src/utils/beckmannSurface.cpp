@@ -85,10 +85,12 @@ public:
 			data[k] = res * m_scale;
 		}
 
+		/*
 		for (int k = 0; k < m_size * m_size; k++)
 			min_height = std::min(min_height, data[k]);
 		for (int k = 0; k < m_size * m_size; k++)
 			data[k] -= min_height;
+		*/
 
 		fs::path filename("heightmap_2d.exr");
 		ref<FileStream> stream = new FileStream(filename, FileStream::ETruncWrite);

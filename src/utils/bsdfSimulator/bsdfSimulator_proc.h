@@ -17,7 +17,8 @@ public:
 	BSDFRayTracer(const Vector &wi, int sqrtNumParticles, int size, const AABB2 &aabb,
 		int minDepth, int maxDepth, int shadowOption, int useFullSphere, Float distGiTexelScale);
 	Point sampleRayOrigin(int idx, double &weight);
-	Spectrum sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts);
+	Spectrum sampleReflectance(const AABB2 &giRangeAABB, 
+		RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts);
 
 	ref<WorkUnit> createWorkUnit() const;
 	ref<WorkResult> createWorkResult() const;

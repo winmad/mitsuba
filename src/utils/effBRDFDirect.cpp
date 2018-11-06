@@ -60,6 +60,7 @@ public:
 		genLinspace(0.0, 1.0, m_wiResolution, smallest, m_wiVec);
 		genLinspace(0.0, 1.0, m_woResolution, smallest, m_woVec);
 
+		/*
 #pragma omp parallel for
 		for (int wiIdx = 0; wiIdx < m_wiResolution * m_wiResolution; wiIdx++) {
 			int r1 = wiIdx / m_wiResolution;
@@ -78,17 +79,22 @@ public:
 
 		Log(EInfo, "Finished. Output 4D effective BRDF");
 		output4DEffBRDF(filename);
+		*/
 
-		/*
-		int tr = 12;
-		int tc = 22;
-		Vector wi = warp::squareToUniformHemisphereConcentric(Point2(m_wiVec[tc], m_wiVec[tr]));
+		int tr = 7;
+		int tc = 7;
+		//Vector wi = warp::squareToUniformHemisphereConcentric(Point2(m_wiVec[tc], m_wiVec[tr]));
+		Vector wi(0, 0, 1);
 		//Vector wi(0.9969, 0.0, 0.0784);
 		//Vector wi(0.987162, 0.0, 0.1597222);
 		//Vector wi(0.95217425, 0.0, 0.3055556);
 		//wi = normalize(wi);
-		output2DSlice(wi, filename);
-		*/
+		
+		//output2DSlice(wi, filename);
+
+		Vector wo(0, 0, 1);
+		Spectrum spec = stocEvalBRDF(wi, wo, m_samplers[0]);
+		Log(EInfo, "spec = (%.6f, %.6f, %.6f)", spec[0], spec[1], spec[2]);
 	}
 
 	void genLinspace(Float st, Float ed, int n, Float smallest, std::vector<Float> &vec) {

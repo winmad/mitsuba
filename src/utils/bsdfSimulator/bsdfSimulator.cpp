@@ -143,7 +143,7 @@ public:
 			Log(EInfo, "Total thr = (%.6f, %.6f, %.6f)", totalThroughput[0], totalThroughput[1], totalThroughput[2]);
 			
 			/*fprintf(fp, "%.6f %.6f %.6f\n", totalThroughput[0], totalThroughput[1], totalThroughput[2]);*/
-		}		
+		}
 		/*fclose(fp);*/
 
 // 		sprintf(txtFilename, "%s_moments.txt", argv[14]);

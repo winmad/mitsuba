@@ -65,8 +65,10 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 		RadianceQueryRecord rRec(m_scene, m_sampler);
 		rRec.type = RadianceQueryRecord::ERadiance;
 
+		AABB2 giRangeAABB(Point2(o.x - m_distGiRange.x, o.y - m_distGiRange.y),
+			Point2(o.x + m_distGiRange.x, o.y + m_distGiRange.y));
 		Intersection its;
-		Spectrum throughput = sampleReflectance(ray, rRec, its);
+		Spectrum throughput = sampleReflectance(giRangeAABB, ray, rRec, its);
 
 // 		if (throughput[0] < -Epsilon) {
 // 			//Log(EInfo, "invalid throughput");
@@ -172,7 +174,8 @@ Point BSDFRayTracer::sampleRayOrigin(int idx, double &weight) {
 	//return o;
 }
 
-Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts) {
+Spectrum BSDFRayTracer::sampleReflectance(const AABB2 &giRangeAABB, 
+	RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts) {
 	const Scene *scene = rRec.scene;
 	Intersection &its = rRec.its;
 	MediumSamplingRecord mRec;
@@ -204,7 +207,7 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			if (rRec.medium)
 				throughput *= mRec.transmittance / mRec.pdfFailure;
 
-			if (!its.isValid() || !m_aabb.contains(Point2(its.p.x, its.p.y)) ||
+			if (!its.isValid() || !giRangeAABB.contains(Point2(its.p.x, its.p.y)) ||
 				rRec.depth == m_maxDepth) {
 // 				if (rRec.depth == 0)
 // 					Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
@@ -233,7 +236,7 @@ Spectrum BSDFRayTracer::sampleReflectance(RayDifferential &ray, RadianceQueryRec
 			Spectrum bsdfVal = bsdf->sample(bRec, rRec.nextSample2D());
 			throughput *= bsdfVal;
 			if (bsdfVal.isZero()) {
-				//Log(EInfo, "zero bsdf, wo = (%.6f, %.6f, %.6f)", bRec.wo.x, bRec.wo.y, bRec.wo.z);
+				//Log(EInfo, "zero bsdf, depth = %d, wo = (%.6f, %.6f, %.6f)", rRec.depth, bRec.wo.x, bRec.wo.y, bRec.wo.z);
 				break;
 			}
 
