@@ -592,6 +592,7 @@
     <ClCompile Include="..\src\bsdfs\bumpmap.cpp" />
     <ClCompile Include="..\src\bsdfs\heightmap_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\multilobe_bsdf.cpp" />
+    <ClCompile Include="..\src\bsdfs\multilobe_microfacet.cpp" />
     <ClCompile Include="..\src\bsdfs\multilobe_micro_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\normalmap.cpp" />
     <ClCompile Include="..\src\bsdfs\roughbsdf_multi.cpp" />
@@ -600,6 +601,7 @@
     <ClCompile Include="..\src\bsdfs\sh_scaled_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\sv_tabulated_scaled_bsdf.cpp" />
     <ClCompile Include="..\src\bsdfs\tabulated_bsdf.cpp" />
+    <ClCompile Include="..\src\bsdfs\tabulated_btf.cpp" />
     <ClCompile Include="..\src\bsdfs\tabulated_scaled_bsdf.cpp" />
     <ClCompile Include="..\src\converter\mtsimport.cpp">
     </ClCompile>

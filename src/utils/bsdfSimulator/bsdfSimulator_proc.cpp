@@ -67,6 +67,8 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 
 		AABB2 giRangeAABB(Point2(o.x - m_distGiRange.x, o.y - m_distGiRange.y),
 			Point2(o.x + m_distGiRange.x, o.y + m_distGiRange.y));
+		//AABB2 giRangeAABB(m_aabb);
+
 		Intersection its;
 		Spectrum throughput = sampleReflectance(giRangeAABB, ray, rRec, its);
 

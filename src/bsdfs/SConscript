@@ -14,6 +14,7 @@ plugins += env.SharedLibrary('aniso_roughdiffuse', ['aniso_roughdiffuse.cpp'])
 plugins += env.SharedLibrary('aniso_roughdiffuse_simple', ['aniso_roughdiffuse_simple.cpp'])
 plugins += env.SharedLibrary('multilobe_bsdf', ['multilobe_bsdf.cpp'])
 plugins += env.SharedLibrary('multilobe_micro_bsdf', ['multilobe_micro_bsdf.cpp'])
+plugins += env.SharedLibrary('multilobe_microfacet', ['multilobe_microfacet.cpp'])
 plugins += env.SharedLibrary('tabulated_bsdf', ['tabulated_bsdf.cpp'])
 
 plugins += env.SharedLibrary('roughdiffuse_multi', ['roughdiffuse_multi.cpp'])
@@ -23,6 +24,7 @@ plugins += env.SharedLibrary('sh_scaled_bsdf', ['sh_scaled_bsdf.cpp'])
 plugins += env.SharedLibrary('tabulated_scaled_bsdf', ['tabulated_scaled_bsdf.cpp'])
 plugins += env.SharedLibrary('sv_tabulated_scaled_bsdf', ['sv_tabulated_scaled_bsdf.cpp'])
 plugins += env.SharedLibrary('heightmap_bsdf', ['heightmap_bsdf.cpp'])
+plugins += env.SharedLibrary('tabulated_btf', ['tabulated_btf.cpp'])
 
 # Materials that act as modifiers
 plugins += env.SharedLibrary('twosided', ['twosided.cpp'])

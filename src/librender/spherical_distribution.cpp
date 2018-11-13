@@ -98,15 +98,31 @@ void SphericalDistribution::put(const Vector &dir, const Spectrum &value, double
 		Float u = square.x * numCells - c;
 		Float v = square.y * numCells - r;
 		
+		/*
+		double tStep = 1.0 / numCells;
+		double sumW = 0.0;
+		double wKernel[2][2];
+		for (int dr = 0; dr < 2; dr++) {
+			for (int dc = 0; dc < 2; dc++) {
+				Vector gridDir = warp::squareToUniformHemisphereConcentric(Point2(
+					tStep * (c + dc), tStep * (r + dr)));
+				wKernel[dr][dc] = dot(dir, gridDir);
+				sumW += wKernel[dr][dc];
+			}
+		}
+		*/
+
 		Spectrum tmp = value * weight * normFactor;
 		// small kernel
 		for (int dr = 0; dr < 2; dr++) {
 			double wv = std::abs(1.0 - dr - v);
 			for (int dc = 0; dc < 2; dc++) {
 				double wKernel = wv * std::abs(1.0 - dc - u);
+
 				int idx = (r + dr + offset_r) * m_size + (c + dc);
 				for (int k = 0; k < 3; k++) {
 					data[3 * idx + k] += tmp[k] * wKernel;
+					//data[3 * idx + k] += tmp[k] * wKernel[dr][dc] / sumW;
 				}
 			}
 		}

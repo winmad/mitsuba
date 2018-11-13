@@ -11,6 +11,7 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/sampler.h>
 #include <boost/filesystem/path.hpp>
+#include "../bsdfs/microfacet.h"
 #include "multi_vmf.h"
 
 MTS_NAMESPACE_BEGIN
@@ -18,6 +19,7 @@ MTS_NAMESPACE_BEGIN
 class NDFMipmap : public Utility {
 public:
 	typedef std::vector<std::vector<Vector> > Vector2DArray;
+	typedef std::vector<std::vector<double> > Float2DArray;
 
 	int run(int argc, char **argv) {
 		m_numLobes = std::atoi(argv[1]);
@@ -25,6 +27,13 @@ public:
 		m_sqrtSpp = std::atoi(argv[3]);
 		m_maxScale = std::atoi(argv[4]);
 		m_scene = loadScene(argv[5]);
+
+		if (argc > 6) {
+			Float alpha = std::atof(argv[6]);
+			int type = std::atoi(argv[7]);
+			m_dist = new MicrofacetDistribution(MicrofacetDistribution::EType(type), alpha, false);
+		} else
+			m_dist = NULL;
 
 		m_scene->initialize();
 		m_spp = m_sqrtSpp * m_sqrtSpp;
@@ -41,6 +50,9 @@ public:
 		// sample normals
 		m_normals = std::vector<std::vector<Vector> >(m_resolution * m_sqrtSpp,
 			std::vector<Vector>(m_resolution * m_sqrtSpp));
+		m_weights = std::vector<std::vector<double> >(m_resolution * m_sqrtSpp,
+			std::vector<double>(m_resolution * m_sqrtSpp));
+
 #pragma omp parallel for
 		for (int i = 0; i < m_resolution * m_sqrtSpp; i++) {
 			for (int j = 0; j < m_resolution * m_sqrtSpp; j++) {
@@ -50,7 +62,24 @@ public:
 
 				Normal norm;
 				m_hmap->getPosAndNormal(uv, NULL, &norm);
-				m_normals[i][j] = norm;
+				m_normals[i][j] = norm;	
+				// pdf conversion factors
+				m_weights[i][j] = 1.0 / norm.z;
+
+				if (m_dist) {
+					// Note: Here we convolve normals (might not be very precise).
+					// A better way is convolving slopes.
+					ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+					Frame lobeFrame(m_normals[i][j]);
+
+					Float microPdf;
+					Vector microNorm = m_dist->sampleAll(Point2(sampler->next1D(), sampler->next1D()), microPdf);
+					Vector newNorm = lobeFrame.toWorld(microNorm);
+
+					m_normals[i][j] = newNorm;
+					// pdf conversion factors
+					m_weights[i][j] *= 1.0 / microNorm.z;
+				}
 			}
 		}
 		Log(EInfo, "Finish sampling normals...");
@@ -78,32 +107,27 @@ public:
 				MultiLobeVMF vmfs;
 				initKMeans(m_normals, i, step, j, step, vmfs);
 
-// 				sprintf(fname, "vmf_D_init_%d_%d.exr", i / step, j / step);
-// 				vmfs.outputDistribution(128, fname);
-
-// 				Log(EInfo, "====== Iter %d vMF distribution ======", 0);
-// 				for (int l = 0; l < m_numLobes; l++) {
-// 					Log(EInfo, "alpha = %.6f, kappa = %.6f, mu = (%.6f, %.6f, %.6f)",
-// 						vmfs.m_alpha[l], vmfs.m_dist[l].getKappa(),
-// 						vmfs.m_mu[l].x, vmfs.m_mu[l].y, vmfs.m_mu[l].z);
-// 				}
-				int maxIters = 20;
-				for (int iter = 0; iter < maxIters; iter++) {
-					EM(m_normals, i, step, j, step, vmfs);
-
-// 					Log(EInfo, "====== Iter %d vMF distribution ======", iter + 1);
-// 					for (int l = 0; l < m_numLobes; l++) {
-// 						Log(EInfo, "alpha = %.6f, kappa = %.6f, mu = (%.6f, %.6f, %.6f)",
-// 							vmfs.m_alpha[l], vmfs.m_dist[l].getKappa(),
-// 							vmfs.m_mu[l].x, vmfs.m_mu[l].y, vmfs.m_mu[l].z);
-// 					}
+				//if (i == 0) {
+				if (false) {
+ 					sprintf(fname, "tmp/ndf_D_%d_%d.exr", i / step, j / step);
+ 					outputOriginalNDF(m_normals, i, step, j, step, fname);
 				}
 
-// 				sprintf(fname, "vmf_D_%d_%d.exr", i / step, j / step);
-// 				vmfs.outputDistribution(128, fname);
-// 
-// 				sprintf(fname, "ndf_D_%d_%d.exr", i / step, j / step);
-// 				outputOriginalNDF(m_normals, i, step, j, step, fname);
+				/*
+				sprintf(fname, "tmp/vmf_init_D_%d_%d.exr", i / step, j / step);
+				vmfs.outputDistribution(128, fname);
+
+				int maxIters = 100;
+				for (int iter = 0; iter < maxIters; iter++) {
+					EM(m_normals, i, step, j, step, vmfs);
+				}
+				*/
+
+				//if (i == 0) {
+				if (false) {
+					sprintf(fname, "tmp/vmf_D_%d_%d.exr", i / step, j / step);
+ 					vmfs.outputDistribution(128, fname);
+				}
 
 				putVMF(vmfs, bitmaps, j / step, i / step, m_resolution / scale,
 					m_resolution / scale);
@@ -138,15 +162,19 @@ public:
 		centers[0].resize(m_numLobes);
 		centers[1].resize(m_numLobes);
 		for (int i = 0; i < m_numLobes; i++) {
+			int counter = 0;
 			while (1) {
 				int u = math::floorToInt(sampler->next1D() * rSize);
 				int v = math::floorToInt(sampler->next1D() * cSize);
 				int r = rSt + v;
 				int c = cSt + u;
 
-				for (int l = 0; l < i; l++) {
-					if (dot(normals[r][c], centers[0][l]) > 0.9999)
-						continue;
+				if (counter < 1000) {
+					counter++;
+					for (int l = 0; l < i; l++) {
+						if (dot(normals[r][c], centers[0][l]) > 0.9999)
+							continue;
+					}
 				}
 
 				centers[0][i] = normals[r][c];
@@ -155,7 +183,7 @@ public:
 		}
 
 		int now = 0;
-		int maxIters = 100;
+		int maxIters = 500;
 		for (int iter = 0; iter < maxIters; iter++) {
 			for (int l = 0; l < m_numLobes; l++) {
 				cnt[l] = 0.0;
@@ -179,10 +207,14 @@ public:
 					}
 
 					// update centers
-					Float w = 1.0 / normals[i][j].z; // weight of each normal
-					centers[1 - now][k] += normals[i][j];
-					areas[k] += w;
-					cnt[k] += 1.0;
+					//Float w = 1.0 / normals[i][j].z; // weight of each normal
+					Float w = m_weights[i][j];
+					
+					//centers[1 - now][k] += normals[i][j];
+					centers[1 - now][k] += normals[i][j] * w;
+					areas[k] += w;					
+					//cnt[k] += 1.0;
+					cnt[k] += w;
 				}
 			}
 
@@ -234,70 +266,72 @@ public:
 
 	void EM(const Vector2DArray &normals, int rSt, int rSize, int cSt, int cSize,
 		MultiLobeVMF &vmfs) {
-		std::vector<std::vector<Float> > prob(rSize * cSize, std::vector<Float>(m_numLobes, 0.0));
+			std::vector<std::vector<Float> > prob(rSize * cSize, std::vector<Float>(m_numLobes, 0.0));
 #pragma omp parallel for
-		for (int i = 0; i < rSize; i++) {
-			for (int j = 0; j < cSize; j++) {
-				int idx = i * cSize + j;
-
-				Float sumProb = 0.0;
-				for (int l = 0; l < m_numLobes; l++) {
-					if (vmfs.m_mu[l].length() < 1e-8)
-						continue;
-					Float cosTheta = dot(vmfs.m_mu[l], normals[rSt + i][cSt + j]);
-					prob[idx][l] = vmfs.m_dist[l].eval(cosTheta);
-					sumProb += prob[idx][l];
-				}
-
-				if (sumProb > 1e-8) {
-					for (int l = 0; l < m_numLobes; l++)
-						prob[idx][l] /= sumProb;
-				}
-			}
-		}
-
-		for (int l = 0; l < m_numLobes; l++) {
-			Float alpha = 0.0;
-			Vector r(0.0);
-			Float totArea = 0.0;
-			Float totW = 0.0;
-
 			for (int i = 0; i < rSize; i++) {
 				for (int j = 0; j < cSize; j++) {
 					int idx = i * cSize + j;
 
-					//Float w = 1.0;
-					Float w = 1.0 / normals[rSt + i][cSt + j].z;
-					alpha += w * prob[idx][l];
-					totArea += 1.0;
+					Float sumProb = 0.0;
+					for (int l = 0; l < m_numLobes; l++) {
+						if (vmfs.m_mu[l].length() < 1e-8)
+							continue;
+						Float cosTheta = dot(vmfs.m_mu[l], normals[rSt + i][cSt + j]);
+						prob[idx][l] = vmfs.m_dist[l].eval(cosTheta);
+						sumProb += prob[idx][l];
+					}
 
-					r += prob[idx][l] * normals[rSt + i][cSt + j];
-					totW += prob[idx][l];
+					//Float w = 1.0 / normals[rSt + i][cSt + j].z;
+					Float w = m_weights[rSt + i][cSt + j];
+
+					if (sumProb > 1e-8) {
+						for (int l = 0; l < m_numLobes; l++) {
+							prob[idx][l] /= sumProb;
+							prob[idx][l] *= w;
+						}
+					}
 				}
 			}
 
-			if (alpha < 1e-8) {
-				vmfs.m_alpha[l] = 0.0;
-				vmfs.m_mu[l] = Vector(0.0);
-				vmfs.m_dist[l] = VonMisesFisherDistr(0.0);
-				continue;
-			}
+			for (int l = 0; l < m_numLobes; l++) {
+				Float alpha = 0.0;
+				Vector r(0.0);
+				Float normR = 0.0;
 
-			alpha /= totArea;
-			r /= totW;
+				for (int i = 0; i < rSize; i++) {
+					for (int j = 0; j < cSize; j++) {
+						int idx = i * cSize + j;
 
-			Float kappa;
-			if (std::abs(r.length() - 1.0) < 1e-8) {
-				kappa = 1e3;
+						//Float w = 1.0 / normals[rSt + i][cSt + j].z;
+						alpha += prob[idx][l];
+
+						r += prob[idx][l] * normals[rSt + i][cSt + j];
+						normR += prob[idx][l];
+					}
+				}
+
+				if (alpha < 1e-8) {
+					vmfs.m_alpha[l] = 0.0;
+					vmfs.m_mu[l] = Vector(0.0);
+					vmfs.m_dist[l] = VonMisesFisherDistr(0.0);
+					continue;
+				}
+
+				r /= normR;
+				alpha /= (double)rSize * cSize;
+
+				Float kappa;
+				if (std::abs(r.length() - 1.0) < 1e-8) {
+					kappa = 1e3;
+				}
+				else {
+					kappa = VonMisesFisherDistr::forMeanLength(r.length());
+					kappa = std::min(kappa, 1e3);
+				}
+				vmfs.m_alpha[l] = alpha;
+				vmfs.m_mu[l] = normalize(r);
+				vmfs.m_dist[l] = VonMisesFisherDistr(kappa);
 			}
-			else {
-				kappa = VonMisesFisherDistr::forMeanLength(r.length());
-				kappa = std::min(kappa, 1e3);
-			}
-			vmfs.m_alpha[l] = alpha;
-			vmfs.m_mu[l] = normalize(r);
-			vmfs.m_dist[l] = VonMisesFisherDistr(kappa);
-		}
 	}
 
 	void putVMF(const MultiLobeVMF &vmfs, std::vector<ref<Bitmap> > &bitmaps, int x, int y, 
@@ -337,7 +371,8 @@ public:
 				int c = math::clamp(math::floorToInt(p.x * size), 0, size - 1);
 				int r = math::clamp(math::floorToInt(p.y * size), 0, size - 1);
 
-				data[r * size + c] += 1.0 / normal.z * size * size / (2.0 * M_PI * rSize * cSize);
+				//data[r * size + c] += 1.0 / normal.z * size * size / (2.0 * M_PI * rSize * cSize);
+				data[r * size + c] += m_weights[i][j] * size * size / (2.0 * M_PI * rSize * cSize);
 			}
 		}
 
@@ -352,8 +387,10 @@ public:
 	ref<Scene> m_scene;
 	Shape *m_hmap;
 	ref_vector<Sampler> m_samplers;
+	MicrofacetDistribution *m_dist;
 
 	Vector2DArray m_normals;
+	Float2DArray m_weights;
 
 	MTS_DECLARE_UTILITY()
 };

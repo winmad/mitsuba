@@ -21,12 +21,16 @@ public:
 	typedef std::vector<std::vector<Point2> > Sample2DArray;
 
 	int run(int argc, char **argv) {
-		m_size = std::atoi(argv[1]);
-		m_sqrtSpp = std::atoi(argv[2]);
+		m_wi = normalize(Vector(std::atof(argv[1]), std::atof(argv[2]), std::atof(argv[3])));
+
+		m_size = std::atoi(argv[4]);
+		m_sqrtSpp = std::atoi(argv[5]);
 		m_spp = m_sqrtSpp * m_sqrtSpp;
 
+		char *outFilename = argv[6];
+
 		//m_wi = normalize(Vector(0.3, 0.2, 1));
-		m_wi = normalize(Vector(0, 0, 1));
+		//m_wi = normalize(Vector(0, 0, 1));
 
 		Properties props;
 		props = Properties("independent");
@@ -78,6 +82,7 @@ public:
 		bsdf->configure();
 		*/
 
+		/*
 		props = Properties("diffuse");
 		props.setSpectrum("reflectance", Spectrum(0.9f));
 		BSDF *baseBSDF = static_cast<BSDF *> (PluginManager::getInstance()->
@@ -93,6 +98,19 @@ public:
 			createObject(MTS_CLASS(BSDF), props));
 		bsdf->addChild("baseBSDF", baseBSDF);
 		bsdf->configure();
+		*/
+
+		props = Properties("roughconductor");
+		props.setString("distribution", "GGX");
+		props.setFloat("alpha", 0.1);
+		props.setString("material", "none");
+		Spectrum spec;
+		spec[0] = 0.9; spec[1] = 0.1; spec[2] = 0.1;
+		props.setSpectrum("specularReflectance", spec);
+		
+		BSDF *bsdf = static_cast<BSDF *> (PluginManager::getInstance()->
+			createObject(MTS_CLASS(BSDF), props));
+		bsdf->configure();
 
 		/*
 		Intersection its;
@@ -104,7 +122,7 @@ public:
 		*/
 
 		calcEvalBSDF(bsdf, m_wi, samples, bsdfValues);
-		outputBitmap(bsdfValues, "microfacet_multi_general.exr");
+		outputBitmap(bsdfValues, outFilename);
 
 		return 0;
 	}

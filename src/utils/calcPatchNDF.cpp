@@ -32,6 +32,18 @@ public:
 		m_normal_stLim = std::atof(argv[12]);
 		fs::path filename(argv[13]);
 
+		if (argc > 14)
+			m_numLobes = std::atoi(argv[14]);
+		else
+			m_numLobes = 0;
+
+		if (argc > 15) {
+			Float alpha = std::atof(argv[15]);
+			int type = std::atoi(argv[16]);
+			m_dist = new MicrofacetDistribution(MicrofacetDistribution::EType(type), alpha, false);
+		} else
+			m_dist = NULL;
+
 		m_wi = normalize(m_wi);
 		m_aabb = AABB2(Point2(xmin, ymin), Point2(xmax, ymax));
 		m_scene->initialize();
@@ -55,6 +67,20 @@ public:
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
 				normals[i][j] = sampleNormal(i, j, weights[i][j]);
+
+				if (m_dist) {
+					ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
+					Frame lobeFrame(normals[i][j]);
+					
+					Float microPdf;
+					Vector microNorm = m_dist->sampleAll(Point2(sampler->next1D(), sampler->next1D()), microPdf);
+					Vector newNorm = lobeFrame.toWorld(microNorm);
+
+					Normal binNormal = getBinNormal(newNorm);
+					normals[i][j] = binNormal;
+					weights[i][j] = std::max(0.0, dot(binNormal, m_wi));
+				}
+
 				normals[i][j] /= m_normal_stLim;
 			}
 		}
@@ -146,7 +172,7 @@ public:
 		}
 
 		// fitting with multi-lobe vMF
-		if (argc > 14) {
+		if (m_numLobes > 0) {
 			m_numLobes = std::atoi(argv[14]);
 			initKMeans(normals, weights);
 
@@ -203,6 +229,17 @@ public:
 		return 0;
 	}
 
+	Normal getBinNormal(const Normal &normal) {
+		Point2 p = warp::uniformHemisphereToSquareConcentric(normal);
+		int c = math::clamp(math::floorToInt(p.x * m_size), 0, m_size - 1);
+		int r = math::clamp(math::floorToInt(p.y * m_size), 0, m_size - 1);
+		Normal binNormal;
+		binNormal = warp::squareToUniformHemisphereConcentric(Point2(
+			(c + 0.5) / m_size, (r + 0.5) / m_size));
+
+		return binNormal;
+	}
+
 	Normal sampleNormal(int i, int j, double &weight) {
 		ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
 		double x = m_aabb.min.x + (j + sampler->next1D()) / (double)m_sqrtSpp * (m_aabb.max.x - m_aabb.min.x);
@@ -220,14 +257,8 @@ public:
 // 		if (normal.z >= 0.9999) {
 // 			Log(EInfo, "(%d, %d), h = %.6f", j, i, its.p.z);
 // 		}
-
-		Point2 p = warp::uniformHemisphereToSquareConcentric(normal);
-		int c = math::clamp(math::floorToInt(p.x * m_size), 0, m_size - 1);
-		int r = math::clamp(math::floorToInt(p.y * m_size), 0, m_size - 1);
-		Normal binNormal;
-		binNormal = warp::squareToUniformHemisphereConcentric(Point2(
-			(c + 0.5) / m_size, (r + 0.5) / m_size));
-
+		
+		Normal binNormal = getBinNormal(normal);
 		weight = std::max(0.0, dot(binNormal, m_wi));
 		if (weight > 0.0) {
 			ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
@@ -544,6 +575,8 @@ public:
 	int m_size;
 	AABB2 m_aabb;
 	double m_normal_stLim;
+	
+	MicrofacetDistribution *m_dist;
 	
 	// D(wm)
 	ref<Bitmap> m_D;
