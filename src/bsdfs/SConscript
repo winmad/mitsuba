@@ -24,7 +24,8 @@ plugins += env.SharedLibrary('sh_scaled_bsdf', ['sh_scaled_bsdf.cpp'])
 plugins += env.SharedLibrary('tabulated_scaled_bsdf', ['tabulated_scaled_bsdf.cpp'])
 plugins += env.SharedLibrary('sv_tabulated_scaled_bsdf', ['sv_tabulated_scaled_bsdf.cpp'])
 plugins += env.SharedLibrary('heightmap_bsdf', ['heightmap_bsdf.cpp'])
-plugins += env.SharedLibrary('tabulated_btf', ['tabulated_btf.cpp'])
+plugins += env.SharedLibrary('tabulated_btf_4d', ['tabulated_btf_4d.cpp'])
+plugins += env.SharedLibrary('tabulated_btf_6d', ['tabulated_btf_6d.cpp'])
 
 # Materials that act as modifiers
 plugins += env.SharedLibrary('twosided', ['twosided.cpp'])

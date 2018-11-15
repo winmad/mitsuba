@@ -1301,10 +1301,13 @@
     <ClCompile Include="..\src\integrators\path\footprint.cpp">
       <Filter>Source Files\integrators\path</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\bsdfs\tabulated_btf.cpp">
+    <ClCompile Include="..\src\bsdfs\multilobe_microfacet.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\bsdfs\multilobe_microfacet.cpp">
+    <ClCompile Include="..\src\bsdfs\tabulated_btf_4d.cpp">
+      <Filter>Source Files\bsdfs</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\bsdfs\tabulated_btf_6d.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
   </ItemGroup>

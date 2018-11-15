@@ -230,7 +230,8 @@ public:
 			Float cosTerm = dot(mu, wiMacro);
 			if (cosTerm < 1e-3)
 				continue;
-			D += alpha * (vmf.eval(dot(mu, HMacro)) / cosTerm);
+			//D += alpha * (vmf.eval(dot(mu, HMacro)) / cosTerm);
+			D += alpha * (vmf.eval(dot(mu, HMacro)));
 			nMeso += alpha * mu;
 
 			//oss << "lobe " << i << ": " << vmf.eval(dot(mu, HMacro)) << std::endl;
@@ -262,17 +263,17 @@ public:
 			m_specularReflectance->eval(bRec.its);
 
 		/* Smith's shadow-masking function */
-		const Float G = m_dist->G(wiMacro, woMacro, HMacro);
+		Float G = m_dist->G(wiMacro, woMacro, HMacro);
 
-// 		nMeso = nMacro;
-// 		Float len = nMeso.length();
-// 		if (len < 1e-4)
-// 			return Spectrum(0.0);
-// 		nMeso /= len;
-// 		const Float G = G2(wiMacro, woMacro, HMacro, nMeso, lobesParam0, lobesParam1);
+		nMeso = nMacro;
+		Float len = nMeso.length();
+		if (len < 1e-4)
+			return Spectrum(0.0);
+		nMeso /= len;
+		G *= G2(wiMacro, woMacro, HMacro, nMeso, lobesParam0, lobesParam1);
 
 		/* Calculate the total amount of reflection */
-		Float model = D * G / 4.0f;	
+		Float model = D * G / (4.0f * Frame::cosTheta(bRec.wi));
 		
 		return F * model;
 	}
