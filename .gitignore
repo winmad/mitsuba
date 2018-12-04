@@ -5,6 +5,7 @@ scenes/
 results/
 render.py
 dependencies_macos/
+dependencies*
 backup/
 build/*.py
 *.txt
@@ -32,6 +33,7 @@ config.log
 *.pyc
 
 # MSVC++-related
+build/mitsuba-msvc2010.vcxproj
 build/mitsuba-msvc2010.sdf
 build/mitsuba-msvc2010.suo
 build/mitsuba-msvc2010.vcxproj.user
