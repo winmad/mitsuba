@@ -19,21 +19,30 @@ class TabulatedScaledBSDF : public BSDF {
 public:
 	TabulatedScaledBSDF(const Properties &props) : BSDF(props) {
 		m_angularScaleFilename = props.getString("angularScaleFilename", "");
+		m_spatialScaleFilename = props.getString("spatialScaleFilename", "");
 		m_useMIS = props.getBoolean("useMIS", false);
 
 		m_wiUseFullSphere = props.getBoolean("wiUseFullSphere", false);
 		m_woUseFullSphere = props.getBoolean("woUseFullSphere", false);
 		m_useGrad = props.getBoolean("useGrad", false);
+
+		Float uvscale = props.getFloat("uvscale", 1.0f);
+		m_uvScale = Vector2(
+			props.getFloat("uscale", uvscale),
+			props.getFloat("vscale", uvscale));
 	}
 
 	TabulatedScaledBSDF(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
 		m_angularScaleFilename = stream->readString();
+		m_spatialScaleFilename = stream->readString();
 		m_useMIS = stream->readBool();
 
 		m_wiUseFullSphere = stream->readBool();
 		m_woUseFullSphere = stream->readBool();
 		m_useGrad = stream->readBool();
+
+		m_uvScale = Vector2(stream);
 
 		configure();
 	}
@@ -42,11 +51,14 @@ public:
 		BSDF::serialize(stream, manager);
 
 		stream->writeString(m_angularScaleFilename);
+		stream->writeString(m_spatialScaleFilename);
 		stream->writeBool(m_useMIS);
 
 		stream->writeBool(m_wiUseFullSphere);
 		stream->writeBool(m_woUseFullSphere);
 		stream->writeBool(m_useGrad);
+
+		m_uvScale.serialize(stream);
 	}
 
 	void configure() {
@@ -56,41 +68,76 @@ public:
 		m_usesRayDifferentials = false;
 
 		// load angular scales
-		m_angularScales = new Bitmap(fs::path(m_angularScaleFilename));
-		m_lobeSize = m_angularScales->getSize();
-
-		if (m_wiUseFullSphere)
-			m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y * 0.5));
+		if (m_angularScaleFilename != "")
+			m_angularScales = new Bitmap(fs::path(m_angularScaleFilename));
 		else
-			m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y));
-		
-		if (m_woUseFullSphere)
-			m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x * 0.5));
-		else
-			m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x));
+			m_angularScales = NULL;
 
-		Log(EInfo, "wiRes = %d, woRes = %d", m_wiResolution, m_woResolution);
+		if (m_angularScales != NULL) {
+			m_lobeSize = m_angularScales->getSize();
 
-		if (m_useMIS) {
-			m_rowCondCdfs.resize(m_lobeSize.y, DiscreteDistribution(m_lobeSize.x));
-			for (int r = 0; r < m_lobeSize.y; r++) {
-				for (int c = 0; c < m_lobeSize.x; c++) {
-					Spectrum spec = m_angularScales->getPixel(Point2i(c, r));
-					m_rowCondCdfs[r].append(spec.average());
+			if (m_wiUseFullSphere)
+				m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y * 0.5));
+			else
+				m_wiResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.y));
+
+			if (m_woUseFullSphere)
+				m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x * 0.5));
+			else
+				m_woResolution = math::floorToInt(std::sqrt((Float)m_lobeSize.x));
+
+			Log(EInfo, "wiRes = %d, woRes = %d", m_wiResolution, m_woResolution);
+
+			if (m_useMIS) {
+				m_rowCondCdfs.resize(m_lobeSize.y, DiscreteDistribution(m_lobeSize.x));
+				for (int r = 0; r < m_lobeSize.y; r++) {
+					for (int c = 0; c < m_lobeSize.x; c++) {
+						Spectrum spec = m_angularScales->getPixel(Point2i(c, r));
+						m_rowCondCdfs[r].append(spec.average());
+					}
+					m_rowCondCdfs[r].normalize();
 				}
-				m_rowCondCdfs[r].normalize();
-			}
 
-			m_samplers.resize(233);
-			m_samplers[0] = static_cast<Sampler *>(PluginManager::getInstance()->
-				createObject(MTS_CLASS(Sampler), Properties("independent")));
-			m_samplers[0]->configure();
-			for (int i = 1; i < 233; i++) {
-				m_samplers[i] = m_samplers[0]->clone();
+				m_samplers.resize(233);
+				m_samplers[0] = static_cast<Sampler *>(PluginManager::getInstance()->
+					createObject(MTS_CLASS(Sampler), Properties("independent")));
+				m_samplers[0]->configure();
+				for (int i = 1; i < 233; i++) {
+					m_samplers[i] = m_samplers[0]->clone();
+				}
 			}
 		}
 
+		// load spatial scales
+		if (m_spatialScaleFilename != "")
+			m_spatialScales = new Bitmap(fs::path(m_spatialScaleFilename));
+		else
+			m_spatialScales = NULL;
+
+		if (m_spatialScales != NULL) {
+			m_xyResolution = m_spatialScales->getSize();
+			Log(EInfo, "xRes = %d, yRes = %d", m_xyResolution.x, m_xyResolution.y);
+		}
+
 		BSDF::configure();
+	}
+
+	Spectrum evalSpatialScale(const BSDFSamplingRecord &bRec) const {
+		Point2 uv = transformUV(bRec.its.uv);
+		int xIdx = math::floorToInt(uv.x * m_xyResolution.x);
+		int yIdx = math::floorToInt(uv.y * m_xyResolution.y);
+		
+		Spectrum res(0.f);
+		for (int dy = 0; dy < 2; dy++) {
+			Float wv = std::abs(1.0 - dy - uv.y);
+			for (int dx = 0; dx < 2; dx++) {
+				Float wu = std::abs(1.0 - dx - uv.x);
+
+				Spectrum tmpValue = m_spatialScales->getPixel(Point2i(xIdx + dx, yIdx + dy));
+				res += tmpValue * wu * wv;
+			}
+		}
+		return res;
 	}
 
 	Spectrum evalScale(const BSDFSamplingRecord &bRec) const {
@@ -366,11 +413,15 @@ public:
 	}
 
 	Spectrum eval(const BSDFSamplingRecord &bRec, EMeasure measure) const {
-		Spectrum scale = evalScale(bRec);
-		if (scale.isZero())
+		Spectrum s(1.f), t(1.f);
+		if (m_angularScales != NULL)
+			s = evalScale(bRec);
+		if (m_spatialScales != NULL)
+			t = evalSpatialScale(bRec);
+		if (s.isZero() || t.isZero())
 			return Spectrum(0.f);
 		Spectrum spec = m_bsdf->eval(bRec, measure);
-		return spec * scale;
+		return spec * s * t;
 	}
 
 	inline int getScaleMatrixRow(const BSDFSamplingRecord &bRec) const {
@@ -461,14 +512,21 @@ public:
 			Spectrum spec = m_bsdf->sample(bRec, pdf, sample);
 			if (spec.isZero())
 				return Spectrum(0.f);
-			Spectrum scale;
 			
-			if (!m_useGrad)
-				scale = evalScale(bRec);
-			else
-				scale = evalScaleAndGrad(bRec);
+			Spectrum s(1.f), t(1.f);
+			
+			if (m_angularScales != NULL) {
+				if (!m_useGrad)
+					s = evalScale(bRec);
+				else
+					s = evalScaleAndGrad(bRec);
+			}
 
-			return spec * scale;
+			if (m_spatialScales != NULL) {
+				t = evalSpatialScale(bRec);
+			}
+
+			return spec * s * t;
 		}
 	}
 
@@ -494,6 +552,15 @@ public:
 		return oss.str();
 	}
 
+	inline Point2 transformUV(const Point2 &_uv) const {
+		Point2 uv(_uv);
+		uv.x *= m_uvScale.x;
+		uv.y *= m_uvScale.y;
+		uv.x = uv.x - math::floorToInt(uv.x);
+		uv.y = uv.y - math::floorToInt(uv.y);
+		return uv;
+	}
+
 	Float getRoughness(const Intersection &its, int component) const {
 		return m_bsdf->getRoughness(its, component);
 	}
@@ -515,9 +582,15 @@ public:
 	MTS_DECLARE_CLASS()
 public:
 	ref<Bitmap> m_angularScales;
+	ref<Bitmap> m_spatialScales;
 	ref<BSDF> m_bsdf;
 	std::string m_angularScaleFilename;
+	std::string m_spatialScaleFilename;
 	Vector2i m_lobeSize;
+	
+	Vector2i m_xyResolution;
+	Vector2 m_uvScale;
+
 	int m_wiResolution;
 	int m_woResolution;
 	
