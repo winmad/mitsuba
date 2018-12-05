@@ -126,7 +126,10 @@ public:
 		Point2 uv = transformUV(bRec.its.uv);
 		int xIdx = math::floorToInt(uv.x * m_xyResolution.x);
 		int yIdx = math::floorToInt(uv.y * m_xyResolution.y);
+
+		Spectrum res = m_spatialScales->getPixel(Point2i(xIdx, yIdx));
 		
+		/*
 		Spectrum res(0.f);
 		for (int dy = 0; dy < 2; dy++) {
 			Float wv = std::abs(1.0 - dy - uv.y);
@@ -137,6 +140,7 @@ public:
 				res += tmpValue * wu * wv;
 			}
 		}
+		*/
 		return res;
 	}
 

@@ -41,6 +41,10 @@ public:
 			m_distGiTexelScale = std::atof(argv[16]);
 
 		ParameterMap params;
+		if (argc > 17) {
+			params["angular"] = argv[17];
+			params["spatial"] = argv[18];
+		}
 		/*
 		if (argc > 16) {
 			params["ssR"] = argv[16];

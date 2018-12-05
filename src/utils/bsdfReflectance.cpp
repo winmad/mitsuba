@@ -32,32 +32,25 @@ public:
 		m_maskingOption = std::atoi(argv[10]);
 
 		// for GI neighborhood
-		m_extendRange.x = std::atof(argv[11]);
-		m_extendRange.y = std::atof(argv[12]);
+		m_blockExtendRange.x = std::atof(argv[11]);
+		m_blockExtendRange.y = std::atof(argv[12]);
+		m_distGiTexelScale = std::atof(argv[13]);
 
 		// spatially-varying blocks
-		m_size.x = std::atoi(argv[13]);
-		m_size.y = std::atoi(argv[14]);
-		m_blockNums.x = std::atoi(argv[15]);
-		m_blockNums.y = std::atoi(argv[16]);
-		m_stIdx = std::atoi(argv[17]);
-		m_edIdx = std::atoi(argv[18]);
+		m_size.x = std::atoi(argv[14]);
+		m_size.y = std::atoi(argv[15]);
+		m_xyReso.x = std::atoi(argv[16]);
+		m_xyReso.y = std::atoi(argv[17]);
+		m_stIdx = std::atoi(argv[18]);
+		m_edIdx = std::atoi(argv[19]);
+
+		m_outputPrefix = std::string(argv[20]);
 
  		ParameterMap params;
-// 		if (argc > 15) {
-// 			params["ssR"] = argv[15];
-// 			params["ssG"] = argv[16];
-// 			params["ssB"] = argv[17];
-// 		}
-// 		if (argc > 18) {
-// 			params["giR"] = argv[18];
-// 			params["giG"] = argv[19];
-// 			params["giB"] = argv[20];
-// 		}
-// 		if (argc > 21)
-// 			params["ssExp"] = argv[21];
-// 		if (argc > 22)
-// 			params["giExp"] = argv[22];
+		if (argc > 21) {
+			params["angular"] = argv[21];
+			params["spatial"] = argv[22];
+		}
 		m_scene = loadScene(argv[1], params);
 		
 		// init
@@ -76,21 +69,21 @@ public:
 			m_samplers[i] = m_samplers[0]->clone();
 		}
 
-		m_rhoSingle.resize(m_blockNums.y);
-		m_rhoAll.resize(m_blockNums.y);
-		for (int i = 0; i < m_blockNums.y; i++) {
-			m_rhoSingle[i].resize(m_blockNums.x, Spectrum(0.0));
-			m_rhoAll[i].resize(m_blockNums.x, Spectrum(0.0));
+		m_rhoSingle.resize(m_xyReso.y);
+		m_rhoAll.resize(m_xyReso.y);
+		for (int i = 0; i < m_xyReso.y; i++) {
+			m_rhoSingle[i].resize(m_xyReso.x, Spectrum(0.0));
+			m_rhoAll[i].resize(m_xyReso.x, Spectrum(0.0));
 		}
 
-		Float xstep = (m_xmax - m_xmin) / m_blockNums.x;
-		Float ystep = (m_ymax - m_ymin) / m_blockNums.y;
+		Float xstep = (m_xmax - m_xmin) / m_xyReso.x;
+		Float ystep = (m_ymax - m_ymin) / m_xyReso.y;
 
 #pragma omp parallel for
-		for (int r = 0; r < m_blockNums.y; r++) {
+		for (int r = 0; r < m_xyReso.y; r++) {
 			ref<Sampler> sampler = m_samplers[Thread::getID() % 233];
-			for (int c = 0; c < m_blockNums.x; c++) {
-				int blockIdx = r * m_blockNums.x + c;
+			for (int c = 0; c < m_xyReso.x; c++) {
+				int blockIdx = r * m_xyReso.x + c;
 				if (blockIdx < m_stIdx || blockIdx >= m_edIdx)
 					continue;
 
@@ -98,15 +91,19 @@ public:
 
 				AABB2 aabb(Point2(m_xmin + c * xstep, m_ymin + r * ystep),
 					Point2(m_xmin + (c + 1) * xstep, m_ymax + (r + 1) * ystep));
-				AABB2 aabbLimit(aabb);
-				aabbLimit.min -= m_extendRange;
-				aabbLimit.max += m_extendRange;
+				AABB2 aabbBlock(aabb);
+				aabbBlock.min -= m_blockExtendRange;
+				aabbBlock.max += m_blockExtendRange;
+
+				Vector2 distGiRange;
+				distGiRange.x = (aabbBlock.max.x - aabbBlock.min.x) * m_distGiTexelScale;
+				distGiRange.y = (aabbBlock.max.y - aabbBlock.min.y) * m_distGiTexelScale;
 
 				// estimate meso-normal
 				Vector nMeso(0.0);
 				Vector2i spcnt;
-				spcnt.x = math::clamp(m_size.x / m_blockNums.x, 16, 128);
-				spcnt.y = math::clamp(m_size.y / m_blockNums.y, 16, 128);
+				spcnt.x = math::clamp(m_size.x / m_xyReso.x, 16, 128);
+				spcnt.y = math::clamp(m_size.y / m_xyReso.y, 16, 128);
 
 				for (int i = 0; i < spcnt.y; i++) {
 					for (int j = 0; j < spcnt.x; j++) {
@@ -146,14 +143,17 @@ public:
 						RadianceQueryRecord rRec(m_scene, sampler);
 						rRec.type = RadianceQueryRecord::ERadiance;
 						Intersection its;
-						Spectrum throughput = sampleReflectance(aabbLimit, ray, rRec, its);
+
+						AABB2 giRangeAABB(Point2(ray.o.x - distGiRange.x, ray.o.y - distGiRange.y),
+							Point2(ray.o.x + distGiRange.x, ray.o.y + distGiRange.y));
+						Spectrum throughput = sampleReflectance(giRangeAABB, ray, rRec, its);
 
 						if (ray.d.z < 0)
 							continue;
 
 						if (!throughput.isZero()) {
 							if (m_shadowOption == 1) {
-								if (its.isValid() && aabbLimit.contains(Point2(its.p.x, its.p.y)))
+								if (its.isValid() && aabbBlock.contains(Point2(its.p.x, its.p.y)))
 									throughput = Spectrum(0.f);
 							} else if (m_shadowOption == 2) {
 								if (its.isValid())
@@ -172,19 +172,22 @@ public:
 			}
 		}
 
+		Log(EInfo, "Finish rendering.");
+
 		// output reflectance map
 		char filename[256];
-		sprintf(filename, "%s_rho_order_%d.exr", argv[19], m_minDepth);
+		sprintf(filename, "%s_order_%d.exr", m_outputPrefix.c_str(), m_minDepth);
 		outputReflectanceMap(m_rhoSingle, filename);
 		
-		sprintf(filename, "%s_rho_order_all.exr", argv[19]);
+		sprintf(filename, "%s_order_all.exr", m_outputPrefix.c_str());
 		outputReflectanceMap(m_rhoAll, filename);
 
 		//validate();
 		return 0;
 	}
 
-	Spectrum sampleReflectance(AABB2 &aabbLimit, RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts) {
+	Spectrum sampleReflectance(const AABB2 &giRangeAABB, 
+		RayDifferential &ray, RadianceQueryRecord &rRec, Intersection &getIts) {
 		const Scene *scene = rRec.scene;
 		Intersection &its = rRec.its;
 		MediumSamplingRecord mRec;
@@ -216,7 +219,7 @@ public:
 				if (rRec.medium)
 					throughput *= mRec.transmittance / mRec.pdfFailure;
 
-				if (!its.isValid() || !aabbLimit.contains(Point2(its.p.x, its.p.y)) ||
+				if (!its.isValid() || !giRangeAABB.contains(Point2(its.p.x, its.p.y)) ||
 					rRec.depth == m_maxDepth) {
 // 				if (rRec.depth == 0)
 // 					Log(EInfo, "%d, (%.6f, %.6f, %.6f), %d", rRec.depth, its.p.x, its.p.y, its.p.z,
@@ -353,10 +356,10 @@ public:
 	}
 
 	void outputReflectanceMap(std::vector<std::vector<Spectrum> > &rho, char *filename) const {
-		ref<Bitmap> bitmap = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat32, m_blockNums);
+		ref<Bitmap> bitmap = new Bitmap(Bitmap::ESpectrum, Bitmap::EFloat32, m_xyReso);
 		float *data = bitmap->getFloat32Data();
-		for (int r = 0; r < m_blockNums.y; r++) {
-			for (int c = 0; c < m_blockNums.x; c++) {
+		for (int r = 0; r < m_xyReso.y; r++) {
+			for (int c = 0; c < m_xyReso.x; c++) {
 				*data++ = rho[r][c][0];
 				*data++ = rho[r][c][1];
 				*data++ = rho[r][c][2];
@@ -367,6 +370,7 @@ public:
 	}
 
 	ref<Scene> m_scene;
+	std::string m_outputPrefix;
 	ref_vector<Sampler> m_samplers;
 	int m_sqrtSpp, m_spp;
 	int m_minDepth;
@@ -376,10 +380,12 @@ public:
 	
 	// 1: local, 2: global
 	int m_shadowOption, m_maskingOption;
-	Vector2 m_extendRange;
+	
+	Vector2 m_blockExtendRange;
+	Float m_distGiTexelScale;
 
 	Vector2i m_size;
-	Vector2i m_blockNums;
+	Vector2i m_xyReso;
 	int m_stIdx, m_edIdx;
 
 	std::vector<std::vector<Spectrum> > m_rhoSingle, m_rhoAll;
