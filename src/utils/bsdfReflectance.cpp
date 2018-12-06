@@ -52,6 +52,8 @@ public:
 			params["spatial"] = argv[22];
 		}
 		m_scene = loadScene(argv[1], params);
+
+		Log(EInfo, "Start working");
 		
 		// init
 		m_aabb = AABB2(Point2(m_xmin, m_ymin), Point2(m_xmax, m_ymax));
@@ -90,7 +92,7 @@ public:
 				Log(EInfo, "working on block (%d, %d)", c, r);
 
 				AABB2 aabb(Point2(m_xmin + c * xstep, m_ymin + r * ystep),
-					Point2(m_xmin + (c + 1) * xstep, m_ymax + (r + 1) * ystep));
+					Point2(m_xmin + (c + 1) * xstep, m_ymin + (r + 1) * ystep));
 				AABB2 aabbBlock(aabb);
 				aabbBlock.min -= m_blockExtendRange;
 				aabbBlock.max += m_blockExtendRange;
@@ -107,8 +109,8 @@ public:
 
 				for (int i = 0; i < spcnt.y; i++) {
 					for (int j = 0; j < spcnt.x; j++) {
-						Float x = aabb.min.x + (j + sampler->next1D()) / spcnt.x * (aabb.max.x - aabb.min.x);
-						Float y = aabb.min.y + (i + sampler->next1D()) / spcnt.y * (aabb.max.y - aabb.min.y);
+						Float x = aabbBlock.min.x + (j + sampler->next1D()) / spcnt.x * (aabbBlock.max.x - aabbBlock.min.x);
+						Float y = aabbBlock.min.y + (i + sampler->next1D()) / spcnt.y * (aabbBlock.max.y - aabbBlock.min.y);
 						Point o(x, y, 1e2);
 						Ray ray(o, Vector(0, 0, -1.0), 0);
 						Intersection its;
@@ -127,7 +129,7 @@ public:
 					for (int j = 0; j < m_sqrtSpp; j++) {
 						// uniformly sample position, sample wi by cos(wi)/pi
 						Float w;
-						RayDifferential ray = samplePathStart(i, j, aabb, sampler, w);
+						RayDifferential ray = samplePathStart(i, j, aabbBlock, sampler, w);
 
 						if (w < 1e-5) {
 							// masked
