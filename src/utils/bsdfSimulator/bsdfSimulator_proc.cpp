@@ -61,6 +61,8 @@ void BSDFRayTracer::process(const WorkUnit *workUnit, WorkResult *workResult, co
 			continue;
 		}
 
+		//Log(EInfo, "weight = %.6f", weight);
+
 		RayDifferential ray(o, -m_wi, 0);
 		RadianceQueryRecord rRec(m_scene, m_sampler);
 		rRec.type = RadianceQueryRecord::ERadiance;
