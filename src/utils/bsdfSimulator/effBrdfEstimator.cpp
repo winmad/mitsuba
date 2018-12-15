@@ -115,7 +115,10 @@ public:
 				res /= totArea;
 			}
 
-			results.push_back(res);
+			if (std::isfinite(res[0]) && std::isfinite(res[1]) && std::isfinite(res[2]))
+				results.push_back(res);
+			else
+				results.push_back(Spectrum(0.f));
 
 // 			Log(EInfo, "Total_vis_area = %.6f", totArea / (m_sqrtSpp * m_sqrtSpp));
 // 			Log(EInfo, "Eff_BRDF_value = (%.6f, %.6f, %.6f)", res[0], res[1], res[2]);

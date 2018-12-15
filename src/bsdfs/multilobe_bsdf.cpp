@@ -480,7 +480,8 @@ public:
 // 			BSDFSamplingRecord pdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
 // 			res += alpha * m_bsdf->pdf(pdfRec);
 		}
-		res = 0.1 + std::max(res, warp::squareToCosineHemispherePdf(bRec.wo));
+		//res = 0.1 + std::max(res, warp::squareToCosineHemispherePdf(bRec.wo));
+		res = 0.01 + std::max(res, warp::squareToCosineHemispherePdf(bRec.wo));
 		return res;
 	}
 
@@ -616,7 +617,8 @@ public:
 // 			BSDFSamplingRecord pdfRec(bRec.its, nFrame.toLocal(wiMacro), nFrame.toLocal(woMacro));
 // 			pdf += alpha * m_bsdf->pdf(pdfRec);
 		}
-		pdf = 0.1 + std::max(pdf, warp::squareToCosineHemispherePdf(bRec.wo));
+		//pdf = 0.1 + std::max(pdf, warp::squareToCosineHemispherePdf(bRec.wo));
+		pdf = 0.01 + std::max(pdf, warp::squareToCosineHemispherePdf(bRec.wo));
 
 		// side check
 		if (Frame::cosTheta(bRec.wo) <= 0)
