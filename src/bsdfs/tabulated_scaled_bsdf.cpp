@@ -157,18 +157,6 @@ public:
 // 		if (woMacro.z <= 0)
 // 			return Spectrum(0.0);
 
-		/*
-		int r1Offset = 0;
-		if (wiMacro.z <= 0) {
-			return Spectrum(0.0);
-
-			if (m_wiUseFullSphere && wiMacro.z > -0.2)
-				r1Offset = m_wiResolution;
-			else
-				return Spectrum(0.0);
-		}
-		*/
-
 		int r1Offset = 0;
 		if (wiMacro.z <= 0) {
 			if (!m_wiUseFullSphere)
@@ -513,6 +501,13 @@ public:
 				return spec * scale * weight * 2.0;
 			}
 		} else {
+			// naive cosine sampling
+// 			bRec.wo = warp::squareToCosineHemisphere(sample);
+// 			bRec.sampledComponent = 0;
+// 			bRec.sampledType = EDiffuseReflection;
+// 			pdf = warp::squareToCosineHemispherePdf(bRec.wo);
+// 			return eval(bRec, ESolidAngle) / pdf;
+
 			Spectrum spec = m_bsdf->sample(bRec, pdf, sample);
 			if (spec.isZero())
 				return Spectrum(0.f);
@@ -529,6 +524,19 @@ public:
 			if (m_spatialScales != NULL) {
 				t = evalSpatialScale(bRec);
 			}
+
+// 			if (!spec.isZero() && !s.isZero()) {
+// 				Vector wiWorld = bRec.its.toWorld(bRec.wi);
+// 				Vector wiMacro = bRec.its.baseFrame.toLocal(wiWorld);
+// 				Vector woWorld = bRec.its.toWorld(bRec.wo);
+// 				Vector woMacro = bRec.its.baseFrame.toLocal(woWorld);
+// 				Log(EInfo, "======================");
+// 				Log(EInfo, "wiMacro = (%.6f, %.6f, %.6f)", wiMacro.x, wiMacro.y, wiMacro.z);
+// 				Log(EInfo, "woMacro = (%.6f, %.6f, %.6f)", woMacro.x, woMacro.y, woMacro.z);
+// 				Log(EInfo, "bsdfWeight = (%.6f, %.6f, %.6f)", spec[0], spec[1], spec[2]);
+// 				Log(EInfo, "S = (%.6f, %.6f, %.6f)", s[0], s[1], s[2]);
+// 				Log(EInfo, "pdf = %.6f", pdf);
+// 			}
 
 			return spec * s * t;
 		}
