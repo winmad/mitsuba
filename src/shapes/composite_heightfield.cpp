@@ -47,6 +47,7 @@ namespace {
 	};
 };
 
+// Note: any tiled sub-block must be fully in a single texel of the base height map
 class CompositeHeightfield : public Shape {
 public:
 	CompositeHeightfield(const Properties &props) : Shape(props), m_data(NULL), m_normals(NULL), m_minmax(NULL),
@@ -136,12 +137,13 @@ public:
 	}
 
 	inline void getBaseHeightsAtPatchCorners(Float blockX, Float blockY, int x, int y,
-		Float &bf00, Float &bf01, Float &bf10, Float &bf11) const {
-		Float u = (Float)(blockX * m_dataSize.x + x) / (m_dataSize.x * m_tileX);
-		Float v = (Float)(blockY * m_dataSize.y + y) / (m_dataSize.y * m_tileY);
+			Float &bf00, Float &bf01, Float &bf10, Float &bf11) const {
+		Vector2 blockSize(1.f, 1.f);
+		Float stepU = blockSize.x / (m_dataSize.x * m_tileX);
+		Float stepV = blockSize.y / (m_dataSize.y * m_tileY);
 
-		Float stepU = 1.0 / (m_dataSize.x * m_tileX);
-		Float stepV = 1.0 / (m_dataSize.y * m_tileY);
+		Float u = (Float)(blockX * m_dataSize.x + x * blockSize.x) / (m_dataSize.x * m_tileX);
+		Float v = (Float)(blockY * m_dataSize.y + y * blockSize.y) / (m_dataSize.y * m_tileY);
 		
 		int xBase = math::clamp(math::floorToInt(u * m_baseDataSize.x), 0, m_baseDataSize.x - 1);
 		int yBase = math::clamp(math::floorToInt(v * m_baseDataSize.y), 0, m_baseDataSize.y - 1);
@@ -149,7 +151,8 @@ public:
 		Float cornerVals[2][2];
 		for (int dy = 0; dy < 2; dy++) {
 			for (int dx = 0; dx < 2; dx++) {
-				cornerVals[dy][dx] = m_baseData[(yBase + dy) * m_baseDataSize.x + (xBase + dx)];
+				cornerVals[dy][dx] = m_baseData[((yBase + dy) % m_baseDataSize.y) * m_baseDataSize.x + 
+												((xBase + dx) % m_baseDataSize.x)];
 			}
 		}
 
@@ -167,10 +170,52 @@ public:
 			}
 		}
 
+// 		Log(EInfo, "====================");
+// 		Log(EInfo, "blockX = %.1f, blockY = %.1f, x = %d, y = %d", blockX, blockY, x, y);
+// 		Log(EInfo, "tileX = %d, tileY = %d", m_tileX, m_tileY);
+// 		Log(EInfo, "u = %.6f, v = %.6f", u, v);
+// 		Log(EInfo, "xBase = %d, yBase = %d", xBase, yBase);
+// 		Log(EInfo, "h00 = %.3f, h01 = %.3f, h10 = %.3f, h11 = %.3f", cornerVals[0][0], cornerVals[1][0],
+// 			cornerVals[0][1], cornerVals[1][1]);
+// 		Log(EInfo, "bh00 = %.3f, bh01 = %.3f, bh10 = %.3f, bh11 = %.3f", res[0][0], res[1][0],
+// 			res[0][1], res[1][1]);
+
 		bf00 = res[0][0];
 		bf10 = res[0][1];
 		bf01 = res[1][0];
 		bf11 = res[1][1];
+	}
+
+	inline Interval getIntervalOfBaseHeightfield(Float blockX, Float blockY, int level, int x, int y) const {
+		const Vector2& blockSize = m_blockSizeF[level];
+
+		Float u = (Float)(blockX * m_dataSize.x + x * blockSize.x) / (m_dataSize.x * m_tileX);
+		Float v = (Float)(blockY * m_dataSize.y + y * blockSize.y) / (m_dataSize.y * m_tileY);
+
+		int xBase = math::clamp(math::floorToInt(u * m_baseDataSize.x), 0, m_baseDataSize.x - 1);
+		int yBase = math::clamp(math::floorToInt(v * m_baseDataSize.y), 0, m_baseDataSize.y - 1);
+		
+		Vector2 baseBlockSize;
+		baseBlockSize.x = blockSize.x / (m_dataSize.x * m_tileX) * m_baseDataSize.x;
+		baseBlockSize.y = blockSize.y / (m_dataSize.y * m_tileY) * m_baseDataSize.y;
+
+		int baseLevel = math::clamp(1 + (int)std::max(math::log2(baseBlockSize.x), 
+			math::log2(baseBlockSize.y)), 0, m_baseLevelCount - 1);
+		int c = math::floorToInt((Float)xBase / m_baseBlockSizeF[baseLevel].x);
+		int r = math::floorToInt((Float)yBase / m_baseBlockSizeF[baseLevel].y);
+
+// 		Log(EInfo, "====================");
+// 		Log(EInfo, "level = %d, blockSize = (%.1f, %.1f)", level, blockSize.x, blockSize.y);
+// 		Log(EInfo, "blockX = %.1f, blockY = %.1f, x = %d, y = %d", blockX, blockY, x, y);
+// 		Log(EInfo, "tileX = %d, tileY = %d", m_tileX, m_tileY);
+// 		Log(EInfo, "u = %.6f, v = %.6f", u, v);
+// 		Log(EInfo, "xBase = %d, yBase = %d", xBase, yBase);
+// 		Log(EInfo, "baseBlockSize = (%.1f, %.1f), baseLevel = %d", baseBlockSize.x, baseBlockSize.y, baseLevel);
+// 		Log(EInfo, "baseLevelSize = (%d, %d)", m_baseLevelSize[baseLevel].x, m_baseLevelSize[baseLevel].y);
+// 		Log(EInfo, "baseMinmax xy = (%d, %d)", c, r);
+
+		Interval res = m_baseMinmax[baseLevel][r * m_baseLevelSize[baseLevel].x + c];	
+		return res;
 	}
 
 	bool rayIntersectLocal(const Ray &_ray, Float mint, Float maxt, Float &t,
@@ -237,9 +282,12 @@ public:
 			Interval interval = m_minmax[entry.level][
 				entry.x + entry.y * m_levelSize[entry.level].x];
 
-			// TO BE IMPROVED: very conservative bound
-			interval.min += m_baseMinmax[m_baseLevelCount - 1][0].min; 
-			interval.max += m_baseMinmax[m_baseLevelCount - 1][0].max;
+			// TO BE IMPROVED: very conservative bound!
+			Interval baseInterval = getIntervalOfBaseHeightfield(blockX, blockY, entry.level, entry.x, entry.y);
+			//Interval baseInterval = m_baseMinmax[m_baseLevelCount - 1][0];
+			interval.min += baseInterval.min; 
+			interval.max += baseInterval.max;
+			// DONE
 
 			const Vector2 &blockSize = m_blockSizeF[entry.level];
 			AABB aabb(
@@ -300,7 +348,7 @@ public:
 					f01 = m_data[((entry.y + 1) % m_dataSize.y) * m_dataSize.x + entry.x],
 					f10 = m_data[entry.y * m_dataSize.x + (entry.x + 1) % m_dataSize.x],
 					f11 = m_data[((entry.y + 1) % m_dataSize.y) * m_dataSize.x + (entry.x + 1) % m_dataSize.x];
-
+				
 				Float bf00, bf01, bf10, bf11;
 				getBaseHeightsAtPatchCorners(blockX, blockY, entry.x, entry.y,
 					bf00, bf01, bf10, bf11);
@@ -308,7 +356,7 @@ public:
 				f01 += bf01;
 				f10 += bf10;
 				f11 += bf11;
-
+				
 				Float A = ray.d.x * ray.d.y * (f00 - f01 - f10 + f11);
 				Float B = ray.d.y * (f01 - f00 + enterPt.x * (f00 - f01 - f10 + f11))
 					+ ray.d.x * (f10 - f00 + enterPt.y * (f00 - f01 - f10 + f11))
@@ -360,7 +408,7 @@ public:
 			f01 = m_data[((y + 1) % m_dataSize.y) * width + x],
 			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
 			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
-
+		
 		Float bf00, bf01, bf10, bf11;
 		getBaseHeightsAtPatchCorners(temp.blockX, temp.blockY, temp.x, temp.y,
 			bf00, bf01, bf10, bf11);
@@ -368,7 +416,7 @@ public:
 		f01 += bf01;
 		f10 += bf10;
 		f11 += bf11;
-
+		
 		Point pLocal(temp.p.x + temp.x + temp.blockX * m_dataSize.x,
 			temp.p.y + temp.y + temp.blockY * m_dataSize.y, temp.p.z);
 
@@ -818,66 +866,7 @@ public:
 	}
 
 	ref<TriMesh> createTriMesh() {
-		Vector2i size = m_dataSize;
-
-		/* Limit the size of the mesh */
-		while (size.x > 2048 && size.y > 2048) {
-			size.x = std::max(size.x / 2, 2);
-			size.y = std::max(size.y / 2, 2);
-		}
-
-		size_t numTris = 2 * (size_t)size.x * (size_t)size.y;
-		size_t numVertices = (size_t)(size.x + 1) * (size_t)(size.y + 1);
-
-		ref<TriMesh> mesh = new TriMesh("Height field approximation",
-			numTris, numVertices, false, true, false, false, !m_shadingNormals);
-
-		Point *vertices = mesh->getVertexPositions();
-		Point2 *texcoords = mesh->getVertexTexcoords();
-		Triangle *triangles = mesh->getTriangles();
-
-		Float dx = (Float)1 / size.x;
-		Float dy = (Float)1 / size.y;
-		Float scaleX = (Float)m_dataSize.x / size.x;
-		Float scaleY = (Float)m_dataSize.y / size.y;
-
-		uint32_t vertexIdx = 0;
-		for (int y = 0; y <= size.y; ++y) {
-			int py = std::min((int)(scaleY * y), m_dataSize.y);
-			for (int x = 0; x <= size.x; ++x) {
-				int px = std::min((int)(scaleX * x), m_dataSize.x);
-				texcoords[vertexIdx] = Point2(x*dx, y*dy);
-				vertices[vertexIdx++] = m_objectToWorld(Point((Float)px, (Float)py,
-					m_data[px % m_dataSize.x + (py % m_dataSize.y) * m_dataSize.x]));
-			}
-		}
-		Assert(vertexIdx == numVertices);
-
-		uint32_t width = size.x + 1;
-		uint32_t triangleIdx = 0;
-		for (int y = 1; y <= size.y; ++y) {
-			for (int x = 0; x <= size.x - 1; ++x) {
-				uint32_t nextx = x + 1;
-				uint32_t idx0 = width * y + x;
-				uint32_t idx1 = width * y + nextx;
-				uint32_t idx2 = width * (y - 1) + x;
-				uint32_t idx3 = width * (y - 1) + nextx;
-
-				triangles[triangleIdx].idx[0] = idx0;
-				triangles[triangleIdx].idx[1] = idx2;
-				triangles[triangleIdx].idx[2] = idx1;
-				triangleIdx++;
-				triangles[triangleIdx].idx[0] = idx1;
-				triangles[triangleIdx].idx[1] = idx2;
-				triangles[triangleIdx].idx[2] = idx3;
-				triangleIdx++;
-			}
-		}
-		Assert(triangleIdx == numTris);
-		mesh->copyAttachments(this);
-		mesh->configure();
-
-		return mesh.get();
+		NotImplementedError("CompositeHeightfield::createTriMesh");
 	}
 
 	Float getHeight(const Point &_p) const {
@@ -901,6 +890,14 @@ public:
 			f01 = m_data[((y + 1) % m_dataSize.y) * width + x],
 			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
 			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
+
+		Float bf00, bf01, bf10, bf11;
+		getBaseHeightsAtPatchCorners(blockX, blockY, x, y,
+			bf00, bf01, bf10, bf11);
+		f00 += bf00;
+		f01 += bf01;
+		f10 += bf10;
+		f11 += bf11;
 
 		//Log(EInfo, "%.6f, %.6f, %.6f, %.6f", f00, f01, f10, f11);
 
@@ -926,6 +923,14 @@ public:
 			f01 = m_data[((y + 1) % m_dataSize.y) * width + x],
 			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
 			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
+
+		Float bf00, bf01, bf10, bf11;
+		getBaseHeightsAtPatchCorners(blockX, blockY, x, y,
+			bf00, bf01, bf10, bf11);
+		f00 += bf00;
+		f01 += bf01;
+		f10 += bf10;
+		f11 += bf11;
 
 		Normal normal = m_objectToWorld(
 			Normal(f00 - f10 + (f01 + f10 - f00 - f11)*v,
@@ -959,6 +964,14 @@ public:
 			f01 = m_data[((y + 1) % m_dataSize.y) * width + x],
 			f10 = m_data[y     * width + (x + 1) % m_dataSize.x],
 			f11 = m_data[((y + 1) % m_dataSize.y) * width + (x + 1) % m_dataSize.x];
+
+		Float bf00, bf01, bf10, bf11;
+		getBaseHeightsAtPatchCorners(blockX, blockY, x, y,
+			bf00, bf01, bf10, bf11);
+		f00 += bf00;
+		f01 += bf01;
+		f10 += bf10;
+		f11 += bf11;
 
 		p.z = (1.0f - u) * (1.0f - v) * f00 + (1.0f - u) * v * f01 +
 			u * (1.0f - v) * f10 + u * v * f11;
