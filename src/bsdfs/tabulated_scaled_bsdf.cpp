@@ -20,6 +20,7 @@ public:
 	TabulatedScaledBSDF(const Properties &props) : BSDF(props) {
 		m_angularScaleFilename = props.getString("angularScaleFilename", "");
 		m_spatialScaleFilename = props.getString("spatialScaleFilename", "");
+		m_spatialInterp = props.getString("spatialInterp", "nearest");
 		m_useMIS = props.getBoolean("useMIS", false);
 
 		m_wiUseFullSphere = props.getBoolean("wiUseFullSphere", false);
@@ -124,24 +125,38 @@ public:
 
 	Spectrum evalSpatialScale(const BSDFSamplingRecord &bRec) const {
 		Point2 uv = transformUV(bRec.its.uv);
-		int xIdx = math::floorToInt(uv.x * m_xyResolution.x);
-		int yIdx = math::floorToInt(uv.y * m_xyResolution.y);
-
-		Spectrum res = m_spatialScales->getPixel(Point2i(xIdx, yIdx));
 		
-		/*
-		Spectrum res(0.f);
-		for (int dy = 0; dy < 2; dy++) {
-			Float wv = std::abs(1.0 - dy - uv.y);
-			for (int dx = 0; dx < 2; dx++) {
-				Float wu = std::abs(1.0 - dx - uv.x);
+		if (m_spatialInterp == "nearest") {
+			int xIdx = math::floorToInt(uv.x * m_xyResolution.x);
+			int yIdx = math::floorToInt(uv.y * m_xyResolution.y);
+			return m_spatialScales->getPixel(Point2i(xIdx, yIdx));
+		} else if (m_spatialInterp == "bilinear") {
+			Float x = uv.x * m_xyResolution.x;
+			Float y = uv.y * m_xyResolution.y;
 
-				Spectrum tmpValue = m_spatialScales->getPixel(Point2i(xIdx + dx, yIdx + dy));
-				res += tmpValue * wu * wv;
+			// grid point at (x+0.5, y+0.5)
+			int xIdx = math::floorToInt(x + 0.5);
+			int yIdx = math::floorToInt(y + 0.5);
+
+// 			Log(EInfo, "==================");
+// 			Log(EInfo, "(x, y) = (%.6f, %.6f)", x, y);
+
+			Spectrum res(0.f);
+
+			for (int dy = -1; dy <= 0; dy++) {
+				Float wv = 1.0 - std::abs(y - (yIdx + dy + 0.5));
+				int yNow = (yIdx + m_xyResolution.y + dy) % m_xyResolution.y;
+				for (int dx = -1; dx <= 0; dx++) {
+					Float wu = 1.0 - std::abs(x - (xIdx + dx + 0.5));
+					int xNow = (xIdx + m_xyResolution.x + dx) % m_xyResolution.x;
+					Spectrum tmpValue = m_spatialScales->getPixel(Point2i(xNow, yNow));
+					res += tmpValue * wu * wv;
+
+					//Log(EInfo, "(xNow, yNow), wu, wv: (%d, %d), %.6f, %.6f", xNow, yNow, wu, wv);
+				}
 			}
-		}
-		*/
-		return res;
+			return res;
+		}		
 	}
 
 	Spectrum evalScale(const BSDFSamplingRecord &bRec) const {
@@ -598,6 +613,7 @@ public:
 	ref<BSDF> m_bsdf;
 	std::string m_angularScaleFilename;
 	std::string m_spatialScaleFilename;
+	std::string m_spatialInterp;
 	Vector2i m_lobeSize;
 	
 	Vector2i m_xyResolution;

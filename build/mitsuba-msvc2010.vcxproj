@@ -927,6 +927,7 @@
     <ClCompile Include="..\src\shapes\lod_heightfield.cpp" />
     <ClCompile Include="..\src\shapes\shellmap_heightfield.cpp" />
     <ClCompile Include="..\src\shapes\tiled_heightfield.cpp" />
+    <ClCompile Include="..\src\shapes\composite_heightfield.cpp" />
     <ClCompile Include="..\src\tests\test_spectrum.cpp">
     </ClCompile>
     <ClCompile Include="..\src\tests\test_chisquare.cpp">
