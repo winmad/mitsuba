@@ -20,6 +20,8 @@ public:
 			m_interp = 1;
 		else if (interpName == "stoc_linear")
 			m_interp = 2;
+
+		m_removeOutlierChannel = props.getInteger("removeOutlier", -1);
 	}
 
 	/// Unserialize from a binary data stream
@@ -50,6 +52,8 @@ public:
 		Film *film = sensor->getFilm();
 		film->clear();
 		m_subIntegrator->render(rScene, queue, job, sceneResID,
+			sensorResID, samplerResID);
+		m_subIntegrator->postprocess(rScene, queue, job, sceneResID,
 			sensorResID, samplerResID);
 
 		Log(EInfo, "Finish calling subIntegrator");
@@ -142,6 +146,11 @@ public:
 			// pixel footprint
 			Spectrum fval = m_footprint->getPixel(offset);
 			Float uvFootprint = fval[0];
+
+			// handle grazing angle artifact
+			//if (fval[1] >= 500)
+			//	uvFootprint = 0.0;
+
 			Float pixelChosenLevel = 0.0;
 
 			if (m_interp == 0) {
@@ -443,6 +452,93 @@ public:
 		return Spectrum(0.f);
 	}
 
+	void postprocess(const Scene *scene, RenderQueue *queue, const RenderJob *job, 
+			int sceneResID, int sensorResID, int samplerResID) {
+		if (m_removeOutlierChannel == -1) 
+			return;
+
+		ref<Scheduler> sched = Scheduler::getInstance();
+		ref<Sensor> sensor = static_cast<Sensor *>(sched->getResource(sensorResID));
+		Bitmap *bitmap = sensor->getFilm()->getImageBlock()->getBitmap();
+
+		Vector2i size = bitmap->getSize();
+		int channelCount = bitmap->getChannelCount();
+		Log(EInfo, "film image size = (%d, %d), channel_count = %d", size.x, size.y, channelCount);
+		Log(EInfo, "border size = %d", sensor->getFilm()->getImageBlock()->getBorderSize());
+		Log(EInfo, "pixel format = %d", (int)bitmap->getPixelFormat());
+		Log(EInfo, "component format = %d", (int)bitmap->getComponentFormat());
+		Log(EInfo, "bytes per pixel = %d", bitmap->getBytesPerPixel());
+		Log(EInfo, "buffer size = %d", bitmap->getBufferSize());
+
+		// double precision
+		double *img = bitmap->getFloat64Data();
+		std::vector<double> tmpVals(size.x * size.y);
+
+		int windowSize = 3;
+#pragma omp parallel for
+		for (int pixelIdx = 0; pixelIdx < size.y * size.x; pixelIdx++) {
+			int y = pixelIdx / size.x;
+			int x = pixelIdx % size.x;
+
+			Spectrum sum(0.0);
+			Spectrum sumSqr(0.0);
+			Float N = 0;
+			for (int dy = -windowSize; dy <= windowSize; dy++) {
+				if (y + dy < 0 || y + dy >= size.y)
+					continue;
+				for (int dx = -windowSize; dx <= windowSize; dx++) {
+					if (x + dx < 0 || x + dx >= size.x)
+						continue;
+
+					int newPixelIdx = (y + dy) * size.x + (x + dx);
+					Float weight = img[newPixelIdx * channelCount + channelCount - 1];
+					Float invWeight = (weight == 0) ? 0 : (Float)1 / weight;
+					Spectrum rgb;
+					for (int k = 0; k < 3; k++)
+						rgb[k] = img[newPixelIdx * channelCount + k] * invWeight;
+
+					sum += rgb;
+					for (int k = 0; k < 3; k++)
+						sumSqr[k] += rgb[k] * rgb[k];
+					N += 1.0;
+				}
+			}
+
+			Spectrum mean = sum / N;
+			Spectrum stddev(0.0);
+			for (int k = 0; k < 3; k++) {
+				Float var = (sumSqr[k] - (sum[k] * sum[k]) / N) / (N - 1);
+				stddev[k] = std::sqrt(var);
+			}
+
+			// outlier
+			Float weight = img[pixelIdx * channelCount + channelCount - 1];
+			Float invWeight = (weight == 0) ? 0 : (Float)1 / weight;
+			Spectrum rgb;
+			for (int k = 0; k < 3; k++)
+				rgb[k] = img[pixelIdx * channelCount + k] * invWeight;
+
+			if (std::abs(rgb[m_removeOutlierChannel] - mean[m_removeOutlierChannel]) >=
+				3.0 * stddev[m_removeOutlierChannel]) {
+					tmpVals[pixelIdx] = mean[m_removeOutlierChannel] * weight;
+					//img[pixelIdx * channelCount + m_removeOutlierChannel] = mean[m_removeOutlierChannel] * weight;
+			} else {
+				tmpVals[pixelIdx] = -1.0;
+			}
+
+			//Log(EInfo, "statistics at (%d, %d): mean = (%.6f, %.6f, %.6f), stddev = (%.6f, %.6f, %.6f)",
+			//	x, y, mean[0], mean[1], mean[2], stddev[0], stddev[1], stddev[2]);
+		}
+
+#pragma omp parallel for
+		for (int pixelIdx = 0; pixelIdx < size.y * size.x; pixelIdx++) {
+			if (tmpVals[pixelIdx] > 0)
+				img[pixelIdx * channelCount + m_removeOutlierChannel] = tmpVals[pixelIdx];
+		}
+
+		Log(EInfo, "finish removing outliers");
+	}
+
 	inline Float miWeight(Float pdfA, Float pdfB) const {
 		pdfA *= pdfA;
 		pdfB *= pdfB;
@@ -484,6 +580,8 @@ private:
 	
 	// 0: nearest, 1: linear, 2: stoc_linear?
 	int m_interp;
+
+	int m_removeOutlierChannel;
 };
 
 MTS_IMPLEMENT_CLASS_S(PathLodTracer, false, MonteCarloIntegrator)

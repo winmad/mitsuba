@@ -9,7 +9,9 @@ MTS_NAMESPACE_BEGIN
 class FootprintIntegrator : public SamplingIntegrator {
 public:
 	FootprintIntegrator(const Properties &props)
-		: SamplingIntegrator(props) { }
+		: SamplingIntegrator(props) {
+		m_minFilterWindowSize = props.getInteger("minFilterWindowSize", 0);
+	}
 
 	/// Unserialize from a binary data stream
 	FootprintIntegrator(Stream *stream, InstanceManager *manager)
@@ -168,10 +170,75 @@ public:
 		return oss.str();
 	}
 
+	void postprocess(const Scene *scene, RenderQueue *queue, const RenderJob *job, 
+			int sceneResID, int sensorResID, int samplerResID) {
+		if (m_minFilterWindowSize == 0) 
+			return;
+
+		ref<Scheduler> sched = Scheduler::getInstance();
+		ref<Sensor> sensor = static_cast<Sensor *>(sched->getResource(sensorResID));
+		Bitmap *bitmap = sensor->getFilm()->getImageBlock()->getBitmap();
+
+		Vector2i size = bitmap->getSize();
+		int channelCount = bitmap->getChannelCount();
+		Log(EInfo, "film image size = (%d, %d), channel_count = %d", size.x, size.y, channelCount);
+		Log(EInfo, "border size = %d", sensor->getFilm()->getImageBlock()->getBorderSize());
+		Log(EInfo, "pixel format = %d", (int)bitmap->getPixelFormat());
+		Log(EInfo, "component format = %d", (int)bitmap->getComponentFormat());
+		Log(EInfo, "bytes per pixel = %d", bitmap->getBytesPerPixel());
+		Log(EInfo, "buffer size = %d", bitmap->getBufferSize());
+
+		// double precision
+		double *img = bitmap->getFloat64Data();
+		std::vector<Spectrum> tmpVals(size.x * size.y);
+
+		int windowSize = m_minFilterWindowSize;
+#pragma omp parallel for
+		for (int pixelIdx = 0; pixelIdx < size.y * size.x; pixelIdx++) {
+			int y = pixelIdx / size.x;
+			int x = pixelIdx % size.x;
+
+			Spectrum minVal(1e20);
+			for (int dy = -windowSize; dy <= windowSize; dy++) {
+				if (y + dy < 0 || y + dy >= size.y)
+					continue;
+				for (int dx = -windowSize; dx <= windowSize; dx++) {
+					if (x + dx < 0 || x + dx >= size.x)
+						continue;
+
+					int newPixelIdx = (y + dy) * size.x + (x + dx);
+					Float weight = img[newPixelIdx * channelCount + channelCount - 1];
+					Float invWeight = (weight == 0) ? 0 : (Float)1 / weight;
+					Spectrum rgb;
+					for (int k = 0; k < 3; k++) {
+						rgb[k] = img[newPixelIdx * channelCount + k] * invWeight;
+						minVal[k] = std::min(minVal[k], rgb[k]);
+					}
+				}
+			}
+
+			Float weight = img[pixelIdx * channelCount + channelCount - 1];
+			for (int k = 0; k < 3; k++)
+				tmpVals[pixelIdx][k] = minVal[k] * weight;
+
+			//Log(EInfo, "statistics at (%d, %d): mean = (%.6f, %.6f, %.6f), stddev = (%.6f, %.6f, %.6f)",
+			//	x, y, mean[0], mean[1], mean[2], stddev[0], stddev[1], stddev[2]);
+		}
+
+#pragma omp parallel for
+		for (int pixelIdx = 0; pixelIdx < size.y * size.x; pixelIdx++) {
+			for (int k = 0; k < 3; k++)
+				img[pixelIdx * channelCount + k] = tmpVals[pixelIdx][k];
+		}
+
+		Log(EInfo, "finish min filtering");
+	}
+
 	MTS_DECLARE_CLASS()
 
 private:
 	ref<Bitmap> m_footprint;
+	int m_minFilterWindowSize;
 };
 
 MTS_IMPLEMENT_CLASS_S(FootprintIntegrator, false, SamplingIntegrator)

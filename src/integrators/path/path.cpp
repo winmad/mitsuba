@@ -315,6 +315,7 @@ public:
 
 		// double precision
 		double *img = bitmap->getFloat64Data();
+		std::vector<double> tmpVals(size.x * size.y);
 
 		int windowSize = 3;
 #pragma omp parallel for
@@ -362,11 +363,20 @@ public:
 
 			if (std::abs(rgb[m_removeOutlierChannel] - mean[m_removeOutlierChannel]) >=
 				3.0 * stddev[m_removeOutlierChannel]) {
-				img[pixelIdx * channelCount + m_removeOutlierChannel] = mean[m_removeOutlierChannel] * weight;
+				tmpVals[pixelIdx] = mean[m_removeOutlierChannel] * weight;
+				//img[pixelIdx * channelCount + m_removeOutlierChannel] = mean[m_removeOutlierChannel] * weight;
+			} else {
+				tmpVals[pixelIdx] = -1.0;
 			}
 
 			//Log(EInfo, "statistics at (%d, %d): mean = (%.6f, %.6f, %.6f), stddev = (%.6f, %.6f, %.6f)",
 			//	x, y, mean[0], mean[1], mean[2], stddev[0], stddev[1], stddev[2]);
+		}
+
+#pragma omp parallel for
+		for (int pixelIdx = 0; pixelIdx < size.y * size.x; pixelIdx++) {
+			if (tmpVals[pixelIdx] > 0)
+				img[pixelIdx * channelCount + m_removeOutlierChannel] = tmpVals[pixelIdx];
 		}
 
 		Log(EInfo, "finish removing outliers");
