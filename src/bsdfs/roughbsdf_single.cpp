@@ -13,7 +13,8 @@ class RoughBSDFSingle: public BSDF {
 public:
 	RoughBSDFSingle(const Properties &props) : BSDF(props) {
 		// avoid negative value
-		m_offset = 1e4;
+		//m_offset = 1e4;
+		m_offset = 0;
 
 		ref<FileResolver> fResolver = Thread::getThread()->getFileResolver();
 
@@ -49,7 +50,8 @@ public:
 	RoughBSDFSingle(Stream *stream, InstanceManager *manager)
 		: BSDF(stream, manager) {
 		// avoid negative value
-		m_offset = 1e4;
+		//m_offset = 1e4;
+		m_offset = 0;
 
 		m_sampleVisibility = stream->readBool();
 		m_uvScale = Vector2(stream->readFloat(), stream->readFloat());
