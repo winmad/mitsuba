@@ -59,7 +59,7 @@ public:
 		Log(EInfo, "Finish calling subIntegrator");
 
 		m_footprint = new Bitmap(Bitmap::ERGB, Bitmap::EFloat32, film->getCropSize());
-		film->develop(Point2i(0, 0), film->getSize(), Point2i(0, 0), m_footprint);
+		film->develop(Point2i(0, 0), film->getCropSize(), Point2i(0, 0), m_footprint);
 
 		float *data = m_footprint->getFloat32Data();
 		Vector2i filmSize = film->getCropSize();
