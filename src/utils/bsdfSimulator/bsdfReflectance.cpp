@@ -169,8 +169,10 @@ public:
 						rhoAll += throughput * w;
 					}
 				}
-				rhoSingle /= m_spp;
-				rhoAll /= m_spp;
+
+				// normalize by 1/PI
+				rhoSingle /= m_spp * M_PI;
+				rhoAll /= m_spp * M_PI;
 			}
 		}
 

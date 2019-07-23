@@ -82,24 +82,45 @@ public:
 				}
 
 				normals[i][j] /= m_normal_stLim;
+
+				if (std::abs(normals[i][j].length() - 1.0) > 1e-4)
+					Log(EInfo, "error! length = %.3f", normals[i][j].length());
 			}
 		}
 		Log(EInfo, "Finish binning.");
 	
+		Vector2 mesoSlope(0.0);
 		Normal avgNormal(0.0);
 		double totWeight = 0.0f;
+		double visProjArea = 0.0;
 		for (int i = 0; i < m_sqrtSpp; i++) {
 			for (int j = 0; j < m_sqrtSpp; j++) {
 				if (weights[i][j] > 0) {
 					avgNormal += normals[i][j] / normals[i][j].z;
 					totWeight += weights[i][j] / normals[i][j].z;
 				}
+
+				double sx = -normals[i][j].x / normals[i][j].z;
+				double sy = -normals[i][j].y / normals[i][j].z;
+				mesoSlope.x += sx;
+				mesoSlope.y += sy;
+				//Log(EInfo, "s = (%.3f, %.3f)", sx, sy);
+
+				visProjArea += dot(normals[i][j], m_wi) / normals[i][j].z;
 			}
 		}
 		avgNormal /= (double)m_spp;
 		totWeight /= (double)m_spp;	
 		Log(EInfo, "Avg normal = (%.6f, %.6f, %.6f)", avgNormal.x, avgNormal.y, avgNormal.z);
 		Log(EInfo, "Validation: %.8f should equal to %.8f", totWeight, dot(avgNormal, m_wi));
+
+		mesoSlope /= (double)m_spp;
+		Log(EInfo, "meso slope = (%.3f, %.3f)", mesoSlope.x, mesoSlope.y);
+		Vector mesoNormal(-mesoSlope.x, -mesoSlope.y, 1.0);
+		mesoNormal = normalize(mesoNormal);
+		visProjArea /= (double)m_spp;
+		Log(EInfo, "Meso normal = (%.6f, %.6f, %.6f)", mesoNormal.x, mesoNormal.y, mesoNormal.z);
+		Log(EInfo, "Vis proj area = %.8f / %.8f", dot(mesoNormal, m_wi) / mesoNormal.z, visProjArea);
 
 		double normFactor = (double)(m_size * m_size) / (2 * M_PI * m_spp);
 		double dp = 2 * M_PI / (double)(m_size * m_size);
@@ -247,8 +268,9 @@ public:
 // 		Point o(x, y, 0);
 // 		return m_hmap->getNormal(o);
 
-		Point o(x, y, 1e2);
-		Ray ray(o, Vector(0, 0, -1.0f), 0);
+		//Point o(x, y, 1e2);
+		Point o(x, y, 20.0);
+		Ray ray(o, Vector(0, 0, -1.0), 0);
 		Intersection its;
 		m_scene->rayIntersect(ray, its);
 
@@ -259,9 +281,12 @@ public:
 // 		}
 		
 		Normal binNormal = getBinNormal(normal);
+		//Normal binNormal = normal;
 		weight = std::max(0.0, dot(binNormal, m_wi));
+
 		if (weight > 0.0) {
-			ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
+			//ray = Ray(its.p + m_wi * ShadowEpsilon, m_wi, 0);
+			ray = Ray(its.p + m_wi * 1e-3, m_wi, 0);
 			if (m_maskingOption == 1) {
 				m_scene->rayIntersect(ray, its);
 				if (its.isValid() && m_aabb.contains(Point2(its.p.x, its.p.y))) {

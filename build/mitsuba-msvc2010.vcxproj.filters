@@ -1259,9 +1259,6 @@
     <ClCompile Include="..\src\bsdfs\multilobe_micro_bsdf.cpp">
       <Filter>Source Files\bsdfs</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\utils\bsdfReflectance.cpp">
-      <Filter>Source Files\utils</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\shapes\cube.cpp">
       <Filter>Source Files\shapes</Filter>
     </ClCompile>
@@ -1315,6 +1312,12 @@
     </ClCompile>
     <ClCompile Include="..\src\shapes\composite_heightfield.cpp">
       <Filter>Source Files\shapes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\shapes\composite_heightfield.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\bsdfSimulator\bsdfReflectance.cpp">
+      <Filter>Source Files\utils\bsdfSimulator</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup Label="Header Files">
